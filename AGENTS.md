@@ -140,3 +140,13 @@ This section exists because of a recurring pattern across this project: work get
 - Evidence over assertion: command output, screenshots, benchmarks — not "it should work now."
 - Explicit pass/fail against the phase's stated acceptance criteria.
 - Flag any deviation from this plan immediately rather than silently improvising — especially if Phase 0 findings suggest the theme system or audio engine is structured differently than assumed here.
+
+## Git Commit Discipline (standing practice, mandatory)
+
+This project has repeatedly lost the ability to diff against "last known good" because 15+ build rounds accumulated 172 uncommitted changes (the entire package rename + UI overhaul was a single giant working-tree delta with no intermediate history). That is a standing risk for every fix, not a one-off. Going forward:
+
+1. **Commit after every device-confirmed fix.** Only commit a change once Hery's device testing confirms it works. Do NOT commit unverified guesses as if they were stable — an unverified change is not a completed unit of work.
+2. **Every commit = a real rollback point.** If the working tree is so large that a single fix cannot be isolated, first commit the current known state as an explicit checkpoint with a `checkpoint: known-broken/known-working` message (state clearly which), then commit the fix on top once confirmed. A clean diff trail beats a clean git log.
+3. **Before any regression investigation, `git diff` against the last checkpoint.** The recurring node-text bug (overflow → fixed → single-char wrap) was only diagnosable once a baseline existed. Never investigate a regression from memory; always diff against the commit graph.
+4. **Never commit scratch.** `WIP/`, `*.diff` scratch files, and throwaway artifacts stay out of git (`.gitignore` already covers WIP/). This is the file-hygiene rule from the universal protocol, applied to git.
+5. **Verify the working tree is clean before closing a round.** `git status --short` empty (or only intentional staging) is part of the evidence, not a nicety.

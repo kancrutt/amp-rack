@@ -22,6 +22,7 @@ public:
 
     std::string LIBRARY_PATH ;
     Engine() ;
+    ~Engine() ;
     std::string tuneLatency();
     static JavaVM * vm ;
     static JNIEnv * env ;
@@ -32,6 +33,14 @@ public:
     static std::string mainActivityClassName ;
     bool              mIsEffectOn = false;
     bool setPluginBuffer (float * buffer, int buffer_size, int plugin) ;
+    bool setPluginBufferStereo (float * buffer_left, int buffer_size_left, float * buffer_right, int buffer_size_right, int plugin) ;
+    void setRoutingMode(int mode);
+    int getRoutingMode();
+    std::vector<ggsolver::Edge> graphEdges ;
+    bool hasExplicitGraph = false ;
+    void setGraphEdges(std::vector<ggsolver::Edge> edges) ;
+    std::vector<ggsolver::Edge> getGraphEdges() { return graphEdges; }
+    void rebuildDagPlan();
 
     int deletePluginFromRack(int pIndex);
     void setRecordingDeviceId(int32_t deviceId);
@@ -74,6 +83,7 @@ public:
     void loadPlugins();
     int moveActivePluginDown(int _p);
     int moveActivePluginUp(int _p);
+    int moveActivePlugin(int from, int to);
     void buildPluginChain();
     void addPluginToRackLazy(char * library, int pluginIndex, SharedLibrary::PluginType _type = SharedLibrary::LADSPA);
     int addPlugintoRackByName(std::string);

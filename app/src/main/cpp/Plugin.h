@@ -50,6 +50,9 @@ public:
     }
 
     void setBuffer (float * buffer, int read_bytes) ;
+    void setBufferStereo (float * buffer_left, int read_bytes_left, float * buffer_right, int read_bytes_right) ;
+    float * stereoBufferRight = nullptr ;
+    int stereoBufferRightSize = 0 ;
     bool active = true ;
     SharedLibrary::PluginType type ;
     int ID ;

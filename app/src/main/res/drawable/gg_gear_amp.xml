@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp"
+    android:height="200dp"
+    android:viewportWidth="200"
+    android:viewportHeight="200">
+    <!-- Large Amp glyph (spec 4.3) for the Parameter Editor gear panel.
+         Rectangular amp-head silhouette: outer panel, 5 knob dots, horizontal vent grille. -->
+
+    <!-- Amp head panel -->
+    <path
+        android:pathData="M24,34 L176,34 A6,6 0 0 1 182,40 L182,96 A6,6 0 0 1 176,102 L24,102 A6,6 0 0 1 18,96 L18,40 A6,6 0 0 1 24,34 Z"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeColor="#E8543C" />
+
+    <!-- 5 knob dots across the control panel -->
+    <path
+        android:pathData="M40,68 m-8,0 a8,8 0 1 0 16,0 a8,8 0 1 0 -16,0 M80,68 m-8,0 a8,8 0 1 0 16,0 a8,8 0 1 0 -16,0 M100,68 m-8,0 a8,8 0 1 0 16,0 a8,8 0 1 0 -16,0 M120,68 m-8,0 a8,8 0 1 0 16,0 a8,8 0 1 0 -16,0 M160,68 m-8,0 a8,8 0 1 0 16,0 a8,8 0 1 0 -16,0"
+        android:fillColor="#E8543C" />
+
+    <!-- Vent grille lines (lower section) -->
+    <path
+        android:pathData="M40,130 L160,130 M40,142 L160,142 M40,154 L160,154"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:strokeColor="#E8543C" />
+</vector>

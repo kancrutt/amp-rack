@@ -1,0 +1,117 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp"
+    android:height="200dp"
+    android:viewportWidth="200"
+    android:viewportHeight="200">
+
+    <!-- Deep Drop Shadow -->
+    <path
+        android:fillColor="#060709"
+        android:pathData="M35,170 L165,170 A8,8 0 0 1 173,178 L173,184 A8,8 0 0 1 165,192 L35,192 A8,8 0 0 1 27,184 L27,178 A8,8 0 0 1 35,170 Z" />
+
+    <!-- Stompbox Enclosure Body (Modern Brushed Steel / Black) -->
+    <path
+        android:fillColor="#181A1F"
+        android:pathData="M40,25 L160,25 A8,8 0 0 1 168,33 L174,170 A8,8 0 0 1 166,178 L34,178 A8,8 0 0 1 26,170 L32,33 A8,8 0 0 1 40,25 Z" />
+
+    <!-- Top Surface Bevel (3D Lighting Highlight) -->
+    <path
+        android:fillColor="#2D3038"
+        android:pathData="M40,25 L160,25 A8,8 0 0 1 168,33 L169,45 L31,45 L32,33 A8,8 0 0 1 40,25 Z" />
+
+    <!-- Recessed Control Plate -->
+    <path
+        android:fillColor="#0E1013"
+        android:pathData="M38,40 L162,40 A4,4 0 0 1 166,44 L167,90 A4,4 0 0 1 163,94 L37,94 A4,4 0 0 1 33,90 L34,44 A4,4 0 0 1 38,40 Z" />
+
+    <!-- Status LED Indicator (Amber Glow) -->
+    <path
+        android:fillColor="#4A3000"
+        android:pathData="M100,48 m-6,0 a6,6 0 1 0 12,0 a6,6 0 1 0 -12,0" />
+    <path
+        android:fillColor="#FFAA00"
+        android:pathData="M100,48 m-3.5,0 a3.5,3.5 0 1 0 7,0 a3.5,3.5 0 1 0 -7,0" />
+    <path
+        android:fillColor="#FFEAA8"
+        android:pathData="M99,46.5 m-1.2,0 a1.2,1.2 0 1 0 2.4,0 a1.2,1.2 0 1 0 -2.4,0" />
+
+    <!-- 3D Knobs Row (3 Knobs: Drive, Tone, Level) -->
+    <!-- Knob 1 (Left) -->
+    <path
+        android:fillColor="#07080A"
+        android:pathData="M60,68 m-13,0 a13,13 0 1 0 26,0 a13,13 0 1 0 -26,0" />
+    <path
+        android:fillColor="#22252C"
+        android:pathData="M60,68 m-10,0 a10,10 0 1 0 20,0 a10,10 0 1 0 -20,0" />
+    <path
+        android:fillColor="#FFAA00"
+        android:pathData="M59,58 L61,58 L61,68 L59,68 Z" />
+
+    <!-- Knob 2 (Center) -->
+    <path
+        android:fillColor="#07080A"
+        android:pathData="M100,72 m-11,0 a11,11 0 1 0 22,0 a11,11 0 1 0 -22,0" />
+    <path
+        android:fillColor="#22252C"
+        android:pathData="M100,72 m-8,0 a8,8 0 1 0 16,0 a8,8 0 1 0 -16,0" />
+    <path
+        android:fillColor="#00E676"
+        android:pathData="M99,64 L101,64 L101,72 L99,72 Z" />
+
+    <!-- Knob 3 (Right) -->
+    <path
+        android:fillColor="#07080A"
+        android:pathData="M140,68 m-13,0 a13,13 0 1 0 26,0 a13,13 0 1 0 -26,0" />
+    <path
+        android:fillColor="#22252C"
+        android:pathData="M140,68 m-10,0 a10,10 0 1 0 20,0 a10,10 0 1 0 -20,0" />
+    <path
+        android:fillColor="#FFAA00"
+        android:pathData="M139,58 L141,58 L141,68 L139,68 Z" />
+
+    <!-- Brand Graphic Panel / Artwork Area: Official Giggin' Gear Stomp Icon Motif -->
+    <path
+        android:fillColor="#111317"
+        android:pathData="M44,98 L156,98 A3,3 0 0 1 159,101 L159,132 A3,3 0 0 1 156,135 L44,135 A3,3 0 0 1 41,132 L41,101 A3,3 0 0 1 44,98 Z" />
+
+    <!-- Play/Pedal Glyph Icon in Center of Effect Block -->
+    <!-- Outer Hex / Ring -->
+    <path
+        android:strokeColor="#FFAA00"
+        android:strokeWidth="1.5"
+        android:pathData="M100,104 L114,112 L114,124 L100,131 L86,124 L86,112 Z" />
+    <!-- Center Play Triangle (The App Branding Motif) -->
+    <path
+        android:fillColor="#FFAA00"
+        android:pathData="M95,111 L108,118 L95,125 Z" />
+
+    <!-- Heavy-Duty Chrome 3D Stomp Footswitch -->
+    <!-- Footswitch Base Washer -->
+    <path
+        android:fillColor="#585E6A"
+        android:pathData="M100,156 m-20,0 a20,20 0 1 0 40,0 a20,20 0 1 0 -40,0" />
+    <!-- Hex Nut (Brushed Steel) -->
+    <path
+        android:fillColor="#8C93A0"
+        android:pathData="M86,156 L93,144 L107,144 L114,156 L107,168 L93,168 Z" />
+    <!-- Footswitch Plunger Outer Ring -->
+    <path
+        android:fillColor="#3D424B"
+        android:pathData="M100,156 m-12,0 a12,12 0 1 0 24,0 a12,12 0 1 0 -24,0" />
+    <!-- Footswitch Domed Head (Chrome) -->
+    <path
+        android:fillColor="#C6CCD6"
+        android:pathData="M100,156 m-9,0 a9,9 0 1 0 18,0 a9,9 0 1 0 -18,0" />
+    <!-- Specular Reflection Highlight -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M98,150 m-2.5,0 a2.5,2.5 0 1 0 5,0 a2.5,2.5 0 1 0 -5,0" />
+
+    <!-- 1/4" Input / Output Jack Hardware -->
+    <path
+        android:fillColor="#7A808C"
+        android:pathData="M22,75 L28,75 L28,95 L22,95 Z" />
+    <path
+        android:fillColor="#7A808C"
+        android:pathData="M172,75 L178,75 L178,95 L172,95 Z" />
+</vector>

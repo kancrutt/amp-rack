@@ -2,6 +2,7 @@
 #include "lv2/atom/atom.h"
 #include "lv2/lv2plug.in/ns/ext/atom/forge.h"
 
+#include <cstring>
 using namespace nlohmann ;
 void replaceAll(std::string& str, const std::string& from, const std::string& to) {
     if(from.empty())
@@ -330,7 +331,7 @@ std::string Plugin::getLV2JSON (std::string pluginName) {
     jstring libname = env->NewStringUTF(sharedLibrary->so_file.c_str());
 
     if (sharedLibrary->mainActivityClassName == "")
-        sharedLibrary->mainActivityClassName = std::string ("com/shajikhan/ladspa/amprack/MainActivity");
+        sharedLibrary->mainActivityClassName = std::string ("com/kancrutt/gigginggear/MainActivity");
     jclass clazz = env->FindClass(sharedLibrary->mainActivityClassName.c_str());
     if (clazz == nullptr) {
         HERE LOGF("cannot find class!");
@@ -377,6 +378,23 @@ void Plugin::setBuffer (float * buffer, int read_bytes) {
         //~ LOGD("setting buffer for LADSPA plugin");
         descriptor->connect_port(handle, 99, reinterpret_cast<LADSPA_Data *>(&read_bytes));
         descriptor->connect_port(handle, 100, buffer);
+    }
+    OUT
+}
+
+void Plugin::setBufferStereo (float * buffer_left, int read_bytes_left, float * buffer_right, int read_bytes_right) {
+    IN
+    setBuffer (buffer_left, read_bytes_left);
+
+    if (stereoBufferRight != nullptr) {
+        delete [] stereoBufferRight ;
+        stereoBufferRight = nullptr ;
+    }
+    stereoBufferRightSize = read_bytes_right;
+    if (read_bytes_right > 0 && buffer_right != nullptr) {
+        stereoBufferRight = new float [read_bytes_right];
+        memcpy (stereoBufferRight, buffer_right, read_bytes_right * sizeof (float));
+        stereoBufferRight [read_bytes_right - 1] = -1 ;
     }
     OUT
 }

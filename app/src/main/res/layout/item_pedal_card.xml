@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="220dp"
+    android:layout_height="320dp"
+    android:layout_margin="8dp"
+    app:cardBackgroundColor="#1E1E22"
+    app:cardCornerRadius="8dp"
+    app:cardElevation="4dp"
+    app:strokeColor="#333338"
+    app:strokeWidth="1dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:padding="12dp">
+
+        <!-- Top Row: Category Badge, Plugin Name, LED Status -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:id="@+id/pedal_category_icon"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:contentDescription="Category Icon"
+                android:src="@android:drawable/ic_menu_compass"
+                app:tint="#8E8E93" />
+
+            <TextView
+                android:id="@+id/pedal_title"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="NAM AMP"
+                android:textColor="#FFFFFF"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <!-- Status LED -->
+            <View
+                android:id="@+id/pedal_status_led"
+                android:layout_width="10dp"
+                android:layout_height="10dp"
+                android:background="@android:drawable/ic_notification_overlay"
+                app:tint="#00E676" />
+        </LinearLayout>
+
+        <!-- Divider line -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="12dp"
+            android:background="#333338" />
+
+        <!-- Middle Area: Top 3 Rotary Knobs Container -->
+        <LinearLayout
+            android:id="@+id/pedal_knobs_container"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="horizontal">
+
+            <com.kancrutt.gigginggear.RotarySeekbar
+                android:id="@+id/pedal_knob1"
+                app:showKnob="true"
+                android:layout_width="60dp"
+                android:layout_height="60dp"
+                android:layout_margin="4dp" />
+
+            <com.kancrutt.gigginggear.RotarySeekbar
+                android:id="@+id/pedal_knob2"
+                app:showKnob="true"
+                android:layout_width="60dp"
+                android:layout_height="60dp"
+                android:layout_margin="4dp" />
+
+            <com.kancrutt.gigginggear.RotarySeekbar
+                android:id="@+id/pedal_knob3"
+                app:showKnob="true"
+                android:layout_width="60dp"
+                android:layout_height="60dp"
+                android:layout_margin="4dp" />
+        </LinearLayout>
+
+        <!-- Bottom Row: Footswitch Button & Controls Expansion Trigger -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:orientation="horizontal">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/pedal_footswitch"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:text="BYPASS"
+                android:textColor="#FFAA00"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                app:cornerRadius="22dp"
+                app:strokeColor="#FFAA00"
+                app:strokeWidth="1.5dp" />
+        </LinearLayout>
+
+    </LinearLayout>
+</androidx.cardview.widget.CardView>

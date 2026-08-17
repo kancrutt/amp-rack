@@ -61,7 +61,7 @@
                 android:layout_height="wrap_content"
                 android:text="@string/app_version"/>
 
-            <androidx.legacy.widget.Space
+            <android.widget.Space
                 android:layout_width="10dp"
                 android:layout_height="wrap_content"/>
             <TextView

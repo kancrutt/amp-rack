@@ -22,9 +22,18 @@ Engine::Engine () {
     fileWriter = new FileWriter ();
     queueManager.add_function (fileWriter->disk_write);
     queueManager.add_function (resetAtomPorts);
-    queueManager.add_function (meter->updateMeterOutput);
+    queueManager.add_function (Meter::updateMeterOutput);
 //    discoverPlugins();
 //    loadPlugins();
+}
+
+Engine::~Engine() {
+    // ISSUE-LIFECYCLE-01: tear down the audio path before the engine object
+    // is freed. setEffectOn(false) stops the Oboe streams, and quit() stops
+    // and joins the lock-free queue worker thread, so no native thread keeps
+    // running against freed engine memory after deletion.
+    setEffectOn(false);
+    queueManager.quit();
 }
 
 void Engine::setRecordingDeviceId(int32_t deviceId) {
@@ -99,22 +108,26 @@ bool Engine::setEffectOn(bool isOn) {
                 }
                  */
 
-                meter->lastRecordedFileName = fileWriter->filename;
-                meter->jack_samplerate = mSampleRate ;
-                meter->lowLatency = lowLatencyMode ;
-                meter->enable();
-                meter->start();
+                 if (meter != nullptr) {
+                     meter->lastRecordedFileName = fileWriter->filename;
+                     meter->jack_samplerate = mSampleRate ;
+                     meter->lowLatency = lowLatencyMode ;
+                     meter->enable();
+                     meter->start();
+                 }
 //                addPluginToRack(0, 0);
-                mIsEffectOn = isOn;
-            }
-        } else {
-            if (mFullDuplexPass.recordingActive) {
-                fileWriter->stopRecording() ;
-                mFullDuplexPass.recordingActive = false;
-            }
+                 mIsEffectOn = isOn;
+             }
+         } else {
+             if (mFullDuplexPass.recordingActive) {
+                 fileWriter->stopRecording() ;
+                 mFullDuplexPass.recordingActive = false;
+             }
 
 //            LOGD("stopping meter");
-            meter->stop();
+             if (meter != nullptr) {
+                 meter->stop();
+             }
 
             mFullDuplexPass.stop();
             closeStreams();
@@ -427,7 +440,7 @@ void Engine::discoverPlugins () {
     libraries.push_back(sharedLibrary1);
     SharedLibrary * sharedLibrary2 = new SharedLibrary ("libcrybabyx.so");
     libraries.push_back(sharedLibrary2);
-    SharedLibrary * sharedLibrary3 = new SharedLibrary ("/data/data/com.shajikhan.ladspa.amprack/lib/libtubex.so");
+    SharedLibrary * sharedLibrary3 = new SharedLibrary ("/data/data/com.kancrutt.gigginggear/lib/libtubex.so");
     libraries.push_back(sharedLibrary3);
     SharedLibrary * sharedLibrary4 = new SharedLibrary ("/data/data/com.shajikhan.ladspa.plugins.tap/lib/libtap_eq.so");
     libraries.push_back(sharedLibrary4);
@@ -471,7 +484,50 @@ void Engine::buildPluginChain () {
         latencyTunerOut->tune();
     }
 
+    rebuildDagPlan();
+
     OUT
+}
+
+void Engine::rebuildDagPlan() {
+    mFullDuplexPass.bypass = true;
+    int n = mFullDuplexPass.activePlugins;
+    std::vector<ggsolver::Edge> edges;
+    if (!hasExplicitGraph) {
+        // No explicit graph: derive from the legacy routing mode.
+        // 0 = Series -> chain 0->1->2... (seriesOnly fast path preserves baseline)
+        // 1 = Parallel -> empty edge set = every node is source AND sink (mixed)
+        if (mFullDuplexPass.routingMode == 0) {
+            for (int i = 0; i + 1 < n; i++)
+                edges.push_back({i, i + 1});
+        }
+    } else {
+        // Explicit graph wins (may be empty = all-parallel, set via JNI).
+        edges = graphEdges;
+    }
+
+    std::string err;
+    ggsolver::Plan plan;
+    int maxSamples = mFullDuplexPass.mBufferSize > 0
+            ? mFullDuplexPass.mBufferSize : 4096;
+    if (!ggsolver::buildPlan(n, edges, plan, err)) {
+        // Fallback to a safe series chain so audio never goes silent.
+        LOGD("rebuildDagPlan failed (%s); falling back to series", err.c_str());
+        std::vector<ggsolver::Edge> fallback;
+        for (int i = 0; i + 1 < n; i++)
+            fallback.push_back({i, i + 1});
+        ggsolver::buildPlan(n, fallback, plan, err);
+    }
+    mFullDuplexPass.setDagPlan(plan, maxSamples);
+    mFullDuplexPass.bypass = false;
+}
+
+void Engine::setGraphEdges(std::vector<ggsolver::Edge> edges) {
+    mFullDuplexPass.bypass = true;
+    graphEdges = edges;
+    hasExplicitGraph = true;
+    rebuildDagPlan();
+    mFullDuplexPass.bypass = false;
 }
 
 void Engine::addPluginToRack (int libraryIndex, int pluginIndex) {
@@ -551,6 +607,22 @@ int Engine :: moveActivePluginUp (int _p) {
     return _p - 1 ;
 }
 
+int Engine::moveActivePlugin(int from, int to) {
+    IN
+    if (from < 0 || from >= (int)activePlugins.size() || to < 0 || to >= (int)activePlugins.size() || from == to) {
+        OUT
+        return from;
+    }
+    mFullDuplexPass.bypass = true;
+    Plugin *p = activePlugins[from];
+    activePlugins.erase(activePlugins.begin() + from);
+    activePlugins.insert(activePlugins.begin() + to, p);
+    buildPluginChain();
+    mFullDuplexPass.bypass = false;
+    OUT
+    return to;
+}
+
 int Engine::addPlugintoRackByName (std::string pluginName) {
     for (int i = 0 ; i < libraries.size() ; i ++) {
         SharedLibrary *sharedLibrary = libraries.at(i);
@@ -583,6 +655,30 @@ bool Engine::setPluginBuffer (float * buffer, int buffer_size, int plugin) {
     mFullDuplexPass.bypass = false ;
     OUT
     return true ;
+}
+
+bool Engine::setPluginBufferStereo (float * buffer_left, int buffer_size_left, float * buffer_right, int buffer_size_right, int plugin) {
+    IN
+    mFullDuplexPass.bypass = true ;
+    activePlugins.at (plugin)->setBufferStereo (buffer_left, buffer_size_left, buffer_right, buffer_size_right);
+    mFullDuplexPass.bypass = false ;
+    OUT
+    return true ;
+}
+
+void Engine::setRoutingMode(int mode) {
+    IN
+    mFullDuplexPass.bypass = true ;
+    mFullDuplexPass.routingMode = mode ;
+    graphEdges.clear(); // legacy toggle is authoritative until an explicit graph is set
+    hasExplicitGraph = false;
+    rebuildDagPlan();
+    mFullDuplexPass.bypass = false ;
+    OUT
+}
+
+int Engine::getRoutingMode() {
+    return mFullDuplexPass.routingMode ;
 }
 
 std::string Engine::tuneLatency () {

@@ -1,20 +1,16 @@
 plugins {
-    id 'com.google.firebase.crashlytics'
     id 'com.android.application'
-    id 'com.google.gms.google-services'
-//    id 'org.jetbrains.kotlin.android'
-
 }
 
 android {
     compileSdk 35
 
     defaultConfig {
-        applicationId "com.shajikhan.ladspa.amprack"
+        applicationId "com.kancrutt.gigginggear"
         minSdk 24
         targetSdk 35
-        versionCode 121
-        versionName '5.95'
+        versionCode 122
+        versionName '5.96'
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         externalNativeBuild {
@@ -30,19 +26,32 @@ android {
         versionNameSuffix '-Raptor'
     }
 
+    flavorDimensions "mode"
+    productFlavors {
+        preview {
+            dimension "mode"
+            ndk {
+                abiFilters "x86_64"
+            }
+        }
+        arm64 {
+            dimension "mode"
+            ndk {
+                abiFilters "arm64-v8a"
+            }
+        }
+        full {
+            dimension "mode"
+            ndk {
+                abiFilters "arm64-v8a"
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            // Add this extension
-            firebaseCrashlytics {
-                // Enable processing and uploading of native symbols to Firebase servers.
-
-                // By default, this is disabled to improve build speeds.
-                // This flag must be enabled to see properly-symbolicated native
-                // stack traces in the Crashlytics dashboard.
-                nativeSymbolUploadEnabled true
-            }
         }
 
         debug {
@@ -66,18 +75,6 @@ android {
         compose true
     }
 
-    /*
-    kotlinOptions {
-        jvmTarget = '1.8'
-        freeCompilerArgs += [
-                "-Xallow-jvm-ir-dependencies",
-                "-P"
-                "plugin:androidx.compose.compiler.plugins.kotlin:suppressKotlinVersionCompatibilityCheck=true"
-        ]
-
-    }
-     */
-
     packagingOptions {
         resources {
             excludes += '/META-INF/{AL2.0,LGPL2.1}'
@@ -86,33 +83,21 @@ android {
     composeOptions {
         kotlinCompilerExtensionVersion compose_version
     }
-    namespace 'com.shajikhan.ladspa.amprack'
+    namespace 'com.kancrutt.gigginggear'
     ndkVersion '26.1.10909125'
 }
 
 dependencies {
-    // Import the BoM for the Firebase platform
-    implementation(platform("org.jetbrains.kotlin:kotlin-bom:1.8.0"))
-
-    implementation 'com.google.gms:google-services:4.4.2'
-    implementation platform('com.google.firebase:firebase-bom:33.9.0')
-    implementation 'com.google.firebase:firebase-auth'
-    implementation 'com.google.firebase:firebase-crashlytics-ndk'
-    implementation 'com.google.firebase:firebase-crashlytics'
-    implementation 'com.google.firebase:firebase-analytics'
+    implementation platform('org.jetbrains.kotlin:kotlin-bom:1.8.0')
     implementation 'com.google.code.gson:gson:2.10.1'
     implementation 'com.squareup.okhttp3:okhttp:3.10.0'
 
-    // Declare the dependency for the Firebase Authentication library
-    // When using the BoM, you don't specify versions in Firebase library dependencies
-    implementation 'com.firebaseui:firebase-ui-auth:7.2.0'
-    implementation 'com.google.firebase:firebase-firestore'
     implementation 'androidx.core:core-splashscreen:1.0.1'
     implementation "androidx.compose.ui:ui:$compose_version"
     implementation "androidx.compose.material:material:$compose_version"
     implementation "androidx.compose.ui:ui-tooling-preview:$compose_version"
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.4.1'
-    implementation "androidx.activity:activity-compose:1.4.0"
+    implementation 'androidx.activity:activity-compose:1.4.0'
     implementation 'androidx.lifecycle:lifecycle-livedata-ktx:2.4.1'
     implementation 'androidx.lifecycle:lifecycle-viewmodel-ktx:2.4.1'
     implementation 'androidx.navigation:navigation-fragment:2.8.7'
@@ -121,22 +106,10 @@ dependencies {
     implementation 'androidx.activity:activity:1.10.0'
     androidTestImplementation "androidx.compose.ui:ui-test-junit4:$compose_version"
 
-    def billing_version = "6.0.1"
-    implementation "com.android.billingclient:billing:7.1.1"
-
-    // Google Ad Mob
-//    implementation 'com.google.android.gms:play-services-ads:20.6.0'
-
-    // round seekbar
-
     implementation 'com.google.oboe:oboe:1.9.3'
     implementation 'androidx.appcompat:appcompat:1.7.0'
     implementation 'com.google.android.material:material:1.12.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.2.0'
-//    implementation project(path: ':app:amp')
-//    implementation project(path: ':app:distortionx')
-//    implementation project(path: ':app:crybabyx')
-//    implementation project(path: ':app:tubex')
     implementation 'androidx.preference:preference:1.1.1'
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.3'

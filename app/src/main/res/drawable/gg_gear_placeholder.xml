@@ -1,0 +1,51 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp"
+    android:height="200dp"
+    android:viewportWidth="120"
+    android:viewportHeight="120">
+
+    <!-- Amp head body -->
+    <path
+        android:fillColor="#1E2024"
+        android:pathData="M20,30 L100,30 A8,8 0 0 1 108,38 L108,78 A8,8 0 0 1 100,86 L20,86 A8,8 0 0 1 12,78 L12,38 A8,8 0 0 1 20,30 Z" />
+
+    <!-- Grill speaker -->
+    <path
+        android:fillColor="#26282E"
+        android:pathData="M22,40 L60,40 L60,80 L22,80 Z" />
+
+    <!-- Grill vertical lines -->
+    <path
+        android:fillColor="#3A3D45"
+        android:pathData="M28,40 L28,80 M34,40 L34,80 M40,40 L40,80 M46,40 L46,80 M52,40 L52,80 M58,40 L58,80" />
+
+    <!-- Control panel -->
+    <path
+        android:fillColor="#16181C"
+        android:pathData="M64,42 L104,42 L104,80 L64,80 Z" />
+
+    <!-- Knob 1 -->
+    <path
+        android:fillColor="#FFAA00"
+        android:pathData="M70,61 m-5,0 a5,5 0 1 0 10,0 a5,5 0 1 0 -10,0" />
+
+    <!-- Knob 2 -->
+    <path
+        android:fillColor="#00E676"
+        android:pathData="M82,61 m-5,0 a5,5 0 1 0 10,0 a5,5 0 1 0 -10,0" />
+
+    <!-- Knob 3 -->
+    <path
+        android:fillColor="#FFAA00"
+        android:pathData="M94,61 m-5,0 a5,5 0 1 0 10,0 a5,5 0 1 0 -10,0" />
+
+    <!-- LED indicator -->
+    <path
+        android:fillColor="#00E676"
+        android:pathData="M66,47 m-2,0 a2,2 0 1 0 4,0 a2,2 0 1 0 -4,0" />
+
+    <!-- Brand strip -->
+    <path
+        android:fillColor="#FFAA00"
+        android:pathData="M20,92 L108,92 L108,98 L20,98 Z" />
+</vector>

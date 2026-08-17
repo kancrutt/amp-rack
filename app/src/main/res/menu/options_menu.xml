@@ -32,10 +32,10 @@
 
     <item android:id="@+id/menu_tune"
         android:title="Latency Tuner"
-        android:icon="@drawable/baseline_tune_24"/>
+        android:icon="@drawable/ic_nav_tuner"/>
     <item
         android:id="@+id/menu_sync"
-        android:icon="@drawable/baseline_sync_24"
+        android:icon="@drawable/ic_chain_signal_flow"
         android:title="Sync with PC / Smart Pedal"/>
 
     <item android:id="@+id/bt_menu"

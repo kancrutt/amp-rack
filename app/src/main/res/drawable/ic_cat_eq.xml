@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Baseline -->
+    <path
+        android:pathData="M2,18 H22"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeColor="@color/cat_eq_sel" />
+    <!-- 5 band EQ bars -->
+    <path
+        android:pathData="M5,18 V12 M9.5,18 V8 M14,18 V5 M18.5,18 V10"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeColor="@color/cat_eq_sel" />
+    <!-- Bar caps -->
+    <path
+        android:pathData="M5,12 h0 M9.5,8 h0 M14,5 h0 M18.5,10 h0"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeColor="@color/cat_eq_sel" />
+</vector>

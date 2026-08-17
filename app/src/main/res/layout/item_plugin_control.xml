@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="72dp"
+    android:layout_height="wrap_content"
+    android:layout_margin="4dp"
+    android:gravity="center"
+    android:orientation="vertical">
+
+    <!-- Control Name Label -->
+    <TextView
+        android:id="@+id/control_label"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:text="GAIN"
+        android:textColor="#8E8E93"
+        android:textSize="10sp"
+        android:textStyle="bold" />
+
+    <!-- Rotary Knob Seekbar -->
+    <com.kancrutt.gigginggear.RotarySeekbar
+        android:id="@+id/control_knob"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:layout_marginTop="4dp"
+        android:layout_marginBottom="4dp" />
+
+    <!-- Numeric Readout -->
+    <TextView
+        android:id="@+id/control_value_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="0.50"
+        android:textColor="#FFAA00"
+        android:textSize="11sp"
+        android:textStyle="bold" />
+
+</LinearLayout>

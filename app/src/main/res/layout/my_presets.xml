@@ -3,7 +3,8 @@
     android:orientation="vertical"
     android:id="@+id/my_presets_layout"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="@color/gg_bg">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -17,14 +18,14 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:fontFamily="@font/comfortaa"
-            android:text="Collection"/>
+            android:text="Collection"
+            android:textColor="@color/gg_text"/>
 
         <Spinner
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:id="@+id/collections_spinner"/>
-
     </LinearLayout>
 
     <LinearLayout
@@ -37,6 +38,11 @@
             android:layout_width="wrap_content"
             android:id="@+id/search_presets"
             android:hint="Search"
+            android:background="@drawable/gg_card_bg"
+            android:paddingLeft="12dp"
+            android:paddingRight="12dp"
+            android:textColor="@color/gg_text"
+            android:textColorHint="@color/gg_hint"
             android:layout_height="wrap_content"
             android:layout_weight="1"/>
         <ToggleButton
@@ -60,9 +66,10 @@
         android:layout_width="match_parent"
         android:id="@+id/my_presets_recycler"
         android:layout_height="wrap_content"
-        android:layout_weight="1">
+        android:padding="6dp"
+        android:clipToPadding="false"
+        android:layout_weight="1"/>
 
-    </androidx.recyclerview.widget.RecyclerView>
     <LinearLayout
         android:visibility="gone"
         android:layout_width="match_parent"
@@ -88,6 +95,7 @@
             android:layout_height="wrap_content"
             android:id="@+id/load_progress"
             android:visibility="invisible"
+            android:indeterminateTint="@color/gg_accent"
             android:layout_gravity="end"/>
     </LinearLayout>
 </LinearLayout>

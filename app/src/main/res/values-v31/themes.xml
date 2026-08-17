@@ -12,9 +12,11 @@
         <item name="colorOnSecondary">@color/white</item>
         <!-- Status bar color. -->
         <item name="android:statusBarColor" tools:targetApi="l">?attr/colorPrimary</item>
-        <item name="windowSplashScreenBackground">@color/white</item>
+        <!-- Dark splash background on API 31+ (independently set per spec 4.7) -->
+        <item name="android:windowBackground">@drawable/splash_bg</item>
+        <item name="windowSplashScreenBackground">@drawable/splash_bg</item>
         <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>
-        <item name="android:windowSplashScreenIconBackgroundColor">@color/fui_transparent</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">@android:color/transparent</item>
         <item name="postSplashScreenTheme">@style/Theme.AmpRack</item>
     </style>
 </resources>

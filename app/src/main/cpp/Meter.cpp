@@ -83,7 +83,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *_pjvm, void *reserved) {
     gJvm = _pjvm;  // cache the JavaVM pointer
     auto env = getEnv();
     //replace with one of your classes in the line below
-//    auto randomClass = env->FindClass("com/shajikhan/ladspa/amprack/MainActivity");
+//    auto randomClass = env->FindClass("com/kancrutt/gigginggear/MainActivity");
 //    jclass classClass = env->GetObjectClass(randomClass);
 //    auto classLoaderClass = env->FindClass("java/lang/ClassLoader");
 //    auto getClassLoaderMethod = env->GetMethodID(classClass, "getClassLoader",
@@ -145,7 +145,7 @@ int Meter::updateMeterOutput (AudioBuffer * buffer) {
         if (envOutput == nullptr)
             LOGF("envOutput is null");
         mainActivityOutput = findClassWithEnv(envOutput, jMainActivityClassName.c_str ());
-//        mainActivityOutput = findClassWithEnv(envOutput, "com/shajikhan/ladspa/amprack/MainActivity");
+//        mainActivityOutput = findClassWithEnv(envOutput, "com/kancrutt/gigginggear/MainActivity");
         if (mainActivityOutput == nullptr) {
             HERE
             LOGF("cannot find class mainactivityOutput!");
@@ -327,7 +327,7 @@ Meter::Meter(JavaVM *pVm) {
     envOutput = getEnv();
     if (envOutput == nullptr)
         LOGF("envOutput is null");
-    mainActivityOutput = findClassWithEnv(envOutput, "com/shajikhan/ladspa/amprack/MainActivity");
+    mainActivityOutput = findClassWithEnv(envOutput, "com/kancrutt/gigginggear/MainActivity");
     if (mainActivityOutput == nullptr) {
         HERE
         LOGF("cannot find class mainactivityOutput!");
@@ -361,25 +361,16 @@ void Meter::disable () {
 
 void Meter::enable () {
     IN
-    if (enabled) {
-        LOGD("already enabled, exiting ..") ;
-        OUT
-        return ;
-    }
-//    vm-> GetEnv((void**)&env, JNI_VERSION_1_6);
-    /*
-    mainActivity = env->FindClass("com/shajikhan/ladspa/amprack/MainActivity");
-    if (mainActivity == nullptr) {
-        HERE LOGF("cannot find class mainactivity!");
-    }
-
-    setMixerMeter = env->GetStaticMethodID(mainActivity, "setMixerMeterSwitch", "(FZ)V");
-    if (setMixerMeter == nullptr) {
-        LOGF("cannot find method!");
-    }
-     */
-
+    // ISSUE-LIFECYCLE-01: `enabled` is a static that survives engine deletion.
+    // Force a full re-init on every enable so a recreated engine's meter thread
+    // re-attaches against the current engine instead of short-circuiting on the
+    // stale flag and reusing JNI refs left behind by the deleted engine.
     enabled = true ;
+    envOutput = nullptr;
+    mainActivityOutput = nullptr;
+    env = nullptr;
+    mainActivity = nullptr;
+    jfloatArray1 = nullptr;
 //    env->CallStaticVoidMethod(mainActivity, setMixerMeter, (jfloat ) 1.0f, true);
     OUT
 }
@@ -456,7 +447,8 @@ void Meter::process (int nframes, const float * data, bool isInput) {
                         tunerBuffer[tunerIndex] = data[i];
                         tunerIndex++;
                     } else {
-                        vringbuffer_return_writing(vringbuffer, buffers);
+                        if (vringbuffer != nullptr)
+                            vringbuffer_return_writing(vringbuffer, buffers);
                     }
                 }
             }
@@ -467,15 +459,13 @@ void Meter::process (int nframes, const float * data, bool isInput) {
             bufferUsed++;
             return;
         } else {
-            vringbuffer_return_writing(vringbuffer, buffers);
+            if (vringbuffer != nullptr)
+                vringbuffer_return_writing(vringbuffer, buffers);
         }
 
-        vringbuffer_trigger_autoincrease_callback(vringbuffer);
-    }
-
-    return;
-    /*
-    else {
+        if (vringbuffer != nullptr)
+            vringbuffer_trigger_autoincrease_callback(vringbuffer);
+    } else {
         if (bufferUsedOutput < MAX_STATIC_BUFFER) {
             for (int i = 0; i < nframes; i++) {
                 buffersOutput[bufferUsedOutput].data[i] = data[i];
@@ -487,12 +477,15 @@ void Meter::process (int nframes, const float * data, bool isInput) {
             bufferUsedOutput++;
             return;
         } else {
-            vringbuffer_return_writing(vringbufferOutput, buffersOutput);
+            if (vringbufferOutput != nullptr)
+                vringbuffer_return_writing(vringbufferOutput, buffersOutput);
         }
 
-        vringbuffer_trigger_autoincrease_callback(vringbufferOutput);
+        if (vringbufferOutput != nullptr)
+            vringbuffer_trigger_autoincrease_callback(vringbufferOutput);
     }
-     */
+
+    return;
 }
 
 float Meter::rms(float *v, int n)
@@ -518,7 +511,12 @@ void Meter::setActivityClassName (std::string name) {
     jMainActivityClassName = name ;
     env = getEnv();
     auto randomClass = env->FindClass(name.c_str());
-//    auto randomClass = env->FindClass("com/shajikhan/ladspa/amprack/MainActivity");
+    if (randomClass == NULL) {
+        env->ExceptionClear();
+        LOGE("setActivityClassName: unable to find class %s", name.c_str());
+        OUT
+        return;
+    }
     jclass classClass = env->GetObjectClass(randomClass);
     auto classLoaderClass = env->FindClass("java/lang/ClassLoader");
     auto getClassLoaderMethod = env->GetMethodID(classClass, "getClassLoader",

@@ -51,7 +51,7 @@ CameraAppEngine *pEngineObj = nullptr;
  * @return application object instance ( not used in this sample )
  */
 extern "C" JNIEXPORT jlong JNICALL
-Java_com_shajikhan_ladspa_amprack_Camera_createCamera(JNIEnv *env,
+Java_com_kancrutt_gigginggear_Camera_createCamera(JNIEnv *env,
                                                       jobject instance,
                                                       jint width, jint height, jobject assetMgr) {
   pEngineObj = new CameraAppEngine(env, instance, width, height);
@@ -66,7 +66,7 @@ Java_com_shajikhan_ladspa_amprack_Camera_createCamera(JNIEnv *env,
  *   triggers native camera object be released
  */
 extern "C" JNIEXPORT void JNICALL
-Java_com_shajikhan_ladspa_amprack_Camera_deleteCamera(JNIEnv *env,
+Java_com_kancrutt_gigginggear_Camera_deleteCamera(JNIEnv *env,
                                                       jobject instance,
                                                       jlong ndkCameraObj) {
   if (!pEngineObj || !ndkCameraObj) {
@@ -93,7 +93,7 @@ Java_com_shajikhan_ladspa_amprack_Camera_deleteCamera(JNIEnv *env,
  *      on display device
  */
 extern "C" JNIEXPORT jobject JNICALL
-Java_com_shajikhan_ladspa_amprack_Camera_getMinimumCompatiblePreviewSize(
+Java_com_kancrutt_gigginggear_Camera_getMinimumCompatiblePreviewSize(
     JNIEnv *env, jobject instance, jlong ndkCameraObj) {
   if (!ndkCameraObj) {
     return nullptr;
@@ -113,7 +113,7 @@ Java_com_shajikhan_ladspa_amprack_Camera_getMinimumCompatiblePreviewSize(
  * display orientation. This sample only deal to back facing camera.
  */
 extern "C" JNIEXPORT jint JNICALL
-Java_com_shajikhan_ladspa_amprack_Camera_getCameraSensorOrientation(
+Java_com_kancrutt_gigginggear_Camera_getCameraSensorOrientation(
     JNIEnv *env, jobject instance, jlong ndkCameraObj) {
   ASSERT(ndkCameraObj, "NativeObject should not be null Pointer");
   CameraAppEngine *pApp = reinterpret_cast<CameraAppEngine *>(ndkCameraObj);
@@ -127,7 +127,7 @@ Java_com_shajikhan_ladspa_amprack_Camera_getCameraSensorOrientation(
  *   start camera preview
  */
 extern "C" JNIEXPORT void JNICALL
-Java_com_shajikhan_ladspa_amprack_Camera_onPreviewSurfaceCreated(
+Java_com_kancrutt_gigginggear_Camera_onPreviewSurfaceCreated(
     JNIEnv *env, jobject instance, jlong ndkCameraObj, jobject surface) {
   ASSERT(ndkCameraObj && (jlong)pEngineObj == ndkCameraObj,
          "NativeObject should not be null Pointer");
@@ -151,7 +151,7 @@ Java_com_shajikhan_ladspa_amprack_Camera_onPreviewSurfaceCreated(
  *      * stop preview
  */
 extern "C" JNIEXPORT void JNICALL
-Java_com_shajikhan_ladspa_amprack_Camera_onPreviewSurfaceDestroyed(
+Java_com_kancrutt_gigginggear_Camera_onPreviewSurfaceDestroyed(
     JNIEnv *env, jobject instance, jlong ndkCameraObj, jobject surface) {
   CameraAppEngine *pApp = reinterpret_cast<CameraAppEngine *>(ndkCameraObj);
   ASSERT(ndkCameraObj && pEngineObj == pApp,
@@ -178,7 +178,7 @@ Java_com_shajikhan_ladspa_amprack_Camera_onPreviewSurfaceDestroyed(
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_shajikhan_ladspa_amprack_Camera_startEncoder(JNIEnv *env, jobject thiz, jstring filename) {
+Java_com_kancrutt_gigginggear_Camera_startEncoder(JNIEnv *env, jobject thiz, jstring filename) {
   if (pEngineObj == NULL) {
     LOGE("start encoder: Camera engine is null") ;
     return ;
@@ -191,6 +191,6 @@ Java_com_shajikhan_ladspa_amprack_Camera_startEncoder(JNIEnv *env, jobject thiz,
 }
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_shajikhan_ladspa_amprack_Camera_testButton(JNIEnv *env, jobject thiz) {
+Java_com_kancrutt_gigginggear_Camera_testButton(JNIEnv *env, jobject thiz) {
   pEngineObj ->  test () ;
 }

@@ -16,3 +16,7 @@ local.properties
 google-services.json
 app/release/app-release.aab
 app/release/app-release.apk
+
+# Scratch artifacts (never commit)
+WIP/
+fix_proof.diff

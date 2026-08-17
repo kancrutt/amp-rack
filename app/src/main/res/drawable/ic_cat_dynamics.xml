@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- VU meter arc -->
+    <path
+        android:pathData="M4,17 A9,9 0 0 1 20,17"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeColor="@color/cat_dynamics_sel" />
+    <!-- Needle (pointing right at "hot" level) -->
+    <path
+        android:pathData="M12,17 L17,10"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeColor="@color/cat_dynamics_sel" />
+    <!-- Needle pivot -->
+    <path
+        android:pathData="M12,17 m-1.6,0 a1.6,1.6 0 1 0 3.2,0 a1.6,1.6 0 1 0 -3.2,0"
+        android:fillColor="@color/cat_dynamics_sel" />
+</vector>

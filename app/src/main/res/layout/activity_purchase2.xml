@@ -216,7 +216,6 @@
                     android:textColor="@color/white"
                     android:visibility="gone"
                     android:id="@+id/source"
-                    android:drawableLeft="@drawable/fui_ic_github_white_24dp"
                     android:background="@color/fui_transparent"
                     android:textStyle="bold"/>
 

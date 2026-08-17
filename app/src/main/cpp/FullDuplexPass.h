@@ -18,11 +18,14 @@
 #define SAMPLES_FULLDUPLEXPASS_H
 
 #include <dlfcn.h>
+#include <vector>
+#include <algorithm>
 #include "ladspa.h"
 #include "FullDuplexStream.h"
 #include "FileWriter.h"
 #include "Meter.h"
 #include "LockFreeQueue.h"
+#include "GraphSolver.h"
 
 class FullDuplexPass : public FullDuplexStream {
     //| TODO: Limit number of plugins active in free version?
@@ -54,6 +57,76 @@ public:
     int inputPorts2 [MAX_PLUGINS] ;
     int outputPorts [MAX_PLUGINS] ;
     int outputPorts2 [MAX_PLUGINS] ;
+    int routingMode = 0 ; // 0 = Series, 1 = Parallel
+    bool hasDagPlan = false ;
+    ggsolver::Plan dagPlan ;
+    std::vector<std::vector<float>> dagScratch ; // scratch buffers [1..numBuffers-1]
+
+    // Set by Engine (non-audio thread) under bypass. Copies the plan and
+    // (re)allocates scratch buffers sized to the current burst.
+    void setDagPlan(const ggsolver::Plan &plan, int maxSamples) {
+        dagPlan = plan ;
+        hasDagPlan = plan.ops.size() > 0 ;
+        if (plan.numBuffers > 1) {
+            dagScratch.resize((size_t)plan.numBuffers - 1);
+            for (auto &b : dagScratch) {
+                if ((int)b.size() < maxSamples) b.resize((size_t)maxSamples, 0.0f);
+            }
+        } else {
+            dagScratch.clear();
+        }
+    }
+
+    // Execute the DAG plan. Buffer 0 is the caller's data buffer; buffers 1..N
+    // are scratch. Falls back to classic series/parallel when no plan is set.
+    void runDagPlan(const float *data, int samplesToProcess) {
+        if (!hasDagPlan) return;
+        std::vector<std::vector<float>> *scratch = &dagScratch;
+
+        auto bufFor = [&](int b) -> float * {
+            if (b == 0) return (float *) data;
+            int idx = b - 1;
+            if (idx < 0 || idx >= (int) scratch->size()) return (float *) data;
+            return (*scratch)[idx].data();
+        };
+
+        for (const ggsolver::Op &op : dagPlan.ops) {
+            switch (op.type) {
+                case ggsolver::OpType::COPY: {
+                    float *dst = bufFor(op.dst);
+                    float *src = bufFor(op.src);
+                    if (dst != src)
+                        memcpy(dst, src, sizeof(float) * (size_t)samplesToProcess);
+                    break;
+                }
+                case ggsolver::OpType::MIX: {
+                    float *dst = bufFor(op.dst);
+                    float *src = bufFor(op.src);
+                    if (dst != src)
+                        for (int s = 0; s < samplesToProcess; s++) dst[s] += src[s];
+                    break;
+                }
+                case ggsolver::OpType::RUN: {
+                    int i = op.node;
+                    if (i < 0 || i >= activePlugins) break;
+                    float *b = bufFor(op.dst);
+                    if (inputPorts [i] != -1)
+                        connect_port [i] (handle [i], inputPorts [i], (LADSPA_Data *) b);
+                    if (outputPorts [i] != -1)
+                        connect_port [i] (handle [i], outputPorts [i], (LADSPA_Data *) b);
+                    if (inputPorts2 [i] != -1)
+                        connect_port [i] (handle [i], inputPorts2 [i], (LADSPA_Data *) b);
+                    if (outputPorts2 [i] != -1)
+                        connect_port [i] (handle [i], outputPorts2 [i], (LADSPA_Data *) b);
+                    if (run [i] == NULL)
+                        LOGF ("run %d is null", i);
+                    else
+                        run [i] (handle [i], samplesToProcess);
+                    break;
+                }
+            }
+        }
+    }
     bool pushToLockFreeBeforeOutputVolume = false ;
     int activePlugins =  0 ;
     float * raw = NULL; // this will never be greater than this(TM)
@@ -87,9 +160,9 @@ public:
             raw [i] = inSamples [i] = inputFloats [i] * inputVolume ;
         }
 
-//        if (meterEnabled) {
-//            Meter::process (samplesToProcess, inSamples, true);
-//        }
+if (meterEnabled) {
+            Meter::process (samplesToProcess, inSamples, true);
+        }
         // this
         // am I devloper yet?
 //        memcpy(outputData, inputData, samplesToProcess);
@@ -108,9 +181,9 @@ public:
             *outputFloats++ = inSamples [i];
         }
 
-//        if (meterEnabled) {
-//            Meter::process (samplesToProcess, inSamples, false);
-//        }
+if (meterEnabled) {
+            Meter::process (samplesToProcess, inSamples, false);
+        }
 
         if (! pushToLockFreeBeforeOutputVolume && ! pause)
             lockFreeQueueManager->process(raw, inSamples, samplesToProcess) ;
@@ -135,60 +208,91 @@ public:
         auto start = std::chrono::system_clock::now();
         auto since_last = start ;
 #endif
-        for (int i = 0 ; i < activePlugins ; i ++) {
-            if (inputPorts [i] != -1)
-                connect_port [i] (handle [i], inputPorts [i], (LADSPA_Data *) data);
-            if (outputPorts [i] != -1)
-                connect_port [i] (handle [i], outputPorts [i], (LADSPA_Data *) data);
+        if (activePlugins == 0) return;
 
-//            LOGD("I/O Ports %d %d", inputPorts [i], outputPorts [i]);
-//            LOGD("[%d] samples", samplesToProcess);
+        // DAG plan takes precedence. When the plan is a pure series chain
+        // (seriesOnly fast path) the ops are all RUN on buffer 0 — identical to
+        // the classic series loop below, so the ~5.3ms baseline is preserved.
+        if (hasDagPlan) {
+            runDagPlan(data, samplesToProcess);
+            return;
+        }
 
-            if (inputPorts2 [i] != -1)
-                connect_port [i] (handle [i], inputPorts2 [i], (LADSPA_Data *) data);
-            if (outputPorts2 [i] != -1)
-                connect_port [i] (handle [i], outputPorts2 [i], (LADSPA_Data *) data);
+        if (routingMode == 0 || activePlugins == 1) {
+            // SERIES ROUTING
+            for (int i = 0 ; i < activePlugins ; i ++) {
+                if (inputPorts [i] != -1)
+                    connect_port [i] (handle [i], inputPorts [i], (LADSPA_Data *) data);
+                if (outputPorts [i] != -1)
+                    connect_port [i] (handle [i], outputPorts [i], (LADSPA_Data *) data);
 
-//            LOGD("I/O 2 Ports %d %d", inputPorts2 [i], outputPorts2 [i]);
+                if (inputPorts2 [i] != -1)
+                    connect_port [i] (handle [i], inputPorts2 [i], (LADSPA_Data *) data);
+                if (outputPorts2 [i] != -1)
+                    connect_port [i] (handle [i], outputPorts2 [i], (LADSPA_Data *) data);
 
-            if (run [i] == NULL)
-                LOGF ("run %d is null", i);
-            else
-                run [i] (handle [i], samplesToProcess);
-            /*
-            if (set_run_adding_gain [i] != NULL)
-                set_run_adding_gain [i] (handle [i], run_adding_gain [i]) ;
-            if (run_adding [i] != NULL)
-                run [i] (handle [i], samplesToProcess);
-            */
+                if (run [i] == NULL)
+                    LOGF ("run %d is null", i);
+                else
+                    run [i] (handle [i], samplesToProcess);
 
 #ifdef PROFILE_PLUGINS
-            auto elapsed = std::chrono::system_clock::now() - since_last ;
-            since_last = since_last + elapsed;
-            LOGD("[%d: %d] %lld ms", i, samplesToProcess, elapsed.count ()) ;
+                auto elapsed = std::chrono::system_clock::now() - since_last ;
+                since_last = since_last + elapsed;
+                LOGD("[%d: %d] %lld ms", i, samplesToProcess, elapsed.count ()) ;
 #endif
+            }
+        } else {
+            // PARALLEL ROUTING
+            static std::vector<float> dryBuf;
+            static std::vector<float> branchBuf;
+            static std::vector<float> mixBuf;
+
+            if (dryBuf.size() < (size_t)samplesToProcess) {
+                dryBuf.resize(samplesToProcess);
+                branchBuf.resize(samplesToProcess);
+                mixBuf.resize(samplesToProcess);
+            }
+
+            for (int s = 0; s < samplesToProcess; s++) {
+                dryBuf[s] = data[s];
+                mixBuf[s] = 0.0f;
+            }
+
+            for (int i = 0 ; i < activePlugins ; i ++) {
+                for (int s = 0; s < samplesToProcess; s++) {
+                    branchBuf[s] = dryBuf[s];
+                }
+
+                if (inputPorts [i] != -1)
+                    connect_port [i] (handle [i], inputPorts [i], (LADSPA_Data *) branchBuf.data());
+                if (outputPorts [i] != -1)
+                    connect_port [i] (handle [i], outputPorts [i], (LADSPA_Data *) branchBuf.data());
+
+                if (inputPorts2 [i] != -1)
+                    connect_port [i] (handle [i], inputPorts2 [i], (LADSPA_Data *) branchBuf.data());
+                if (outputPorts2 [i] != -1)
+                    connect_port [i] (handle [i], outputPorts2 [i], (LADSPA_Data *) branchBuf.data());
+
+                if (run [i] != NULL)
+                    run [i] (handle [i], samplesToProcess);
+
+                for (int s = 0; s < samplesToProcess; s++) {
+                    mixBuf[s] += branchBuf[s];
+                }
+            }
+
+            float norm = 1.0f / activePlugins;
+            float * outData = (float *) data;
+            for (int s = 0; s < samplesToProcess; s++) {
+                outData[s] = mixBuf[s] * norm;
+            }
         }
 
 #ifdef PROFILE_PLUGINS
         auto elapsed = std::chrono::system_clock::now() - start ;
         LOGD("[%d] %lld ms", samplesToProcess, elapsed.count ()) ;
 #endif
-
-        /*
-        if (triggerRecord) {
-            LOGD("%f", data [0]);
-            if (data [0] > 0.1)
-                recordingActive = true ;
-            else
-                recordingActive = false ;
-        }
-         */
-
-//        if (recordingActive) {
-//            FileWriter::process(samplesToProcess, data);
-//        }
-
-
     }
 };
 #endif //SAMPLES_FULLDUPLEXPASS_H

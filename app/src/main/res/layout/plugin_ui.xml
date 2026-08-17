@@ -12,11 +12,10 @@
         android:orientation="horizontal">
 
         <LinearLayout
-            android:layout_margin="10dp"
-            android:outlineAmbientShadowColor="@color/white"
-            android:outlineSpotShadowColor="@color/white"
+            android:layout_margin="8dp"
             android:layout_width="match_parent"
-            android:background="@drawable/rounded_corners_transparent"
+            android:id="@+id/pedal_card_root"
+            android:background="@drawable/rounded_corners_pedal"
             android:layout_height="wrap_content">
             <!-- plugin base linear layout-->
             <LinearLayout
@@ -27,16 +26,19 @@
                     android:layout_marginLeft="10dp"
                     android:padding="10dp"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content">
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
 
                     <TextView
                         android:textStyle="bold"
                         android:layout_weight="1"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:fontFamily="@font/gruppo"
-                        android:text="Mono Amplifier"
-                        android:textSize="25dp" />
+                        android:text="NAM AMP"
+                        android:textColor="#FFFFFF"
+                        android:textSize="18dp"
+                        android:maxLines="1"
+                        android:ellipsize="end" />
                     <com.google.android.material.switchmaterial.SwitchMaterial
                         android:layout_marginRight="10dp"
                         android:layout_width="wrap_content"
@@ -59,28 +61,6 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical">
-                    <!--
-                        <TextView
-                            android:layout_marginTop="-20dp"
-                            android:layout_marginLeft="0dp"
-                            android:textStyle="bold"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:fontFamily="@font/comfortaa"
-                            android:text="Gain"
-                            android:rotation="-90"
-                            android:textSize="12dp"/>
-                        <SeekBar
-                            android:padding="10dp"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"/>
-                        <EditText
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:fontFamily="@font/comfortaa"
-                            android:padding="20dp"/>
-                    -->
                 </LinearLayout>
                 <LinearLayout
                     android:layout_marginLeft="10dp"

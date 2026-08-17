@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "id": "factory-cleanchorus",
+  "name": "Clean Chorus Twin",
+  "description": "Sparkling clean amp tone with a subtle mono chorus for shimmer and width. Ideal for pop and funk rhythm work.",
+  "author": "GigginGear Stage",
+  "created_at": 1735689600000,
+  "modified_at": 1735689600000,
+  "favorite": false,
+  "master_input_volume": 1.0,
+  "master_output_volume": 1.0,
+  "tags": ["AMP", "CAB", "MOD"],
+  "plugins": [
+    {
+      "index": 0,
+      "name": "C* AmpVTS - Idealised guitar amplification",
+      "library": "libAmp.so",
+      "unique_id": 2592,
+      "enabled": true,
+      "controls": [],
+      "file_ports": []
+    },
+    {
+      "index": 1,
+      "name": "C* ChorusI - Mono chorus/flanger",
+      "library": "libChorus.so",
+      "unique_id": 1767,
+      "enabled": true,
+      "controls": [],
+      "file_ports": []
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Cabinet frame -->
+    <path
+        android:pathData="M4,5 H20 C21.1,5 22,5.9 22,7 V17 C22,18.1 21.1,19 20,19 H4 C2.9,19 2,18.1 2,17 V7 C2,5.9 2.9,5 4,5 Z"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeColor="@color/cat_cab_sel" />
+    <!-- Grill frame -->
+    <path
+        android:pathData="M5,8 H19 V16 H5 Z"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeColor="@color/cat_cab_sel" />
+    <!-- 4 speaker cones -->
+    <path
+        android:pathData="M8.5,10.5 m-2.3,0 a2.3,2.3 0 1 0 4.6,0 a2.3,2.3 0 1 0 -4.6,0 M15.5,10.5 m-2.3,0 a2.3,2.3 0 1 0 4.6,0 a2.3,2.3 0 1 0 -4.6,0 M8.5,14.5 m-2.3,0 a2.3,2.3 0 1 0 4.6,0 a2.3,2.3 0 1 0 -4.6,0 M15.5,14.5 m-2.3,0 a2.3,2.3 0 1 0 4.6,0 a2.3,2.3 0 1 0 -4.6,0"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:strokeColor="@color/cat_cab_sel" />
+    <!-- cone centers -->
+    <path
+        android:pathData="M8.5,10.5 m-1,0 a1,1 0 1 0 2,0 a1,1 0 1 0 -2,0 M15.5,10.5 m-1,0 a1,1 0 1 0 2,0 a1,1 0 1 0 -2,0 M8.5,14.5 m-1,0 a1,1 0 1 0 2,0 a1,1 0 1 0 -2,0 M15.5,14.5 m-1,0 a1,1 0 1 0 2,0 a1,1 0 1 0 -2,0"
+        android:fillColor="@color/cat_cab_sel" />
+</vector>

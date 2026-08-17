@@ -3,34 +3,28 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
     <item
-        android:id="@+id/page_quick"
-        android:enabled="true"
-        android:visible="true"
-        android:icon="@drawable/ic_baseline_offline_bolt_24"
-        android:title="Quick"/>
-    <item
         android:id="@+id/page_rack"
         android:enabled="true"
         android:visible="true"
-        android:icon="@drawable/ic_baseline_play_circle_filled_24"
-        android:title="Effects"/>
+        android:icon="@drawable/ic_nav_rig"
+        android:title="Giggin' Gear"/>
     <item
         android:visible="true"
         android:id="@+id/page_preset"
         android:enabled="true"
-        android:icon="@drawable/ic_baseline_view_list_24"
+        android:icon="@drawable/ic_nav_presets"
         android:title="Presets"/>
     <item
         android:visible="true"
-        android:id="@+id/page_tracks"
+        android:id="@+id/page_tuner"
         android:enabled="true"
-        android:icon="@drawable/ic_baseline_audio_file_24"
-        android:title="Recordings"/>
+        android:icon="@drawable/ic_nav_tuner"
+        android:title="Tuner"/>
     <item
         android:visible="true"
-        android:id="@+id/page_drums"
+        android:id="@+id/page_settings"
         android:enabled="true"
-        android:icon="@drawable/ic_baseline_speaker_24"
-        android:title="Drums"/>
+        android:icon="@drawable/ic_nav_settings"
+        android:title="Settings"/>
 
 </menu>

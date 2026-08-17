@@ -3,8 +3,8 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:fitsSystemWindows="true"
     android:layout_height="match_parent"
+    android:background="@color/gg_bg"
     tools:context=".MainActivity">
 
     <ImageView
@@ -13,33 +13,108 @@
         android:scaleType="fitXY"
         android:id="@+id/wallpaper"/>
 
-    <LinearLayout
-        app:layout_constraintVertical_weight="1"
-        android:id="@+id/bottom_navigation_layout"
+    <FrameLayout
+        android:id="@+id/fragment_container"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="0dp"
+        app:layout_constraintLeft_toLeftOf="parent"
         app:layout_constraintRight_toRightOf="parent"
         app:layout_constraintTop_toTopOf="parent"
-        android:orientation="vertical">
+        app:layout_constraintBottom_toTopOf="@id/bottom_nav_wrapper"/>
 
-        <FrameLayout
-            android:layout_weight="1"
-            android:id="@+id/fragment_container"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"/>
+    <!-- Bottom Navigation Bar Wrapper with Integrated Signal Meters -->
+    <LinearLayout
+        android:id="@+id/bottom_nav_wrapper"
+        android:layout_width="match_parent"
+        android:layout_height="64dp"
+        android:background="#0B0B0C"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:elevation="12dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toRightOf="parent">
 
+        <!-- Left Meter (Input Signal) -->
+        <LinearLayout
+            android:layout_width="24dp"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:paddingStart="4dp"
+            android:paddingEnd="2dp"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="IN"
+                android:textColor="#8F94A0"
+                android:textSize="8sp"
+                android:textStyle="bold" />
+
+            <com.kancrutt.gigginggear.VerticalMeterView
+                android:id="@+id/meter_input"
+                android:layout_width="14dp"
+                android:layout_height="42dp"
+                android:layout_marginTop="2dp" />
+        </LinearLayout>
+
+        <!-- Navigation Tabs in Center -->
         <com.google.android.material.bottomnavigation.BottomNavigationView
             android:id="@+id/bottom_navigation"
-            android:layout_width="match_parent"
-            app:labelVisibilityMode="selected"
-            app:layout_behavior="@string/hide_bottom_view_on_scroll_behavior"
-            android:layout_gravity="bottom"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="#0B0B0C"
+            app:elevation="0dp"
+            app:itemIconTint="@color/bottom_nav_icon_tint"
             app:itemTextColor="@color/white"
-            app:itemIconTint="@color/white"
-            android:foregroundTint="@color/white"
-            android:background="@drawable/rounded_corners_transparent"
-            app:layout_insetEdge="bottom"
-            android:layout_height="wrap_content"
+            app:itemActiveIndicatorStyle="@android:style/Widget"
+            app:itemRippleColor="@color/gg_accent"
             app:menu="@menu/bottom" />
+
+        <!-- Right Meter (Output Signal) -->
+        <LinearLayout
+            android:layout_width="24dp"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:paddingStart="2dp"
+            android:paddingEnd="4dp"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="OUT"
+                android:textColor="#8F94A0"
+                android:textSize="8sp"
+                android:textStyle="bold" />
+
+            <com.kancrutt.gigginggear.VerticalMeterView
+                android:id="@+id/meter_output"
+                android:layout_width="14dp"
+                android:layout_height="42dp"
+                android:layout_marginTop="2dp" />
+        </LinearLayout>
     </LinearLayout>
+
+    <!-- Tuner overlay: sits above content but below bottom nav so the nav
+         stays visible and reachable while tuning (UI_UX_SPEC SS3.5). -->
+    <FrameLayout
+        android:id="@+id/tuner_overlay_container"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:visibility="gone"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/bottom_nav_wrapper"/>
+
+    <LinearLayout
+        android:id="@+id/bottom_navigation_layout"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintTop_toTopOf="parent"/>
 </androidx.constraintlayout.widget.ConstraintLayout>

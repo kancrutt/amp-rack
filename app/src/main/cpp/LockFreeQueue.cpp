@@ -116,18 +116,20 @@ void LockFreeQueueManager::main () {
 
 void LockFreeQueueManager::quit () {
     IN
-//    ready = false ;
+    // ISSUE-LIFECYCLE-01: the worker thread previously ran forever because
+    // `ready` was never cleared and the thread was never joined, so a deleted
+    // engine left a live native thread running against freed memory. Stop the
+    // loop and join the worker before tearing the engine down.
+    ready = false ;
     AudioBuffer * buffer ;
     while (lockFreeQueue.pop(buffer))
         1 ; // TIL this can also be a statement
 
-    //    detach();
-//    fileWriteThread.join();
-//    for (int i = 0; i < SPARE_BUFFERS; i ++) {
-//        free (pAudioBuffer [i] -> data) ;
-//        free (pAudioBuffer [i] -> raw) ;
-//        free (pAudioBuffer [i]) ;
-//    }
+    if (fileWriteThread.joinable()) {
+        fileWriteThread.join();
+        fileWriteThread = std::thread();
+    }
+    thread_started = false;
 
     OUT
 }

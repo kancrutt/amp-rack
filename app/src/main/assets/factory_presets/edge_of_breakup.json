@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "id": "factory-edge-breakup",
+  "name": "Edge of Breakup",
+  "description": "Pushed clean tone sitting right at the edge of breakup. Classic tube-amp crunch that cleans up from the guitar volume knob.",
+  "author": "GigginGear Stage",
+  "created_at": 1735689600000,
+  "modified_at": 1735689600000,
+  "favorite": false,
+  "master_input_volume": 1.0,
+  "master_output_volume": 1.0,
+  "tags": ["AMP", "CAB", "DELAY"],
+  "plugins": [
+    {
+      "index": 0,
+      "name": "C* AmpVTS - Idealised guitar amplification",
+      "library": "libAmp.so",
+      "unique_id": 2592,
+      "enabled": true,
+      "controls": [],
+      "file_ports": []
+    },
+    {
+      "index": 1,
+      "name": "C* ToneStack - Classic amplifier tone stack emulation",
+      "library": "libToneStack.so",
+      "unique_id": 2589,
+      "enabled": true,
+      "controls": [],
+      "file_ports": []
+    },
+    {
+      "index": 2,
+      "name": "Tape Delay Simulation",
+      "library": "libtape_delay_1211.so",
+      "unique_id": 1211,
+      "enabled": true,
+      "controls": [],
+      "file_ports": []
+    }
+  ]
+}

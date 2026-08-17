@@ -18,6 +18,8 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:fontFamily="@font/comfortaa"
+            android:maxLines="1"
+            android:ellipsize="end"
             android:text="Plugin"/>
 
         <ToggleButton
@@ -42,5 +44,7 @@
         android:layout_height="wrap_content"
         android:id="@+id/plugin_desc"
         android:fontFamily="@font/comfortaa"
+        android:maxLines="1"
+        android:ellipsize="end"
         android:text="Effect Plugin"/>
 </LinearLayout>

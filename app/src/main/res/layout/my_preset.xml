@@ -1,74 +1,112 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:orientation="vertical"
     android:layout_width="match_parent"
-    android:layout_margin="10dp"
-    android:padding="10dp"
-    android:background="@drawable/rounded_corners_transparent"
-    android:layout_height="wrap_content">
+    android:layout_height="wrap_content"
+    android:layout_margin="6dp"
+    android:padding="12dp"
+    android:background="@drawable/gg_card_bg"
+    android:elevation="2dp">
+
+    <TextView
+        android:id="@+id/preset_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:fontFamily="sans-serif-medium"
+        android:textSize="16sp"
+        android:textColor="@color/gg_text"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:text="Rig Title"/>
+
+    <TextView
+        android:id="@+id/preset_desc"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:fontFamily="sans-serif"
+        android:textSize="12sp"
+        android:textColor="@color/gg_secondary"
+        android:maxLines="2"
+        android:ellipsize="end"
+        android:text="Preset description"/>
+
+    <LinearLayout
+        android:id="@+id/preset_tags"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:orientation="horizontal"/>
+
+    <TextView
+        android:id="@+id/preset_meta"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:fontFamily="sans-serif"
+        android:textSize="11sp"
+        android:textColor="@color/gg_hint"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:text="Aug 2026 - GigginGear Stage"/>
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
         android:orientation="horizontal">
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical">
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:fontFamily="@font/comfortaa"
-                android:textSize="24dp"
-                android:text="Plugin Name"/>
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:fontFamily="@font/montserrat_alternates"
-                android:text="Description of the preset comes here"/>
 
-        </LinearLayout>
         <com.google.android.material.button.MaterialButton
+            android:id="@+id/preset_quick_load"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:background="@color/fui_transparent"
-            android:drawableRight="@drawable/ic_baseline_play_arrow_24"
-            android:width="30dp"/>
-    </LinearLayout>
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal">
-        <com.google.android.material.button.MaterialButton
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:padding="10dp"
-            android:text="Delete"
-            android:textColor="@color/dark_red"
             android:layout_gravity="start"
-            android:drawableLeft="@drawable/ic_baseline_delete_forever_24"
-            android:background="@color/fui_transparent"/>
-
+            android:text="Quick Load"
+            android:textSize="12sp"
+            android:textColor="@color/black"
+            app:backgroundTint="@color/gg_accent"
+            app:cornerRadius="8dp"
+            android:drawableLeft="@drawable/ic_baseline_play_arrow_24"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:paddingLeft="12dp"
+            android:paddingRight="12dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"/>
 
         <Space
-            android:layout_width="wrap_content"
-            android:layout_gravity="center"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"/>
+
         <ToggleButton
+            android:id="@+id/preset_favorite"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:backgroundTint="@android:color/transparent"
             android:background="@android:color/transparent"
             android:drawable="@drawable/ic_baseline_favorite_border_24"
-            android:layout_marginRight="5dp"
-            android:textOff="Like"
-            android:textOn="Unlike"
-            android:layout_gravity="end|right"/>
+            android:textOff=""
+            android:textOn=""
+            android:layout_gravity="center_vertical"/>
 
-
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/preset_delete"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:text="Delete"
+            android:textSize="12sp"
+            android:textColor="@color/dark_red"
+            android:layout_gravity="center_vertical"
+            app:backgroundTint="@color/gg_card"
+            app:cornerRadius="8dp"
+            android:drawableLeft="@drawable/ic_baseline_delete_forever_24"
+            android:paddingLeft="10dp"
+            android:paddingRight="10dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"/>
     </LinearLayout>
 </LinearLayout>

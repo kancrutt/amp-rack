@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "id": "factory-plexicrunch",
+  "name": "Plexi Crunch",
+  "description": "Stage-ready British crunch: idealised Plexi front-end into a classic 4x12 cabinet, with a tape delay for lead lines.",
+  "author": "GigginGear Stage",
+  "created_at": 1735689600000,
+  "modified_at": 1735689600000,
+  "favorite": false,
+  "master_input_volume": 1.0,
+  "master_output_volume": 1.0,
+  "tags": ["AMP", "CAB", "DELAY"],
+  "plugins": [
+    {
+      "index": 0,
+      "name": "C* AmpVTS - Idealised guitar amplification",
+      "library": "libAmp.so",
+      "unique_id": 2592,
+      "enabled": true,
+      "controls": [],
+      "file_ports": []
+    },
+    {
+      "index": 1,
+      "name": "C* CabinetIV - Idealised loudspeaker cabinet",
+      "library": "libCabIV.so",
+      "unique_id": 2606,
+      "enabled": true,
+      "controls": [],
+      "file_ports": []
+    },
+    {
+      "index": 2,
+      "name": "Tape Delay Simulation",
+      "library": "libtape_delay_1211.so",
+      "unique_id": 1211,
+      "enabled": true,
+      "controls": [],
+      "file_ports": []
+    }
+  ]
+}

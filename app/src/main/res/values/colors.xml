@@ -140,4 +140,106 @@
     <color name="dark_blue">#00008B</color>
     <color name="navy">#000080</color>
     <color name="black">#000000</color>
+    <color name="fui_transparent">#00000000</color>
+    <color name="colorPrimary">#FFAA00</color>
+
+    <!-- Phase 2.4/2.5 dark UI tokens -->
+    <color name="gg_bg">#121214</color>
+    <color name="gg_card">#1E1E22</color>
+    <color name="gg_border">#3A3A3C</color>
+    <color name="gg_secondary">#8E8E93</color>
+    <color name="gg_hint">#6C6C70</color>
+    <color name="gg_accent">#FF9500</color>
+    <color name="gg_text">#FFFFFF</color>
+
+    <!-- ============================================================
+         ICON CATEGORY COLOR SYSTEM
+         Two-axis: hue = category identity (constant), state = active/inactive
+         Active  = full saturation category hue
+         Inactive = 40% saturation, muted
+         ============================================================ -->
+
+    <!-- ── Amp ── warm red ── -->
+    <color name="cat_amp_active">#E8543C</color>
+    <color name="cat_amp_inactive">#8C4A3A</color>
+
+    <!-- ── Cabinet / IR ── neutral gray-white (no hue, matches Helix convention) ── -->
+    <color name="cat_cab_active">#B0B0B0</color>
+    <color name="cat_cab_inactive">#5A5A5A</color>
+
+    <!-- ── Distortion / Overdrive ── orange-red ── -->
+    <color name="cat_dist_active">#F2A03D</color>
+    <color name="cat_dist_inactive">#7A5530</color>
+
+    <!-- ── Modulation ── blue ── -->
+    <color name="cat_mod_active">#3D8BF2</color>
+    <color name="cat_mod_inactive">#2A5580</color>
+
+    <!-- ── Delay ── green ── -->
+    <color name="cat_delay_active">#4CD97B</color>
+    <color name="cat_delay_inactive">#2A6644</color>
+
+    <!-- ── Reverb ── magenta-purple ── -->
+    <color name="cat_reverb_active">#B85CF2</color>
+    <color name="cat_reverb_inactive">#5E3378</color>
+
+    <!-- ── Dynamics / Compressor ── amber-orange ── -->
+    <color name="cat_dynamics_active">#FFB74D</color>
+    <color name="cat_dynamics_inactive">#7A5530</color>
+
+    <!-- ── EQ ── lime-green ── -->
+    <color name="cat_eq_active">#A5D6A7</color>
+    <color name="cat_eq_inactive">#4A6648</color>
+
+    <!-- ── Pitch / Synth ── purple ── -->
+    <color name="cat_pitch_active">#8B5CF2</color>
+    <color name="cat_pitch_inactive">#3E2E6E</color>
+
+    <!-- ── Wah / Filter ── cyan ── -->
+    <color name="cat_wah_active">#3DE8F2</color>
+    <color name="cat_wah_inactive">#1E6A70</color>
+
+    <!-- ── Volume / Pan ── teal ── -->
+    <color name="cat_vol_active">#3DE8C1</color>
+    <color name="cat_vol_inactive">#1E6A58</color>
+
+    <!-- ── Noise Gate ── amber-orange (same family as Dynamics, distinguished by shape) ── -->
+    <color name="cat_gate_active">#FFE0B2</color>
+    <color name="cat_gate_inactive">#6E5538</color>
+
+    <!-- ── Nav icon tint (neutral) ── -->
+    <color name="nav_icon_inactive">#6C6C70</color>
+    <color name="nav_icon_active">#FFAA00</color>
+
+    <!-- ============================================================
+         STATE SELECTORS — active / inactive per category
+         Each selector points to the concrete color pair above.
+         Use these as android:tint / android:strokeColor源头.
+         ============================================================ -->
+
+    <!-- Selectors (lightweight wrappers) -->
+    <color name="cat_amp_sel">#E8543C</color>
+    <color name="cat_amp_dim">#5A2A1E</color>
+    <color name="cat_cab_sel">#B0B0B0</color>
+    <color name="cat_cab_dim">#3A3A3A</color>
+    <color name="cat_dist_sel">#F2A03D</color>
+    <color name="cat_dist_dim">#5E3A18</color>
+    <color name="cat_mod_sel">#3D8BF2</color>
+    <color name="cat_mod_dim">#1E3A60</color>
+    <color name="cat_delay_sel">#4CD97B</color>
+    <color name="cat_delay_dim">#1A4028</color>
+    <color name="cat_reverb_sel">#B85CF2</color>
+    <color name="cat_reverb_dim">#3E1A60</color>
+    <color name="cat_dynamics_sel">#FFB74D</color>
+    <color name="cat_dynamics_dim">#5E3A18</color>
+    <color name="cat_eq_sel">#A5D6A7</color>
+    <color name="cat_eq_dim">#2A4028</color>
+    <color name="cat_pitch_sel">#8B5CF2</color>
+    <color name="cat_pitch_dim">#2E1A50</color>
+    <color name="cat_wah_sel">#3DE8F2</color>
+    <color name="cat_wah_dim">#0E3A40</color>
+    <color name="cat_vol_sel">#3DE8C1</color>
+    <color name="cat_vol_dim">#0E3A30</color>
+    <color name="cat_gate_sel">#FFE0B2</color>
+    <color name="cat_gate_dim">#2A2010</color>
 </resources>

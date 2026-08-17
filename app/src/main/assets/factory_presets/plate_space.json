@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "id": "factory-plate-space",
+  "name": "Plate Space",
+  "description": "Warm amp into a wide plate reverb - vintage studio ambience for ballads and ambient parts.",
+  "author": "GigginGear Stage",
+  "created_at": 1735689600000,
+  "modified_at": 1735689600000,
+  "favorite": false,
+  "master_input_volume": 1.0,
+  "master_output_volume": 1.0,
+  "tags": ["AMP", "CAB", "REVERB"],
+  "plugins": [
+    {
+      "index": 0,
+      "name": "C* AmpVTS - Idealised guitar amplification",
+      "library": "libAmp.so",
+      "unique_id": 2592,
+      "enabled": true,
+      "controls": [],
+      "file_ports": []
+    },
+    {
+      "index": 1,
+      "name": "C* Plate - Versatile plate reverb",
+      "library": "libReverb.so",
+      "unique_id": 1779,
+      "enabled": true,
+      "controls": [],
+      "file_ports": []
+    }
+  ]
+}

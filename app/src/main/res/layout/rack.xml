@@ -115,29 +115,81 @@
             android:background="#2E3138" />
 
         <!-- Lower Half: Inline Split-Screen Parameter Editor -->
-        <LinearLayout
-            android:id="@+id/parameter_editor_container"
+        <ScrollView
+            android:id="@+id/parameter_editor_scroll"
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
             android:background="#15171B"
-            android:orientation="horizontal"
-            android:padding="10dp">
+            android:fillViewport="true">
 
-            <!-- Left Column: Amp/Cabinet Gear Graphic Render -->
-            <FrameLayout
-                android:layout_width="160dp"
+            <LinearLayout
+                android:id="@+id/parameter_editor_container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:padding="10dp">
+
+            <!-- Left Column: Amp/Cabinet Gear Graphic Render + Plugin Identity -->
+            <LinearLayout
+                android:layout_width="@dimen/dialog_gear_width"
                 android:layout_height="match_parent"
                 android:background="#0C0D0F"
+                android:orientation="vertical"
                 android:padding="6dp">
 
-                <ImageView
-                    android:id="@+id/detail_gear_render"
+                <!-- Gear Render -->
+                <FrameLayout
                     android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:scaleType="fitCenter"
-                    android:src="@drawable/gg_gear_placeholder" />
-            </FrameLayout>
+                    android:layout_height="@dimen/dialog_gear_height">
+
+                    <ImageView
+                        android:id="@+id/detail_gear_render"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:scaleType="fitCenter"
+                        android:src="@drawable/gg_gear_placeholder" />
+                </FrameLayout>
+
+                <!-- Plugin Badge -->
+                <TextView
+                    android:id="@+id/detail_badge_pill"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_horizontal"
+                    android:layout_marginTop="8dp"
+                    android:layout_marginBottom="4dp"
+                    android:background="@drawable/gg_pill_bg"
+                    android:paddingStart="6dp"
+                    android:paddingTop="2dp"
+                    android:paddingEnd="6dp"
+                    android:paddingBottom="2dp"
+                    android:text="A1"
+                    android:textColor="#00FF66"
+                    android:textSize="9sp"
+                    android:textStyle="bold" />
+
+                <!-- ENABLED Button -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/detail_enabled_btn"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:minHeight="26dp"
+                    android:paddingLeft="8dp"
+                    android:paddingTop="0dp"
+                    android:paddingRight="8dp"
+                    android:paddingBottom="0dp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:text="ENABLED"
+                    android:textColor="#00E676"
+                    android:textSize="9sp"
+                    android:textStyle="bold"
+                    app:cornerRadius="12dp"
+                    app:strokeColor="#00E676" />
+            </LinearLayout>
 
             <!-- Right Column: Model Browser + Tabs + Control Panels -->
             <LinearLayout
@@ -188,40 +240,7 @@
                             android:textSize="9sp" />
                     </LinearLayout>
 
-                    <TextView
-                        android:id="@+id/detail_badge_pill"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="4dp"
-                        android:layout_marginEnd="6dp"
-                        android:background="@drawable/gg_pill_bg"
-                        android:paddingStart="6dp"
-                        android:paddingTop="2dp"
-                        android:paddingEnd="6dp"
-                        android:paddingBottom="2dp"
-                        android:text="A1"
-                        android:textColor="#00FF66"
-                        android:textSize="9sp"
-                        android:textStyle="bold" />
 
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/detail_enabled_btn"
-                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:minHeight="26dp"
-                        android:paddingLeft="8dp"
-                        android:paddingTop="0dp"
-                        android:paddingRight="8dp"
-                        android:paddingBottom="0dp"
-                        android:insetTop="0dp"
-                        android:insetBottom="0dp"
-                        android:text="ENABLED"
-                        android:textColor="#00E676"
-                        android:textSize="9sp"
-                        android:textStyle="bold"
-                        app:cornerRadius="12dp"
-                        app:strokeColor="#00E676" />
                 </LinearLayout>
 
                 <!-- Model Browser Row -->
@@ -327,6 +346,7 @@
                         android:layout_height="match_parent"
                         android:layout_marginEnd="6dp"
                         android:background="#1E2024"
+                        android:minHeight="@dimen/dialog_control_row_height"
                         android:orientation="vertical"
                         android:padding="6dp"
                         android:visibility="gone">
@@ -342,7 +362,9 @@
 
                         <HorizontalScrollView
                             android:layout_width="wrap_content"
-                            android:layout_height="match_parent"
+                            android:layout_height="wrap_content"
+                            android:maxHeight="@dimen/dialog_knob_grid_max_height"
+                            android:minHeight="@dimen/dialog_control_row_height"
                             android:fillViewport="true"
                             android:scrollbars="none">
 
@@ -362,6 +384,7 @@
                         android:layout_height="match_parent"
                         android:layout_weight="1"
                         android:background="#1E2024"
+                        android:minHeight="@dimen/dialog_control_row_height"
                         android:orientation="vertical"
                         android:padding="6dp">
 
@@ -377,7 +400,9 @@
 
                         <HorizontalScrollView
                             android:layout_width="match_parent"
-                            android:layout_height="match_parent"
+                            android:layout_height="wrap_content"
+                            android:maxHeight="@dimen/dialog_knob_grid_max_height"
+                            android:minHeight="@dimen/dialog_control_row_height"
                             android:fillViewport="true"
                             android:scrollbars="none">
 
@@ -387,12 +412,15 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="match_parent"
                                 android:gravity="center"
-                                android:orientation="vertical" />
+                                android:orientation="vertical">
+                                
+                            </LinearLayout>
                         </HorizontalScrollView>
                     </LinearLayout>
                 </LinearLayout>
             </LinearLayout>
         </LinearLayout>
+        </ScrollView>
     </LinearLayout>
     <!-- Hidden Legacy Views Container (Guarantees backend Java code compiles while views stay 100% hidden) -->
     <LinearLayout
@@ -417,7 +445,9 @@
         <ToggleButton android:id="@+id/toggle_video" android:layout_width="wrap_content" android:layout_height="wrap_content" />
         <ToggleButton android:id="@+id/flip_camera" android:layout_width="wrap_content" android:layout_height="wrap_content" />
         <TextureView android:id="@+id/video_texture" android:layout_width="wrap_content" android:layout_height="wrap_content" />
-        <LinearLayout android:id="@+id/video_preview" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+        <LinearLayout android:id="@+id/video_preview" android:layout_width="wrap_content" android:layout_height="wrap_content">
+                
+            </LinearLayout>
 
         <LinearLayout android:id="@+id/mixer" android:layout_width="wrap_content" android:layout_height="wrap_content">
             <TextView android:id="@+id/patch_label" android:layout_width="wrap_content" android:layout_height="wrap_content" />
@@ -429,10 +459,18 @@
             <TextView android:id="@+id/pro_label" android:layout_width="wrap_content" android:layout_height="wrap_content" />
             <TextView android:id="@+id/sample_rate_display" android:layout_width="wrap_content" android:layout_height="wrap_content" />
             <ImageView android:id="@+id/lowLatencyWarning" android:layout_width="wrap_content" android:layout_height="wrap_content" />
-            <LinearLayout android:id="@+id/sr_layout" android:layout_width="wrap_content" android:layout_height="wrap_content" />
-            <LinearLayout android:id="@+id/patch_master" android:layout_width="wrap_content" android:layout_height="wrap_content" />
-            <LinearLayout android:id="@+id/mixer_input" android:layout_width="wrap_content" android:layout_height="wrap_content" />
-            <LinearLayout android:id="@+id/mixer_output" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+            <LinearLayout android:id="@+id/sr_layout" android:layout_width="wrap_content" android:layout_height="wrap_content">
+                
+            </LinearLayout>
+            <LinearLayout android:id="@+id/patch_master" android:layout_width="wrap_content" android:layout_height="wrap_content">
+                
+            </LinearLayout>
+            <LinearLayout android:id="@+id/mixer_input" android:layout_width="wrap_content" android:layout_height="wrap_content">
+                
+            </LinearLayout>
+            <LinearLayout android:id="@+id/mixer_output" android:layout_width="wrap_content" android:layout_height="wrap_content">
+                
+            </LinearLayout>
             <TextView android:id="@+id/mixer_input_label" android:layout_width="wrap_content" android:layout_height="wrap_content" />
             <TextView android:id="@+id/mixer_output_label" android:layout_width="wrap_content" android:layout_height="wrap_content" />
             <ProgressBar android:id="@+id/mixer_input_progress" android:layout_width="wrap_content" android:layout_height="wrap_content" />
@@ -452,7 +490,9 @@
             <TextView android:id="@+id/rotary_input_label" android:layout_width="wrap_content" android:layout_height="wrap_content" />
             <TextView android:id="@+id/rotary_output_display" android:layout_width="wrap_content" android:layout_height="wrap_content" />
             <TextView android:id="@+id/rotary_output_label" android:layout_width="wrap_content" android:layout_height="wrap_content" />
-            <LinearLayout android:id="@+id/rotary_rack" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+            <LinearLayout android:id="@+id/rotary_rack" android:layout_width="wrap_content" android:layout_height="wrap_content">
+                
+            </LinearLayout>
             <com.kancrutt.gigginggear.RotarySeekbar android:id="@+id/rotary_input_volume"
             app:showKnob="true" android:layout_width="wrap_content" android:layout_height="wrap_content" />
             <com.kancrutt.gigginggear.RotarySeekbar android:id="@+id/rotary_output_volume"

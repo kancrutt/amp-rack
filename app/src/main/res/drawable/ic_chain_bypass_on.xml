@@ -1,0 +1,39 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <!-- Outer circle -->
+    <path
+        android:pathData="M12,4 A8,8 0 1,1 12,20 A8,8 0 1,1 12,4 Z"
+        android:strokeColor="#4CAF50"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="@android:color/transparent" />
+
+    <!-- Power symbol vertical line -->
+    <path
+        android:pathData="M12,3 L12,7"
+        android:strokeColor="#4CAF50"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+
+    <!-- Power symbol arc -->
+    <path
+        android:pathData="M8.5,6.5 A5.5,5.5 0 1,1 15.5,6.5"
+        android:strokeColor="#4CAF50"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="@android:color/transparent" />
+
+    <!-- LED dot (filled) -->
+    <path
+        android:pathData="M12,1.5 A1,1 0 1,1 12,3.5 A1,1 0 1,1 12,1.5 Z"
+        android:fillColor="#4CAF50"
+        android:strokeWidth="0" />
+
+</vector>

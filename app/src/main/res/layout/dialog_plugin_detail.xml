@@ -7,7 +7,7 @@
     android:orientation="vertical"
     android:padding="16dp">
 
-    <!-- Top Header Bar -->
+    <!-- Top Header Bar - Simplified for Better Mobile Spacing -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -52,39 +52,7 @@
                 android:textStyle="bold" />
         </LinearLayout>
 
-        <!-- Pill Badge A1 -->
-        <TextView
-            android:id="@+id/detail_badge_pill"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginEnd="10dp"
-            android:background="@drawable/gg_pill_bg"
-            android:paddingStart="10dp"
-            android:paddingTop="3dp"
-            android:paddingEnd="10dp"
-            android:paddingBottom="3dp"
-            android:text="A1"
-            android:textColor="#00FF66"
-            android:textSize="11sp"
-            android:textStyle="bold" />
-
-        <!-- ENABLED Button -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/detail_enabled_btn"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-            android:layout_width="wrap_content"
-            android:layout_height="32dp"
-            android:layout_marginEnd="10dp"
-            android:paddingLeft="12dp"
-            android:paddingRight="12dp"
-            android:text="ENABLED"
-            android:textColor="#00E676"
-            android:textSize="10sp"
-            android:textStyle="bold"
-            app:cornerRadius="16dp"
-            app:strokeColor="#00E676" />
-
-        <!-- Close Button -->
+        <!-- Close Button Only -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/detail_close_btn"
             style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
@@ -113,19 +81,59 @@
         android:orientation="horizontal">
 
         <!-- Left Column: Amp/Gear Stack Render Graphic -->
-        <FrameLayout
+        <LinearLayout
             android:layout_width="220dp"
-            android:layout_height="260dp"
+            android:layout_height="wrap_content"
             android:background="#0C0D0F"
+            android:orientation="vertical"
             android:padding="8dp">
 
-            <ImageView
-                android:id="@+id/detail_gear_render"
+            <!-- Gear Render -->
+            <FrameLayout
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:scaleType="fitCenter"
-                android:src="@drawable/gg_gear_placeholder" />
-        </FrameLayout>
+                android:layout_height="@dimen/dialog_gear_height">
+
+                <ImageView
+                    android:id="@+id/detail_gear_render"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/gg_gear_placeholder" />
+            </FrameLayout>
+
+            <!-- Badge A5 -->
+            <TextView
+                android:id="@+id/detail_badge_pill"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="8dp"
+                android:background="@drawable/gg_pill_bg"
+                android:paddingStart="10dp"
+                android:paddingTop="3dp"
+                android:paddingEnd="10dp"
+                android:paddingBottom="3dp"
+                android:text="A1"
+                android:textColor="#00FF66"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <!-- ENABLED Button -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/detail_enabled_btn"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="32dp"
+                android:paddingLeft="12dp"
+                android:paddingRight="12dp"
+                android:text="ENABLED"
+                android:textColor="#00E676"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                app:cornerRadius="16dp"
+                app:strokeColor="#00E676" />
+        </LinearLayout>
 
         <!-- Right Column: Model Browser + Tabs + Control Panels -->
         <LinearLayout
@@ -230,6 +238,7 @@
                     android:layout_marginEnd="10dp"
                     android:background="#1E2024"
                     android:orientation="vertical"
+                    android:minHeight="@dimen/dialog_control_row_height"
                     android:padding="10dp">
 
                     <TextView
@@ -245,6 +254,8 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
+                        android:maxHeight="@dimen/dialog_knob_grid_max_height"
+                        android:minHeight="@dimen/dialog_control_row_height"
                         android:scrollbars="horizontal">
 
                         <LinearLayout
@@ -263,6 +274,7 @@
                     android:layout_weight="1"
                     android:background="#1E2024"
                     android:orientation="vertical"
+                    android:minHeight="@dimen/dialog_control_row_height"
                     android:padding="10dp">
 
                     <TextView
@@ -278,6 +290,8 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
+                        android:maxHeight="@dimen/dialog_knob_grid_max_height"
+                        android:minHeight="@dimen/dialog_control_row_height"
                         android:scrollbars="horizontal">
 
                         <LinearLayout

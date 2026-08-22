@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_activated="true" android:drawable="@drawable/ic_cat_eq" android:tint="@color/cat_eq_active" />
+    <item android:state_activated="false" android:drawable="@drawable/ic_cat_eq" android:tint="@color/cat_eq_inactive" />
+    <item android:drawable="@drawable/ic_cat_eq" android:tint="@color/cat_eq_inactive" />
+</selector>

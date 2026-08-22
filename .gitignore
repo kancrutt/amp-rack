@@ -20,3 +20,5 @@ app/release/app-release.apk
 # Scratch artifacts (never commit)
 WIP/
 fix_proof.diff
+*.jks
+*.keystore

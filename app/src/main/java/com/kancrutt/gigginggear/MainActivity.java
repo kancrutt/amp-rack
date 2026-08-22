@@ -1864,37 +1864,66 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     Log.d(TAG, "onActivityResult: got mime type " + mimeType + ": " + path + " (" + ext + ")");
                     String dir = context.getExternalFilesDir(
                             Environment.DIRECTORY_DOWNLOADS) + "/" + AudioEngine.getActivePluginName(plugin);
-                    DataAdapter.ViewHolder holder = (DataAdapter.ViewHolder) recyclerView.findViewHolderForAdapterPosition(plugin);
+                    // Legacy spinner holder no longer exists (hidden RecyclerView has no
+                    // attached holders) — load straight into the engine instead.
                     switch (ext.toLowerCase()) {
                         case "nam":
                         default: // aye
                             Log.d(TAG, String.format("setFileName: %s", path));
-                            String s = getFileContent(returnUri);
-//                            AudioEngine.setPluginFilename(s, plugin);
-                            String basename = path ; //returnUri.getLastPathSegment();
-                            basename = basename.substring(basename.lastIndexOf(":") + 1);
-                            Log.d(TAG, String.format("[basename]: %s", basename));
-                            String dest = dir + "/" + basename;
-                            File fDir = new File (dir) ;
-                            if (! fDir.exists())
-                                if (!fDir.mkdirs())
-                                    alert("Cannot create directory", "Error loading model: " + dir);
+                            try {
+                                String s = getFileContent(returnUri);
+                                String basename = path.substring(path.lastIndexOf(":") + 1);
+                                basename = basename.substring(basename.lastIndexOf("/") + 1);
+                                Log.d(TAG, String.format("[basename]: %s", basename));
+                                String dest = dir + "/" + basename;
+                                File fDir = new File (dir) ;
+                                if (! fDir.exists())
+                                    if (!fDir.mkdirs())
+                                        alert("Cannot create directory", "Error loading model: " + dir);
 
-                            writeFile(dest, s);
-                            // FIX: the engine was never told about the model —
-                            // file landed on disk but no setAtomPort call existed,
-                            // so Browse appeared to do nothing to the sound.
-                            int atomCtrl = resolveAtomControl(plugin);
-                            AudioEngine.setAtomPort(plugin, atomCtrl, dest);
-                            Log.i(TAG, "[load atom] SAF pick -> plugin " + plugin + " ctrl " + atomCtrl + " file " + dest);
-                            int position = setSpinnerFromDir(holder.modelSpinner, dir, basename);
-                            holder.modelSpinner.setSelection(position);
-                            //                            ((DataAdapter.ViewHolder) mainActivity.recyclerView.findViewHolderForAdapterPosition(plugin)).modelSpinnerLayout.setVisibility(View.GONE);
-                            toast("Loaded model successfully: " + basename);
+                                writeFile(dest, s);
+                                // Native setPluginFilename dereferences lv2Descriptor
+                                // without null-check -> SIGSEGV on non-file-port plugins.
+                                boolean canLoad = false;
+                                try {
+                                    canLoad = plugin < AudioEngine.getActivePlugins()
+                                            && AudioEngine.getFilePort(plugin);
+                                } catch (Throwable t) {
+                                    Log.w(TAG, "getFilePort probe failed", t);
+                                }
+                                if (!canLoad) {
+                                    toast("This block cannot load model files");
+                                    return;
+                                }
+                                // Correct engine API: Plugin::setFileName() connects port 99
+                                // (size) / port 100 (path). Arg order: filename FIRST.
+                                AudioEngine.setPluginFilename(dest, plugin);
+                                Log.i(TAG, "[load model] SAF pick -> plugin " + plugin + " file " + dest);
+                                toast("Loaded model successfully: " + basename);
+                            } catch (Exception e) {
+                                Log.e(TAG, "model load failed", e);
+                                toast("Failed to load model: " + e.getMessage());
+                            }
                             return;
                         case "zip":
-                            unzipNAMModel(dir, returnUri);
-                            setSpinnerFromDir(holder.modelSpinner, dir, null);
+                            try {
+                                unzipNAMModel(dir, returnUri);
+                                File zdir = new File(dir);
+                                File[] models = zdir.listFiles((d, n) -> n.toLowerCase().endsWith(".nam"));
+                                boolean canZ = plugin < AudioEngine.getActivePlugins()
+                                        && AudioEngine.getFilePort(plugin);
+                                if (models != null && models.length > 0 && canZ) {
+                                    java.util.Arrays.sort(models);
+                                    String picked = models[models.length - 1].getAbsolutePath();
+                                    AudioEngine.setPluginFilename(picked, plugin);
+                                    toast("Loaded model: " + models[models.length - 1].getName());
+                                } else {
+                                    toast("No .nam file found inside zip");
+                                }
+                            } catch (Exception e) {
+                                Log.e(TAG, "zip model load failed", e);
+                                toast("Failed to unpack model");
+                            }
                             return;
                     }
                 }
@@ -1937,7 +1966,11 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 AudioEngine.setPluginBuffer(samples, plugin);
                 Log.d(TAG, String.format ("[decoder]: %d", samples.length));
                 DataAdapter.ViewHolder holder = (DataAdapter.ViewHolder) recyclerView.findViewHolderForAdapterPosition(plugin);
-                holder.audioFile = audioFile.toString();
+                if (holder != null) {
+                    holder.audioFile = audioFile.toString();
+                } else if (dataAdapter != null) {
+                    dataAdapter.setAudioFiles(plugin, audioFile.toString());
+                }
             } catch (IOException e) {
                 toast(e.getMessage());
                 Log.e(TAG, "onActivityResult: ", e);
@@ -2563,7 +2596,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
     Map presetToMap() {
         int totalPresets = AudioEngine.getActivePlugins();
-        Map<String, Map> preset = new HashMap<>();
+        Map<String, Object> preset = new HashMap<>();
 
         for (int i = 0; i < totalPresets; i++) {
             Map<String, String> jo = new HashMap<>();
@@ -2615,9 +2648,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             if (graphEdges != null && graphEdges.length > 0) {
                 java.util.List<Integer> gList = new ArrayList<>();
                 for (int g : graphEdges) gList.add(g);
-                Map<String, Object> gMap = new HashMap<>();
-                gMap.put("graph", gList);
-                preset.put("graph_meta", (Map) gMap);
+                preset.put("graph", gList); // flat list; reader accepts JSONArray/List
             }
         } catch (Exception ignored) {}
 
@@ -2679,7 +2710,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     }
 
     Map _presetToMap() throws JSONException {
-        Map<String, Map> preset = new HashMap<>();
+        Map<String, Object> preset = new HashMap<>();
         if (dataAdapter == null)
             return null;
 
@@ -2977,35 +3008,12 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     levelContainer.addView(cell);
                 }
 
-                // Populate TONE container
-                if (tabletMode && toneCells.size() > 4) {
-                    toneContainer.setOrientation(LinearLayout.VERTICAL);
-                    int half = (int) Math.ceil(toneCells.size() / 2.0);
-                    LinearLayout row1 = new LinearLayout(this);
-                    row1.setOrientation(LinearLayout.HORIZONTAL);
-                    row1.setGravity(Gravity.CENTER);
-
-                    LinearLayout row2 = new LinearLayout(this);
-                    row2.setOrientation(LinearLayout.HORIZONTAL);
-                    row2.setGravity(Gravity.CENTER);
-                    row2.setPadding(0, Math.round(2 * density), 0, 0);
-
-                    for (int k = 0; k < toneCells.size(); k++) {
-                        if (k < half) {
-                            row1.addView(toneCells.get(k));
-                        } else {
-                            row2.addView(toneCells.get(k));
-                        }
-                    }
-                    toneContainer.addView(row1);
-                    toneContainer.addView(row2);
-                } else {
-                    // Single row horizontal scrollable — directly add knob cells to horizontal container
-                    toneContainer.setOrientation(LinearLayout.HORIZONTAL);
-                    toneContainer.setGravity(Gravity.CENTER_VERTICAL);
-                    for (LinearLayout cell : toneCells) {
-                        toneContainer.addView(cell);
-                    }
+                // Populate TONE container — single horizontal scrollable row,
+                // center-justified by HSV layout_gravity when content is narrow
+                toneContainer.setOrientation(LinearLayout.HORIZONTAL);
+                toneContainer.setGravity(Gravity.CENTER_VERTICAL);
+                for (LinearLayout cell : toneCells) {
+                    toneContainer.addView(cell);
                 }
 
                 // Dynamically adjust panel visibility so we don't force empty "LEVEL" boxes
@@ -3197,8 +3205,12 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             }
 
             // Carry over graph edges & node positions if present in map
-            if (map.containsKey("graph") && map.get("graph") instanceof java.util.List) {
-                legacy.put("graph", new JSONArray((java.util.List<?>) map.get("graph")));
+            Object gSrc = map.containsKey("graph") ? map.get("graph") : map.get("graph_meta");
+            if (gSrc instanceof Map && ((Map<?, ?>) gSrc).containsKey("graph")) {
+                gSrc = ((Map<?, ?>) gSrc).get("graph");
+            }
+            if (gSrc instanceof java.util.List) {
+                legacy.put("graph", new JSONArray((java.util.List<?>) gSrc));
             }
             if (map.containsKey("node_positions") && map.get("node_positions") instanceof Map) {
                 legacy.put("node_positions", new JSONObject((Map<?, ?>) map.get("node_positions")));
@@ -3419,6 +3431,9 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
         // Refresh visual chain and select the first active block in the editor
         if (signalChainCanvas != null) {
+            if (!customNodePos.isEmpty()) {
+                signalChainCanvas.setPendingCustomPositions(customNodePos);
+            }
             signalChainCanvas.postDelayed(() -> {
                 signalChainCanvas.loadFromActivePlugins();
                 if (!savedGraphEdges.isEmpty()) {
@@ -3433,6 +3448,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 }
                 if (!customNodePos.isEmpty()) {
                     signalChainCanvas.setCustomNodePositions(customNodePos);
+                    signalChainCanvas.setPendingCustomPositions(customNodePos);
                 }
                 int activeCount = AudioEngine.getActivePlugins();
                 if (activeCount > 0) {
@@ -3675,9 +3691,15 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 java.nio.file.Files.copy(srcFile.toPath(), dest.toPath(),
                         java.nio.file.StandardCopyOption.REPLACE_EXISTING);
             }
-            int ctrl = resolveAtomControl(plugin);
-            AudioEngine.setAtomPort(plugin, ctrl, dest.getAbsolutePath());
-            Log.i(TAG, "[load atom] " + srcFile.getName() + " -> plugin " + plugin + " ctrl " + ctrl);
+            // Correct engine API: file-path ports (Plugin::setFileName)
+            boolean canL = plugin < AudioEngine.getActivePlugins()
+                    && AudioEngine.getFilePort(plugin);
+            if (!canL) {
+                toast("This block cannot load model files");
+                return;
+            }
+            AudioEngine.setPluginFilename(dest.getAbsolutePath(), plugin);
+            Log.i(TAG, "[load model] local -> plugin " + plugin + " file " + dest.getAbsolutePath());
             toast("Model loaded: " + srcFile.getName());
         } catch (Exception e) {
             Log.e(TAG, "applyLocalModelToPlugin failed", e);

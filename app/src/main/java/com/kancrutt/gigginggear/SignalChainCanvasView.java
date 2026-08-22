@@ -12,6 +12,7 @@ import android.text.TextPaint;
 import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.util.Log;
+import android.os.SystemClock;
 import android.view.MotionEvent;
 import android.view.View;
 
@@ -130,6 +131,9 @@ public class SignalChainCanvasView extends View {
     private float lastX, lastY;
     private int dragFromIndex = -1;
     private boolean dragStarted = false;
+    private long lastTapTime = 0;
+    private int lastTapNodeId = -1;
+    private Map<String, float[]> pendingCustomPos = null;
     private static final float DRAG_THRESHOLD = 8f;
 
     private boolean draggingPort = false;
@@ -267,6 +271,17 @@ public class SignalChainCanvasView extends View {
         float nodeW = nodeWDp * density;
         float nodeH = nodeHDp * density;
 
+        // Guarantee 3 rows fit top-to-bottom: shrink node + glyph when canvas
+        // is too short for the default height (S23 landscape ~85dp).
+        if (getHeight() > 0) {
+            float maxH = getHeight() / 3f - 4f * density;
+            if (nodeH > maxH && maxH > 30f * density) {
+                float ratio = maxH / nodeH;
+                nodeW = nodeW * ratio;
+                nodeH = maxH;
+            }
+        }
+
         float totalNodesWidth = totalBlocks * nodeW;
         float dynamicSpacing = (usableWidth - totalNodesWidth) / Math.max(1, totalBlocks - 1);
         float spacing = Math.max(6 * density, Math.min(32 * density, dynamicSpacing));
@@ -356,6 +371,13 @@ public class SignalChainCanvasView extends View {
 
         requestLayout();
         invalidate();
+    
+        // Apply pending custom node positions (from preset load) after rebuild,
+        // so slow engine adds can't outrun the restore (S23 timing bug).
+        if (pendingCustomPos != null && !pendingCustomPos.isEmpty()) {
+            setCustomNodePositions(pendingCustomPos);
+            pendingCustomPos = null;
+        }
     }
 
     private void syncGraphToAudioEngine() {
@@ -416,7 +438,9 @@ public class SignalChainCanvasView extends View {
 
     private Node hitTest(float tx, float ty) {
         for (int i = nodes.size() - 1; i >= 0; i--) {
-            if (nodes.get(i).contains(tx, ty)) return nodes.get(i);
+            Node n = nodes.get(i);
+            if (n.isAnchor()) continue; // anchors invisible & non-interactive
+            if (n.contains(tx, ty)) return n;
         }
         return null;
     }
@@ -466,6 +490,20 @@ public class SignalChainCanvasView extends View {
                 Node hit = hitTest(tx, ty);
                 if (hit != null && hit.nodeType != NodeType.OUTPUT) {
                     // Tap di dalam block = SELECT + siap drag (bukan port)
+                    long now = SystemClock.elapsedRealtime();
+                    if (lastTapNodeId == hit.id && now - lastTapTime < 320L) {
+                        // Double tap = bypass on/off
+                        try {
+                            boolean en = AudioEngine.getActivePluginEnabled(hit.id);
+                            AudioEngine.togglePlugin(hit.id, !en);
+                            toastBypass(hit, !en);
+                        } catch (Exception ex) {
+                            Log.w("SignalChainCanvas", "bypass toggle failed", ex);
+                        }
+                        lastTapTime = 0; lastTapNodeId = -1;
+                    } else {
+                        lastTapTime = now; lastTapNodeId = hit.id;
+                    }
                     for (Node n : nodes) n.selected = false;
                     hit.selected = true;
                     lastX = tx;
@@ -613,6 +651,18 @@ public class SignalChainCanvasView extends View {
         return null;
     }
 
+    public void setPendingCustomPositions(java.util.Map<String, float[]> p) {
+        this.pendingCustomPos = p;
+    }
+
+    private void toastBypass(Node n, boolean enabled) {
+        try {
+            android.widget.Toast.makeText(getContext(),
+                n.name + (enabled ? " ON" : " BYPASSED"),
+                android.widget.Toast.LENGTH_SHORT).show();
+        } catch (Exception ignore) {}
+    }
+
     public void setCustomNodePositions(Map<String, float[]> customPos) {
         if (customPos == null || customPos.isEmpty()) return;
         for (Node n : nodes) {
@@ -657,10 +707,11 @@ public class SignalChainCanvasView extends View {
                     dragCurrentX, dragCurrentY, wireColor);
         }
 
+        // INPUT/OUTPUT anchors are kept internally for engine semantics but are
+        // NOT drawn and NOT hit-testable — first/last plugin blocks are the
+        // visible connection endpoints, freeing canvas space for blocks.
         for (Node n : nodes) {
-            if (n.isAnchor()) {
-                drawAnchorNode(canvas, n);
-            } else {
+            if (!n.isAnchor()) {
                 drawNode(canvas, n);
             }
         }
@@ -748,7 +799,7 @@ public class SignalChainCanvasView extends View {
 
         Bitmap iconBmp = getCategoryIcon(n.name);
         float d = getResources().getDisplayMetrics().density;
-        float iconSize = 36f * d;
+        float iconSize = Math.min(26f * d, n.height * 0.40f);
         float iconX = n.x + (n.width - iconSize) / 2f;
         float iconY = n.y + 7f * d;
 

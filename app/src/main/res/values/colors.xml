@@ -160,52 +160,52 @@
          ============================================================ -->
 
     <!-- ── Amp ── warm red ── -->
-    <color name="cat_amp_active">#E8543C</color>
-    <color name="cat_amp_inactive">#8C4A3A</color>
+    <color name="cat_amp_active">#FFD1DC</color>
+    <color name="cat_amp_inactive">#664A50</color>
 
     <!-- ── Cabinet / IR ── neutral gray-white (no hue, matches Helix convention) ── -->
-    <color name="cat_cab_active">#B0B0B0</color>
-    <color name="cat_cab_inactive">#5A5A5A</color>
+    <color name="cat_cab_active">#E3E2E6</color>
+    <color name="cat_cab_inactive">#565460</color>
 
     <!-- ── Distortion / Overdrive ── orange-red ── -->
-    <color name="cat_dist_active">#F2A03D</color>
-    <color name="cat_dist_inactive">#7A5530</color>
+    <color name="cat_dist_active">#FFD9C2</color>
+    <color name="cat_dist_inactive">#6B4A38</color>
 
     <!-- ── Modulation ── blue ── -->
-    <color name="cat_mod_active">#3D8BF2</color>
-    <color name="cat_mod_inactive">#2A5580</color>
+    <color name="cat_mod_active">#CBE4F9</color>
+    <color name="cat_mod_inactive">#3A4B5C</color>
 
     <!-- ── Delay ── green ── -->
-    <color name="cat_delay_active">#4CD97B</color>
-    <color name="cat_delay_inactive">#2A6644</color>
+    <color name="cat_delay_active">#D8F3DC</color>
+    <color name="cat_delay_inactive">#3E5C45</color>
 
     <!-- ── Reverb ── magenta-purple ── -->
-    <color name="cat_reverb_active">#B85CF2</color>
-    <color name="cat_reverb_inactive">#5E3378</color>
+    <color name="cat_reverb_active">#E8D7F1</color>
+    <color name="cat_reverb_inactive">#55485E</color>
 
     <!-- ── Dynamics / Compressor ── amber-orange ── -->
-    <color name="cat_dynamics_active">#FFB74D</color>
-    <color name="cat_dynamics_inactive">#7A5530</color>
+    <color name="cat_dynamics_active">#FFE8B8</color>
+    <color name="cat_dynamics_inactive">#6B5A34</color>
 
     <!-- ── EQ ── lime-green ── -->
-    <color name="cat_eq_active">#A5D6A7</color>
-    <color name="cat_eq_inactive">#4A6648</color>
+    <color name="cat_eq_active">#D7F0DB</color>
+    <color name="cat_eq_inactive">#45584A</color>
 
     <!-- ── Pitch / Synth ── purple ── -->
-    <color name="cat_pitch_active">#8B5CF2</color>
-    <color name="cat_pitch_inactive">#3E2E6E</color>
+    <color name="cat_pitch_active">#D8D4F7</color>
+    <color name="cat_pitch_inactive">#4E4870</color>
 
     <!-- ── Wah / Filter ── cyan ── -->
-    <color name="cat_wah_active">#3DE8F2</color>
-    <color name="cat_wah_inactive">#1E6A70</color>
+    <color name="cat_wah_active">#CFF2EE</color>
+    <color name="cat_wah_inactive">#3C5C58</color>
 
     <!-- ── Volume / Pan ── teal ── -->
-    <color name="cat_vol_active">#3DE8C1</color>
-    <color name="cat_vol_inactive">#1E6A58</color>
+    <color name="cat_vol_active">#CCF0E4</color>
+    <color name="cat_vol_inactive">#35574D</color>
 
     <!-- ── Noise Gate ── amber-orange (same family as Dynamics, distinguished by shape) ── -->
-    <color name="cat_gate_active">#FFE0B2</color>
-    <color name="cat_gate_inactive">#6E5538</color>
+    <color name="cat_gate_active">#F5EBD8</color>
+    <color name="cat_gate_inactive">#5E5644</color>
 
     <!-- ── Nav icon tint (neutral) ── -->
     <color name="nav_icon_inactive">#6C6C70</color>
@@ -244,18 +244,18 @@
     <color name="cat_gate_sel">#FFB300</color>
     <color name="cat_gate_dim">#593E00</color>
 
-    <color name="color_cat_amp_active">#FF3D00</color>
-    <color name="color_cat_cab_active">#ECEFF1</color>
-    <color name="color_cat_distortion_active">#FF5252</color>
-    <color name="color_cat_modulation_active">#7C4DFF</color>
-    <color name="color_cat_delay_active">#00E5FF</color>
-    <color name="color_cat_reverb_active">#E040FB</color>
-    <color name="color_cat_dynamics_active">#FFB74D</color>
-    <color name="color_cat_eq_active">#A5D6A7</color>
-    <color name="color_cat_pitch_active">#D500F9</color>
-    <color name="color_cat_wah_active">#FF9100</color>
-    <color name="color_cat_volume_active">#00E5FF</color>
-    <color name="color_cat_noisegate_active">#FFB300</color>
+    <color name="color_cat_amp_active">#FFD1DC</color>
+    <color name="color_cat_cab_active">#E3E2E6</color>
+    <color name="color_cat_distortion_active">#FFD9C2</color>
+    <color name="color_cat_modulation_active">#CBE4F9</color>
+    <color name="color_cat_delay_active">#D8F3DC</color>
+    <color name="color_cat_reverb_active">#E8D7F1</color>
+    <color name="color_cat_dynamics_active">#FFE8B8</color>
+    <color name="color_cat_eq_active">#D7F0DB</color>
+    <color name="color_cat_pitch_active">#D8D4F7</color>
+    <color name="color_cat_wah_active">#CFF2EE</color>
+    <color name="color_cat_volume_active">#CCF0E4</color>
+    <color name="color_cat_noisegate_active">#F5EBD8</color>
 
     <color name="color_cat_amp_inactive">#5A1800</color>
     <color name="color_cat_cab_inactive">#455A64</color>

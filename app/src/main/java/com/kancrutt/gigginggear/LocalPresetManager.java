@@ -105,6 +105,22 @@ public class LocalPresetManager {
         if (file.exists()) {
             return file.delete();
         }
+        // Fallback: legacy saves may lack a stable id — delete any preset whose
+        // stored "id" or "name" matches, so user deletes always stick.
+        File[] files = presetsDir.listFiles((d, n) -> n.toLowerCase().endsWith(".json"));
+        if (files != null) {
+            for (File f : files) {
+                try (FileInputStream fis = new FileInputStream(f)) {
+                    byte[] data = new byte[(int) f.length()];
+                    int read = fis.read(data);
+                    if (read <= 0) continue;
+                    JSONObject o = new JSONObject(new String(data, StandardCharsets.UTF_8));
+                    if (id.equals(o.optString("id")) || id.equals(o.optString("name"))) {
+                        return f.delete();
+                    }
+                } catch (Exception ignored) {}
+            }
+        }
         return false;
     }
 

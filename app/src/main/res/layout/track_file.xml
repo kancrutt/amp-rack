@@ -1,22 +1,39 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:orientation="horizontal"
     android:layout_width="match_parent"
-    android:layout_margin="10dp"
-    android:background="@drawable/rounded_corners_transparent"
+    android:layout_marginStart="10dp"
+    android:layout_marginEnd="10dp"
+    android:layout_marginTop="6dp"
+    android:layout_marginBottom="6dp"
+    android:background="@drawable/gg_card_bg"
+    android:gravity="center_vertical"
+    android:minHeight="48dp"
+    android:paddingStart="4dp"
+    android:paddingEnd="4dp"
     android:layout_height="wrap_content">
 
     <Button
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:layout_width="0dp"
+        android:layout_height="48dp"
         android:layout_weight="1"
-        android:drawableLeft="@drawable/ic_baseline_play_circle_filled_24"
+        android:drawableLeft="@drawable/ic_track_waveform"
+        android:drawablePadding="10dp"
+        android:gravity="center_vertical|start"
+        android:textAlignment="textStart"
+        android:textColor="#ECEFF1"
+        android:textSize="12sp"
+        android:ellipsize="end"
+        android:maxLines="1"
         android:background="@color/fui_transparent"
         android:id="@+id/track_file_button"/>
-    <Button
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+    <ImageButton
+        android:layout_width="44dp"
+        android:layout_height="48dp"
         android:id="@+id/track_delete_file"
-        android:drawableRight="@drawable/ic_baseline_delete_forever_24"
-        android:background="@color/fui_transparent"/>
+        android:src="@drawable/ic_baseline_delete_forever_24"
+        app:tint="#FF3B30"
+        android:contentDescription="Delete sample"
+        android:background="?attr/selectableItemBackgroundBorderless"/>
 </LinearLayout>

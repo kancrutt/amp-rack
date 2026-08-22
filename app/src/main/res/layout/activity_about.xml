@@ -19,7 +19,7 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="center"
                 android:gravity="center"
-                android:fontFamily="@font/gruppo"
+                android:fontFamily="@font/plus_jakarta_sans"
                 android:textSize="40dp"
                 android:layout_marginTop="30dp"
                 android:layout_marginBottom="1dp"
@@ -37,7 +37,7 @@
                     android:layout_height="wrap_content"
                     android:layout_gravity="center"
                     android:gravity="center"
-                    android:fontFamily="@font/gruppo"
+                    android:fontFamily="@font/plus_jakarta_sans"
                     android:textSize="20dp"
                     android:layout_marginTop="1dp"
                     android:layout_marginBottom="20dp"
@@ -49,7 +49,7 @@
                     android:layout_height="wrap_content"
                     android:layout_gravity="center"
                     android:gravity="center"
-                    android:fontFamily="@font/gruppo"
+                    android:fontFamily="@font/plus_jakarta_sans"
                     android:textSize="20dp"
                     android:layout_marginTop="1dp"
                     android:layout_marginBottom="20dp"
@@ -94,7 +94,7 @@
                 android:layout_marginTop="10dp"
                 android:layout_gravity="center"
                 android:gravity="center"
-                android:fontFamily="@font/comfortaa"
+                android:fontFamily="@font/plus_jakarta_sans"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Developed by"/>
@@ -104,7 +104,7 @@
                 android:layout_gravity="center"
                 android:gravity="center"
                 android:textStyle="bold"
-                android:fontFamily="@font/comfortaa"
+                android:fontFamily="@font/plus_jakarta_sans"
                 android:textSize="20dp"
                 android:text="Shaji"/>
 
@@ -118,7 +118,7 @@
                 <Button
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:fontFamily="@font/comfortaa"
+                    android:fontFamily="@font/plus_jakarta_sans"
                     android:id="@+id/music"
                     android:layout_margin="5dp"
                     android:text="Music"/>
@@ -127,7 +127,7 @@
                     android:layout_height="wrap_content"
                     android:layout_margin="5dp"
                     android:id="@+id/github"
-                    android:fontFamily="@font/comfortaa"
+                    android:fontFamily="@font/plus_jakarta_sans"
                     android:text="Github"/>
             </LinearLayout>
 
@@ -137,7 +137,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:text="@string/about_dev"
-                    android:fontFamily="@font/comfortaa"
+                    android:fontFamily="@font/plus_jakarta_sans"
                     android:layout_margin="5dp"
                     android:padding="5dp"
                     android:textAlignment="center"

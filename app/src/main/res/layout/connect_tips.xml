@@ -25,7 +25,7 @@
             android:layout_height="wrap_content"
             android:text="Splitter"
             android:textStyle="bold"
-            android:fontFamily="@font/comfortaa"
+            android:fontFamily="@font/plus_jakarta_sans"
             android:textSize="24dp"/>
     </LinearLayout>
     <TextView
@@ -34,7 +34,7 @@
         android:paddingRight="10dp"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:fontFamily="@font/comfortaa"
+        android:fontFamily="@font/plus_jakarta_sans"
         android:paddingBottom="20dp"
         android:text="Use this to split mic/earphone jacks"/>
 </LinearLayout>

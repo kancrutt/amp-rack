@@ -1,6 +1,11 @@
 <resources>
-    <dimen name="dialog_gear_width">140dp</dimen>
-    <dimen name="dialog_gear_height">160dp</dimen>
-    <dimen name="dialog_knob_grid_max_height">500dp</dimen>
-    <dimen name="dialog_control_row_height">60dp</dimen>
+    <!-- S23-class narrow phones (smallestWidth ~360dp) -->
+    <dimen name="signal_chain_height">82dp</dimen>
+    <dimen name="param_gear_col_width">108dp</dimen>
+    <dimen name="rack_top_bar_height">32dp</dimen>
+    <dimen name="knob_size_large">46dp</dimen>
+    <dimen name="knob_size_small">42dp</dimen>
+    <dimen name="knob_label_size">7.5sp</dimen>
+    <dimen name="knob_val_size">7sp</dimen>
+    <dimen name="param_panel_padding">2dp</dimen>
 </resources>

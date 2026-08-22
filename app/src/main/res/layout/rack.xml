@@ -12,77 +12,137 @@
         android:layout_height="match_parent"
         android:orientation="vertical">
 
-        <!-- Top Header: Signal Routing Mode Selector -->
+        <!-- Top Bar: Knob+Preset(flex) | Logo(collapsible) | Scene+SR+CPU (phone/tablet adaptive).
+             Left zone is weight-based so the preset name gets ALL leftover space;
+             Rack.java hides the logo first when width is tight (defined priority). -->
         <LinearLayout
             android:id="@+id/routing_header_bar"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="@dimen/rack_top_bar_height"
             android:background="#1A1C20"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingStart="12dp"
-            android:paddingTop="6dp"
-            android:paddingEnd="12dp"
-            android:paddingBottom="6dp">
+            android:paddingStart="6dp"
+            android:paddingEnd="6dp">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="10dp"
-                android:text="SIGNAL ROUTING:"
-                android:textColor="#8F94A0"
-                android:textSize="11sp"
-                android:textStyle="bold" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_routing_series"
-                style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
-                android:layout_width="wrap_content"
-                android:layout_height="32dp"
-                android:layout_marginEnd="6dp"
-                android:backgroundTint="#FFAA00"
-                android:paddingLeft="12dp"
-                android:paddingRight="12dp"
-                android:text="Series ══►"
-                android:textColor="#121214"
-                android:textSize="10sp"
-                android:textStyle="bold"
-                app:cornerRadius="6dp" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_routing_parallel"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                android:layout_width="wrap_content"
-                android:layout_height="32dp"
-                android:paddingLeft="12dp"
-                android:paddingRight="12dp"
-                android:text="Parallel ⇇"
-                android:textColor="#AAAAAA"
-                android:textSize="10sp"
-                android:textStyle="bold"
-                app:cornerRadius="6dp"
-                app:strokeColor="#3A3D45" />
-
-            <android.widget.Space
+            <!-- LEFT ZONE: knob + preset display + quick-save (flex) -->
+            <LinearLayout
+                android:id="@+id/top_left_zone"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1" />
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
 
-            <TextView
-                android:id="@+id/cpu_meter_text"
+                <LinearLayout
+                    android:id="@+id/top_volume_knob_container"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:gravity="center" />
+
+                <!-- Combined "1  CLEAN": number bold orange + white name, tap to rename.
+                     No maxWidth: grows until collision, logo collapses first, THEN it truncates. -->
+                <TextView
+                    android:id="@+id/top_preset_display"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text="1  CLEAN"
+                    android:textColor="#8F94A0"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+
+                <!-- Quick-save floppy icon: save current chain to preset -->
+                <ImageView
+                    android:id="@+id/top_quick_save"
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:layout_marginStart="3dp"
+                    android:contentDescription="Save preset"
+                    android:src="@drawable/ic_baseline_save_24"
+                    android:tint="#FFAA00" />
+            </LinearLayout>
+
+            <!-- CENTER: Logo — first element collapsed on narrow screens -->
+            <ImageView
+                android:id="@+id/top_logo"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="CPU --"
-                android:textColor="#8F94A0"
-                android:textSize="10sp"
-                android:textStyle="bold"
-                android:layout_marginStart="8dp" />
+                android:layout_height="20dp"
+                android:layout_marginStart="4dp"
+                android:layout_marginEnd="4dp"
+                android:contentDescription="Giggin' Gear"
+                android:maxWidth="64dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/logo" />
+
+            <!-- RIGHT ZONE: Scene + BPM + SampleRate + CPU (intrinsic size only) -->
+            <LinearLayout
+                android:id="@+id/top_right_zone"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:gravity="center_vertical|end"
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/top_scene_btn"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="22dp"
+                    android:minWidth="0dp"
+                    android:minHeight="22dp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:paddingStart="4dp"
+                    android:paddingTop="0dp"
+                    android:paddingEnd="4dp"
+                    android:paddingBottom="0dp"
+                    android:text="SC1"
+                    android:textColor="#FFAA00"
+                    android:textSize="9.5sp"
+                    android:textStyle="bold"
+                    app:cornerRadius="6dp"
+                    app:strokeColor="#555860" />
+
+                <TextView
+                    android:id="@+id/top_bpm_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:gravity="center_vertical"
+                    android:layout_marginStart="4dp"
+                    android:text=""
+                    android:textColor="#FFAA00"
+                    android:textSize="9.5sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/top_sr_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="3dp"
+                    android:text=""
+                    android:textColor="#8F94A0"
+                    android:textSize="9.5sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/cpu_meter_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="3dp"
+                    android:text=""
+                    android:textColor="#D7DBE2"
+                    android:textSize="9.5sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
         </LinearLayout>
 
         <!-- Upper Half: Signal Chain Canvas (Horizontal Flowchart) -->
         <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="145dp"
+            android:layout_height="@dimen/signal_chain_height"
             android:background="#1A1C20"
             android:paddingStart="8dp"
             android:paddingEnd="8dp">
@@ -115,33 +175,169 @@
             android:background="#2E3138" />
 
         <!-- Lower Half: Inline Split-Screen Parameter Editor -->
-        <ScrollView
-            android:id="@+id/parameter_editor_scroll"
+        <LinearLayout
+            android:id="@+id/parameter_editor_container"
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
             android:background="#15171B"
-            android:fillViewport="true">
+            android:orientation="horizontal"
+            android:paddingStart="6dp"
+            android:paddingEnd="6dp"
+            android:paddingTop="2dp"
+            android:paddingBottom="2dp">
 
+            <!-- LEFT COLUMN: full plugin identity (title, subtype, badge, POWER) + MODEL row + gear render + info strip -->
             <LinearLayout
-                android:id="@+id/parameter_editor_container"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:padding="10dp">
-
-            <!-- Left Column: Amp/Cabinet Gear Graphic Render + Plugin Identity -->
-            <LinearLayout
-                android:layout_width="@dimen/dialog_gear_width"
+                android:layout_width="@dimen/param_gear_col_width"
                 android:layout_height="match_parent"
                 android:background="#0C0D0F"
                 android:orientation="vertical"
-                android:padding="6dp">
+                android:padding="5dp">
 
-                <!-- Gear Render -->
+                <TextView
+                    android:id="@+id/detail_plugin_title"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:fontFamily="@font/plus_jakarta_sans"
+                    android:maxLines="1"
+                    android:text="Metal Guitar (MIX READY)"
+                    android:textColor="#FFFFFF"
+                    android:textSize="11.5sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/detail_plugin_subtitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="1dp"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text="AMP · NEURAL AMP (NAM)"
+                    android:textColor="#8F94A0"
+                    android:textSize="8sp" />
+
+                <!-- Badge A1 + POWER switch row -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <View
+                        android:id="@+id/detail_led"
+                        android:layout_width="6dp"
+                        android:layout_height="6dp"
+                        android:layout_marginEnd="5dp"
+                        android:background="@drawable/led_glowing_active" />
+
+                    <TextView
+                        android:id="@+id/detail_badge_pill"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/gg_pill_bg"
+                        android:paddingStart="5dp"
+                        android:paddingTop="1dp"
+                        android:paddingEnd="5dp"
+                        android:paddingBottom="1dp"
+                        android:text="A1"
+                        android:textColor="#00FF66"
+                        android:textSize="8sp"
+                        android:textStyle="bold" />
+
+                    <View
+                        android:layout_width="0dp"
+                        android:layout_height="1dp"
+                        android:layout_weight="1" />
+
+                    <com.google.android.material.switchmaterial.SwitchMaterial
+                        android:id="@+id/detail_enabled_switch"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:checked="true"
+                        app:thumbTint="#00E676"
+                        app:trackTint="#2A3D2E" />
+
+                    <TextView
+                        android:id="@+id/detail_enabled_label"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="3dp"
+                        android:text="ON"
+                        android:textColor="#00E676"
+                        android:textSize="9sp"
+                        android:textStyle="bold" />
+
+                    <!-- Legacy button kept hidden for code compatibility -->
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/detail_enabled_btn"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="0dp"
+                        android:visibility="gone"
+                        android:text="ENABLED" />
+                </LinearLayout>
+
+                <!-- MODEL Browser Row -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="20dp"
+                    android:layout_marginTop="4dp"
+                    android:background="#24262B"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="4dp"
+                    android:paddingEnd="4dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="4dp"
+                        android:text="MODEL:"
+                        android:textColor="#8F94A0"
+                        android:textSize="8sp"
+                        android:textStyle="bold" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/detail_model_browse_btn"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="18dp"
+                        android:minHeight="18dp"
+                        android:backgroundTint="#363942"
+                        android:paddingLeft="5dp"
+                        android:paddingTop="0dp"
+                        android:paddingRight="5dp"
+                        android:paddingBottom="0dp"
+                        android:insetTop="0dp"
+                        android:insetBottom="0dp"
+                        android:text="Browse"
+                        android:textColor="#FFFFFF"
+                        android:textSize="7.5sp"
+                        app:cornerRadius="3dp" />
+
+                    <TextView
+                        android:id="@+id/detail_model_name"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                        android:layout_weight="1"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:text="Clean Twin / Plexi Tone"
+                        android:textColor="#FFFFFF"
+                        android:textSize="8.5sp" />
+                </LinearLayout>
+
+                <!-- Gear render fills remaining height; info strip overlays bottom -->
                 <FrameLayout
                     android:layout_width="match_parent"
-                    android:layout_height="@dimen/dialog_gear_height">
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:layout_marginTop="5dp"
+                    android:background="#0C0D0F">
 
                     <ImageView
                         android:id="@+id/detail_gear_render"
@@ -149,193 +345,53 @@
                         android:layout_height="match_parent"
                         android:scaleType="fitCenter"
                         android:src="@drawable/gg_gear_placeholder" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="bottom"
+                        android:orientation="vertical"
+                        android:background="#99000000"
+                        android:padding="5dp">
+
+                        <TextView
+                            android:id="@+id/detail_gear_info_type"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="AMP · NAM"
+                            android:textColor="#FFAA00"
+                            android:textSize="10.5sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/detail_gear_info_desc"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="Full plugin description"
+                            android:textColor="#ECEFF1"
+                            android:textSize="8.5sp"
+                            android:maxLines="4"
+                            android:ellipsize="end" />
+                    </LinearLayout>
                 </FrameLayout>
-
-                <!-- Plugin Badge -->
-                <TextView
-                    android:id="@+id/detail_badge_pill"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="center_horizontal"
-                    android:layout_marginTop="8dp"
-                    android:layout_marginBottom="4dp"
-                    android:background="@drawable/gg_pill_bg"
-                    android:paddingStart="6dp"
-                    android:paddingTop="2dp"
-                    android:paddingEnd="6dp"
-                    android:paddingBottom="2dp"
-                    android:text="A1"
-                    android:textColor="#00FF66"
-                    android:textSize="9sp"
-                    android:textStyle="bold" />
-
-                <!-- ENABLED Button -->
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/detail_enabled_btn"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:minHeight="26dp"
-                    android:paddingLeft="8dp"
-                    android:paddingTop="0dp"
-                    android:paddingRight="8dp"
-                    android:paddingBottom="0dp"
-                    android:insetTop="0dp"
-                    android:insetBottom="0dp"
-                    android:text="ENABLED"
-                    android:textColor="#00E676"
-                    android:textSize="9sp"
-                    android:textStyle="bold"
-                    app:cornerRadius="12dp"
-                    app:strokeColor="#00E676" />
             </LinearLayout>
 
             <!-- Right Column: Model Browser + Tabs + Control Panels -->
             <LinearLayout
+                android:id="@+id/parameter_right_column"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:layout_marginStart="10dp"
+                android:layout_marginStart="6dp"
                 android:layout_weight="1"
                 android:orientation="vertical">
-
-                <!-- Header Row inside editor -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-
-                    <View
-                        android:id="@+id/detail_led"
-                        android:layout_width="8dp"
-                        android:layout_height="8dp"
-                        android:layout_marginEnd="8dp"
-                        android:background="@drawable/led_glowing_active" />
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:id="@+id/detail_plugin_title"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:ellipsize="end"
-                            android:fontFamily="sans-serif-black"
-                            android:maxLines="1"
-                            android:text="Metal Guitar (MIX READY)"
-                            android:textColor="#FFFFFF"
-                            android:textSize="13sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:id="@+id/detail_plugin_subtitle"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="AMP · NEURAL AMP (NAM)"
-                            android:textColor="#8F94A0"
-                            android:textSize="9sp" />
-                    </LinearLayout>
-
-
-                </LinearLayout>
-
-                <!-- Model Browser Row -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="28dp"
-                    android:layout_marginTop="4dp"
-                    android:background="#24262B"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingStart="6dp"
-                    android:paddingEnd="6dp">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginEnd="6dp"
-                        android:text="MODEL:"
-                        android:textColor="#8F94A0"
-                        android:textSize="9sp"
-                        android:textStyle="bold" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/detail_model_browse_btn"
-                        style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:minHeight="22dp"
-                        android:backgroundTint="#363942"
-                        android:paddingLeft="6dp"
-                        android:paddingTop="0dp"
-                        android:paddingRight="6dp"
-                        android:paddingBottom="0dp"
-                        android:insetTop="0dp"
-                        android:insetBottom="0dp"
-                        android:text="Browse"
-                        android:textColor="#FFFFFF"
-                        android:textSize="9sp"
-                        app:cornerRadius="4dp" />
-
-                    <TextView
-                        android:id="@+id/detail_model_name"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="8dp"
-                        android:layout_weight="1"
-                        android:ellipsize="end"
-                        android:maxLines="1"
-                        android:text="Clean Twin / Plexi Tone"
-                        android:textColor="#FFFFFF"
-                        android:textSize="10sp" />
-                </LinearLayout>
-
-                <!-- MAIN / ADVANCED Tabs -->
-                <LinearLayout
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:background="#24262B"
-                    android:padding="2dp">
-
-                    <TextView
-                        android:id="@+id/tab_main"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:background="#363942"
-                        android:paddingStart="10dp"
-                        android:paddingTop="2dp"
-                        android:paddingEnd="10dp"
-                        android:paddingBottom="2dp"
-                        android:text="MAIN"
-                        android:textColor="#FFFFFF"
-                        android:textSize="9sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:id="@+id/tab_advanced"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:paddingStart="10dp"
-                        android:paddingTop="2dp"
-                        android:paddingEnd="10dp"
-                        android:paddingBottom="2dp"
-                        android:text="ADVANCED"
-                        android:textColor="#8F94A0"
-                        android:textSize="9sp"
-                        android:textStyle="bold" />
-                </LinearLayout>
 
                 <!-- Dynamic Parameter Controls Container -->
                 <LinearLayout
                     android:id="@+id/container_param_panels"
                     android:layout_width="match_parent"
                     android:layout_height="0dp"
-                    android:layout_marginTop="6dp"
+                    android:layout_marginTop="2dp"
                     android:layout_weight="1"
                     android:orientation="horizontal">
 
@@ -344,11 +400,13 @@
                         android:id="@+id/panel_level"
                         android:layout_width="wrap_content"
                         android:layout_height="match_parent"
-                        android:layout_marginEnd="6dp"
+                        android:layout_marginEnd="4dp"
                         android:background="#1E2024"
-                        android:minHeight="@dimen/dialog_control_row_height"
                         android:orientation="vertical"
-                        android:padding="6dp"
+                        android:paddingStart="4dp"
+                        android:paddingEnd="4dp"
+                        android:paddingTop="2dp"
+                        android:paddingBottom="2dp"
                         android:visibility="gone">
 
                         <TextView
@@ -357,14 +415,12 @@
                             android:layout_gravity="center_horizontal"
                             android:text="LEVEL"
                             android:textColor="#8F94A0"
-                            android:textSize="9sp"
+                            android:textSize="8sp"
                             android:textStyle="bold" />
 
                         <HorizontalScrollView
                             android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:maxHeight="@dimen/dialog_knob_grid_max_height"
-                            android:minHeight="@dimen/dialog_control_row_height"
+                            android:layout_height="match_parent"
                             android:fillViewport="true"
                             android:scrollbars="none">
 
@@ -372,7 +428,8 @@
                                 android:id="@+id/container_level_knobs"
                                 android:layout_width="wrap_content"
                                 android:layout_height="match_parent"
-                                android:gravity="center"
+                                android:layout_gravity="center"
+                                android:gravity="center_vertical"
                                 android:orientation="horizontal" />
                         </HorizontalScrollView>
                     </LinearLayout>
@@ -384,9 +441,11 @@
                         android:layout_height="match_parent"
                         android:layout_weight="1"
                         android:background="#1E2024"
-                        android:minHeight="@dimen/dialog_control_row_height"
                         android:orientation="vertical"
-                        android:padding="6dp">
+                        android:paddingStart="4dp"
+                        android:paddingEnd="4dp"
+                        android:paddingTop="2dp"
+                        android:paddingBottom="2dp">
 
                         <TextView
                             android:id="@+id/panel_tone_title"
@@ -395,33 +454,30 @@
                             android:layout_gravity="center_horizontal"
                             android:text="CONTROLS"
                             android:textColor="#8F94A0"
-                            android:textSize="9sp"
+                            android:textSize="8sp"
                             android:textStyle="bold" />
 
                         <HorizontalScrollView
                             android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:maxHeight="@dimen/dialog_knob_grid_max_height"
-                            android:minHeight="@dimen/dialog_control_row_height"
+                            android:layout_height="match_parent"
                             android:fillViewport="true"
-                            android:scrollbars="none">
+                            android:scrollbars="horizontal">
 
-                            <!-- Multi-row container: vertical orientation containing row1 and row2 -->
+                            <!-- Center-justified when few knobs; scrolls when many -->
                             <LinearLayout
                                 android:id="@+id/container_tone_knobs"
                                 android:layout_width="wrap_content"
                                 android:layout_height="match_parent"
-                                android:gravity="center"
-                                android:orientation="vertical">
-                                
-                            </LinearLayout>
+                                android:layout_gravity="center"
+                                android:gravity="center_vertical"
+                                android:orientation="horizontal" />
                         </HorizontalScrollView>
                     </LinearLayout>
                 </LinearLayout>
             </LinearLayout>
         </LinearLayout>
-        </ScrollView>
     </LinearLayout>
+
     <!-- Hidden Legacy Views Container (Guarantees backend Java code compiles while views stay 100% hidden) -->
     <LinearLayout
         android:id="@+id/hidden_legacy_views"
@@ -445,9 +501,7 @@
         <ToggleButton android:id="@+id/toggle_video" android:layout_width="wrap_content" android:layout_height="wrap_content" />
         <ToggleButton android:id="@+id/flip_camera" android:layout_width="wrap_content" android:layout_height="wrap_content" />
         <TextureView android:id="@+id/video_texture" android:layout_width="wrap_content" android:layout_height="wrap_content" />
-        <LinearLayout android:id="@+id/video_preview" android:layout_width="wrap_content" android:layout_height="wrap_content">
-                
-            </LinearLayout>
+        <LinearLayout android:id="@+id/video_preview" android:layout_width="wrap_content" android:layout_height="wrap_content" />
 
         <LinearLayout android:id="@+id/mixer" android:layout_width="wrap_content" android:layout_height="wrap_content">
             <TextView android:id="@+id/patch_label" android:layout_width="wrap_content" android:layout_height="wrap_content" />
@@ -459,18 +513,10 @@
             <TextView android:id="@+id/pro_label" android:layout_width="wrap_content" android:layout_height="wrap_content" />
             <TextView android:id="@+id/sample_rate_display" android:layout_width="wrap_content" android:layout_height="wrap_content" />
             <ImageView android:id="@+id/lowLatencyWarning" android:layout_width="wrap_content" android:layout_height="wrap_content" />
-            <LinearLayout android:id="@+id/sr_layout" android:layout_width="wrap_content" android:layout_height="wrap_content">
-                
-            </LinearLayout>
-            <LinearLayout android:id="@+id/patch_master" android:layout_width="wrap_content" android:layout_height="wrap_content">
-                
-            </LinearLayout>
-            <LinearLayout android:id="@+id/mixer_input" android:layout_width="wrap_content" android:layout_height="wrap_content">
-                
-            </LinearLayout>
-            <LinearLayout android:id="@+id/mixer_output" android:layout_width="wrap_content" android:layout_height="wrap_content">
-                
-            </LinearLayout>
+            <LinearLayout android:id="@+id/sr_layout" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+            <LinearLayout android:id="@+id/patch_master" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+            <LinearLayout android:id="@+id/mixer_input" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+            <LinearLayout android:id="@+id/mixer_output" android:layout_width="wrap_content" android:layout_height="wrap_content" />
             <TextView android:id="@+id/mixer_input_label" android:layout_width="wrap_content" android:layout_height="wrap_content" />
             <TextView android:id="@+id/mixer_output_label" android:layout_width="wrap_content" android:layout_height="wrap_content" />
             <ProgressBar android:id="@+id/mixer_input_progress" android:layout_width="wrap_content" android:layout_height="wrap_content" />
@@ -490,9 +536,7 @@
             <TextView android:id="@+id/rotary_input_label" android:layout_width="wrap_content" android:layout_height="wrap_content" />
             <TextView android:id="@+id/rotary_output_display" android:layout_width="wrap_content" android:layout_height="wrap_content" />
             <TextView android:id="@+id/rotary_output_label" android:layout_width="wrap_content" android:layout_height="wrap_content" />
-            <LinearLayout android:id="@+id/rotary_rack" android:layout_width="wrap_content" android:layout_height="wrap_content">
-                
-            </LinearLayout>
+            <LinearLayout android:id="@+id/rotary_rack" android:layout_width="wrap_content" android:layout_height="wrap_content" />
             <com.kancrutt.gigginggear.RotarySeekbar android:id="@+id/rotary_input_volume"
             app:showKnob="true" android:layout_width="wrap_content" android:layout_height="wrap_content" />
             <com.kancrutt.gigginggear.RotarySeekbar android:id="@+id/rotary_output_volume"

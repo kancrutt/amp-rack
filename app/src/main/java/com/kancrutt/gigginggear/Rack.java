@@ -55,6 +55,16 @@ import com.google.android.material.button.MaterialButton;
 import com.google.android.material.progressindicator.LinearProgressIndicator;
 import com.google.android.material.slider.Slider;
 
+import android.content.SharedPreferences;
+import android.view.WindowInsets;
+import android.view.RoundedCorner;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
+import android.widget.Spinner;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
+
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -76,6 +86,8 @@ import java.util.concurrent.ExecutionException;
 
 public class Rack extends Fragment {
     MainActivity mainActivity ;
+    int currentPresetNumber = 1 ;
+    int currentSceneIndex = 0 ;
     LinearProgressIndicator quickPatchProgress ;
     Dialog youtubePlayer ;
     String TAG = getClass().getSimpleName();
@@ -380,6 +392,7 @@ public class Rack extends Fragment {
         });
 
         SignalChainCanvasView signalChainCanvas = view.findViewById(R.id.signalChainCanvas);
+        mainActivity.signalChainCanvas = signalChainCanvas;
         mainActivity.dataAdapter = new DataAdapter();
         mainActivity.dataAdapter.mainActivity = mainActivity;
         RecyclerView hiddenRv = new RecyclerView(getContext());
@@ -392,13 +405,13 @@ public class Rack extends Fragment {
 
         if (signalChainCanvas != null) {
             signalChainCanvas.setOnNodeSelectedListener(node -> {
-                if (node != null && mainActivity.dataAdapter != null) {
+                if (node != null && node.id >= 0 && mainActivity.dataAdapter != null) {
                     String pluginName = AudioEngine.getActivePluginName(node.id);
                     mainActivity.populateInlineParameterEditor(node.id, pluginName != null ? pluginName : "");
                 }
             });
             signalChainCanvas.setOnDeleteNodeListener(node -> {
-                if (node != null) {
+                if (node != null && node.id >= 0) {
                     try {
                         AudioEngine.deletePlugin(node.id);
                         signalChainCanvas.postDelayed(() -> {
@@ -410,58 +423,187 @@ public class Rack extends Fragment {
                     }
                 }
             });
+            signalChainCanvas.setOnWireDeleteListener(edge -> {
+                if (edge == null) return;
+                new AlertDialog.Builder(getContext())
+                        .setTitle("Remove connection?")
+                        .setMessage("Delete this connection from the signal chain?")
+                        .setPositiveButton("Delete", (dialog, which) -> {
+                            signalChainCanvas.deleteEdge(edge);
+                            if (mainActivity.dataAdapter != null) mainActivity.dataAdapter.notifyDataSetChanged();
+                        })
+                        .setNegativeButton("Cancel", null)
+                        .show();
+            });
             view.postDelayed(() -> signalChainCanvas.loadFromActivePlugins(), 600);
-        }
-
-        MaterialButton btnSeries = view.findViewById(R.id.btn_routing_series);
-        MaterialButton btnParallel = view.findViewById(R.id.btn_routing_parallel);
-
-        if (btnSeries != null && btnParallel != null) {
-            btnSeries.setOnClickListener(v -> {
-                AudioEngine.setRoutingMode(0);
-                mainActivity.updateRoutingUI(0);
-            });
-            btnParallel.setOnClickListener(v -> {
-                AudioEngine.setRoutingMode(1);
-                mainActivity.updateRoutingUI(1);
-            });
-            int currentMode = AudioEngine.getRoutingMode();
-            mainActivity.updateRoutingUI(currentMode);
         }
 
         TextView cpuMeter = view.findViewById(R.id.cpu_meter_text);
         if (cpuMeter != null) {
             Handler cpuHandler = new Handler(Looper.getMainLooper());
-            final long[] prevCpu = new long[2];
+            // Real app-process CPU usage (includes native audio threads).
+            // /proc/stat is SELinux-blocked on modern Android (always threw ->
+            // permanent "CPU --" placeholder); getElapsedCpuTime works everywhere.
+            final long[] prevCpu = new long[2]; // [cpuMs, wallMs]
             Runnable cpuRunnable = new Runnable() {
                 @Override
                 public void run() {
                     try {
-                        java.io.RandomAccessFile reader = new java.io.RandomAccessFile("/proc/stat", "r");
-                        String load = reader.readLine();
-                        reader.close();
-                        String[] toks = load.split("\\s+");
-                        long idle = Long.parseLong(toks[4]);
-                        long total = 0;
-                        for (int i = 1; i < toks.length; i++) {
-                            total += Long.parseLong(toks[i]);
+                        long cpuMs = android.os.Process.getElapsedCpuTime();
+                        long wallMs = android.os.SystemClock.elapsedRealtime();
+                        if (prevCpu[1] > 0 && wallMs > prevCpu[1]) {
+                            long dCpu = cpuMs - prevCpu[0];
+                            long dWall = wallMs - prevCpu[1];
+                            int pct = (int) Math.round(100.0 * dCpu / dWall);
+                            cpuMeter.setText("CPU " + pct + "%");
+                            // CPU text width just changed -> re-check top-bar fit
+                            applyTopBarCollapse();
                         }
-                        if (prevCpu[0] > 0 && prevCpu[1] > 0) {
-                            long idleDelta = idle - prevCpu[0];
-                            long totalDelta = total - prevCpu[1];
-                            int cpu = totalDelta > 0 ? (int) (100 * (1 - (double) idleDelta / totalDelta)) : 0;
-                            cpuMeter.setText("CPU " + cpu + "%");
-                        }
-                        prevCpu[0] = idle;
-                        prevCpu[1] = total;
+                        prevCpu[0] = cpuMs;
+                        prevCpu[1] = wallMs;
                     } catch (Exception e) {
-                        cpuMeter.setText("CPU --");
+                        cpuMeter.setText("");
                     }
                     cpuHandler.postDelayed(this, 2000);
                 }
             };
             cpuHandler.post(cpuRunnable);
         }
+
+        // Real sample-rate readout (replaces the old hardcoded fake "BPM" label)
+        TextView srText = view.findViewById(R.id.top_sr_text);
+        if (srText != null) {
+            try {
+                int sr = AudioEngine.getSampleRate();
+                if (sr > 0) srText.setText((sr / 1000f) + " kHz");
+                else srText.setText("");
+            } catch (Exception e) {
+                Log.w(TAG, "sample rate read failed", e);
+            }
+        }
+
+        // BPM chip: REAL tempo state — drives delay/mod time controls on change
+        TextView bpmChip = view.findViewById(R.id.top_bpm_text);
+        if (bpmChip != null) {
+            bpmChip.setText(mainActivity.getBpmDisplay());
+            bpmChip.setOnClickListener(v -> mainActivity.showBpmDialog());
+        }
+
+        // ---- Top bar wiring (B5): master volume knob + preset rename / quick save ----
+        LinearLayout knobContainer = view.findViewById(R.id.top_volume_knob_container);
+        if (knobContainer != null && mainActivity.skinEngine != null) {
+            RotarySeekbar volKnob = new RotarySeekbar(getContext());
+            mainActivity.skinEngine.rotary(volKnob, 40, 0, 100, 80);
+            volKnob.mKnobColor = Color.parseColor("#00E5FF");
+            LinearLayout.LayoutParams vkLp = new LinearLayout.LayoutParams(dp(40), dp(40));
+            vkLp.gravity = android.view.Gravity.CENTER_VERTICAL;
+            knobContainer.addView(volKnob, vkLp);
+            volKnob.setOnValueChangedListener((bar, value) -> {
+                try {
+                    AudioEngine.setOutputVolume(value / 100f);
+                } catch (Exception e) {
+                    Log.w(TAG, "setOutputVolume failed", e);
+                }
+            });
+            volKnob.setOnTouchListener((v, event) -> {
+                float val = volKnob.getValue();
+                try { AudioEngine.setOutputVolume(val / 100f); } catch (Exception ignored) {}
+                return false;
+            });
+        }
+
+        TextView topPresetDisplay = view.findViewById(R.id.top_preset_display);
+        updateTopBarPresetDisplay(1, "CLEAN");
+        if (topPresetDisplay != null) {
+            topPresetDisplay.setOnClickListener(v -> showRenamePresetDialog());
+        }
+
+        // Responsive top bar: measure REAL laid-out widths, collapse in defined
+        // order (logo -> CPU -> sample-rate) so Scene + preset name always fit.
+        // Replaces the old fixed-dp budgets tuned for one screen width.
+        // One-way policy: elements only collapse (restore happens on view recreate).
+        final View headerBarV = view.findViewById(R.id.routing_header_bar);
+        topBarForCollapse = headerBarV;
+        if (headerBarV != null) {
+            headerBarV.post(() -> applyTopBarCollapse());
+        }
+        ImageView quickSaveBtn = view.findViewById(R.id.top_quick_save);
+        if (quickSaveBtn != null) {
+            quickSaveBtn.setOnClickListener(v -> showQuickSaveDialog());
+        }
+
+        com.google.android.material.button.MaterialButton sceneBtn = view.findViewById(R.id.top_scene_btn);
+        SharedPreferences scenePrefs = getContext().getSharedPreferences("giggingear_scenes", android.content.Context.MODE_PRIVATE);
+        String[] defaultSceneNames = getContext().getResources().getStringArray(R.array.scene_slots);
+        final java.util.ArrayList<String> sceneNames = new java.util.ArrayList<>();
+        for (int i = 0; i < defaultSceneNames.length; i++) {
+            sceneNames.add(scenePrefs.getString("scene_name_" + i, defaultSceneNames[i]));
+        }
+        if (sceneBtn != null) {
+            sceneBtn.setText(sceneNames.get(0));
+            sceneBtn.setOnClickListener(v -> {
+                new AlertDialog.Builder(getContext())
+                        .setTitle("Scene Options (" + sceneNames.get(currentSceneIndex) + ")")
+                        .setSingleChoiceItems(sceneNames.toArray(new CharSequence[0]), currentSceneIndex, (d, which) -> {
+                            currentSceneIndex = which;
+                            sceneBtn.setText(sceneNames.get(which));
+                            String json = scenePrefs.getString("scene_" + which, null);
+                            if (json != null && !json.isEmpty() && mainActivity != null) {
+                                mainActivity.loadPreset(json);
+                            }
+                            d.dismiss();
+                        })
+                        .setPositiveButton("Save To Current Scene", (d, w) -> {
+                            saveCurrentChainToScene();
+                        })
+                        .setNeutralButton("Rename", (d, w) -> {
+                                int which = currentSceneIndex;
+                                AlertDialog.Builder rb = new AlertDialog.Builder(getContext());
+                                rb.setTitle("Rename " + sceneNames.get(which));
+                                final EditText input = new EditText(getContext());
+                                input.setSingleLine(true);
+                                input.setText(sceneNames.get(which));
+                                input.setSelectAllOnFocus(true);
+                                rb.setView(input);
+                                rb.setNegativeButton("Cancel", null);
+                                rb.setPositiveButton("Rename", (rd, rw) -> {
+                                    String nm = input.getText().toString().trim();
+                                    if (!nm.isEmpty()) {
+                                        sceneNames.set(which, nm);
+                                        scenePrefs.edit().putString("scene_name_" + which, nm).apply();
+                                        sceneBtn.setText(nm);
+                                    }
+                                });
+                                rb.show();
+                            })
+                        .setNegativeButton("Close", null)
+                        .show();
+            });
+            sceneBtn.setOnLongClickListener(v -> {
+                saveCurrentChainToScene();
+                return true;
+            });
+        }
+
+        // ---- Safe-area / rounded-corner insets (B4) ----
+        ViewCompat.setOnApplyWindowInsetsListener(view, (v, insets) -> {
+            Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+            Insets cutout = insets.getInsets(WindowInsetsCompat.Type.displayCutout());
+            int top = Math.max(bars.top, cutout.top);
+            int left = Math.max(bars.left, cutout.left);
+            int right = Math.max(bars.right, cutout.right);
+            if (Build.VERSION.SDK_INT >= 31) {
+                WindowInsets rootInsets = v.getRootWindowInsets();
+                if (rootInsets != null) {
+                    RoundedCorner rcTL = rootInsets.getRoundedCorner(RoundedCorner.POSITION_TOP_LEFT);
+                    RoundedCorner rcTR = rootInsets.getRoundedCorner(RoundedCorner.POSITION_TOP_RIGHT);
+                    if (rcTL != null) left = Math.max(left, rcTL.getRadius());
+                    if (rcTR != null) right = Math.max(right, rcTR.getRadius());
+                }
+            }
+            v.setPadding(left, top, right, v.getPaddingBottom());
+            return insets;
+        });
 
         FloatingActionButton fabAddBlock = view.findViewById(R.id.fab_add_block);
         if (fabAddBlock != null) {
@@ -948,20 +1090,21 @@ public class Rack extends Fragment {
             });
         }
 
-        TextView patchName = mainActivity.findViewById(R.id.patch_name),
-                patchNo = mainActivity.findViewById(R.id.patch_no);
-
+        TextView patchName = mainActivity.findViewById(R.id.patch_name);
+        mainActivity.patchName = patchName;
         TextView patchDesc = mainActivity.findViewById(R.id.patch_desc);
-        mainActivity.patchDesc = patchDesc ;
-        mainActivity.patchName = patchName ;
-        mainActivity.patchNo = patchNo;
+        mainActivity.patchDesc = patchDesc;
+        mainActivity.patchNo = null; // replaced by per-selection top_preset_display update
+        // skip syncTopBarPresetInfo here; updateTopBarPresetDisplay() handles it on node selection
 
-        patchDesc.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                patchName.performClick();
-            }
-        });
+        if (patchDesc != null) {
+            patchDesc.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (patchName != null) patchName.performClick();
+                }
+            });
+        }
 
         LinearLayout patchMaster = mainActivity.findViewById(R.id.patch_master);
         patchMaster.setOnTouchListener(new View.OnTouchListener() {
@@ -1096,7 +1239,6 @@ public class Rack extends Fragment {
             mainActivity.skinEngine.cardText(inLabel);
             mainActivity.skinEngine.cardText(outLabel);
             mainActivity.skinEngine.cardText(patchLabel);
-            mainActivity.skinEngine.cardText(patchNo);
 
             mainActivity.skinEngine.cardText(inRotaryDisplay);
             mainActivity.skinEngine.cardText(outRotaryDisplay);
@@ -1321,6 +1463,7 @@ public class Rack extends Fragment {
     }
 
     public void patchMove (boolean up) {
+        if (mainActivity.patchNo == null) return; // retired by top-bar preset display
         String text = String.valueOf(mainActivity.patchNo.getText()) ;
         if (text == "-")
             text = "0" ;
@@ -1581,6 +1724,249 @@ public class Rack extends Fragment {
             super.onPostExecute(result);
             // do something with the result
         }
+    }
+
+    private void updateTopBarPresetDisplay(int presetNumber, String presetName) {
+        currentPresetNumber = presetNumber;
+        TextView display = getView() != null ? getView().findViewById(R.id.top_preset_display) : null;
+        if (display != null) {
+            android.text.SpannableStringBuilder sb = new android.text.SpannableStringBuilder();
+            if (presetNumber > 0) {
+                String num = String.valueOf(presetNumber) + "  ";
+                int start = sb.length();
+                sb.append(num);
+                sb.setSpan(new android.text.style.StyleSpan(android.graphics.Typeface.BOLD),
+                        start, start + num.length(), android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+                sb.setSpan(new android.text.style.ForegroundColorSpan(android.graphics.Color.parseColor("#FFAA00")),
+                        start, start + num.length(), android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+            }
+            if (presetName != null && !presetName.isEmpty()) {
+                String cleanName = presetName;
+                if (cleanName.matches("^\\d+\\s+.*")) {
+                    cleanName = cleanName.replaceFirst("^\\d+\\s+", "");
+                }
+                sb.append(cleanName);
+            }
+            display.setText(sb);
+        }
+        // Also push into patchName so syncTopBarPresetInfo() stays consistent
+        if (mainActivity != null && mainActivity.patchName != null && presetName != null) {
+            mainActivity.patchName.setText(presetName);
+        }
+    }
+
+    private int dp(float value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
+    private View topBarForCollapse;
+
+    /**
+     * Collapse top-bar elements in defined priority order based on REAL measured
+     * widths (not fixed-dp budgets). Priority: preset name + scene always visible;
+     * collapse order logo -> CPU -> sample-rate. One-way: no auto-restore.
+     */
+    private void applyTopBarCollapse() {
+        try {
+            if (!isAdded() || getContext() == null) return; // fragment detached (logcat IllegalStateException)
+            View headerBar = topBarForCollapse;
+            if (headerBar == null) return;
+            ImageView logo = headerBar.findViewById(R.id.top_logo);
+            LinearLayout left = headerBar.findViewById(R.id.top_left_zone);
+            LinearLayout right = headerBar.findViewById(R.id.top_right_zone);
+            TextView presetDisplay = headerBar.findViewById(R.id.top_preset_display);
+            TextView cpuText = headerBar.findViewById(R.id.cpu_meter_text);
+            TextView srText = headerBar.findViewById(R.id.top_sr_text);
+            if (logo == null || left == null || right == null || presetDisplay == null) return;
+
+            int barW = headerBar.getWidth() - headerBar.getPaddingStart() - headerBar.getPaddingEnd();
+            if (barW <= 0) return;
+
+            float density = getResources().getDisplayMetrics().density;
+            float screenWidthDp = barW / density;
+
+            // On phones (< 600dp) hide the center logo immediately so Scene, BPM,
+            // SampleRate & CPU have 100% full width and never get clipped.
+            if (screenWidthDp < 600f) {
+                logo.setVisibility(View.GONE);
+            }
+
+            int leftFixed = Math.round(58 * density); // knob 36dp + floppy 16dp + margins
+            int rightW = right.getWidth();
+            int freeForName = barW - leftFixed - rightW;
+
+            if (logo.getVisibility() == View.VISIBLE && logo.getWidth() > 0)
+                freeForName -= logo.getWidth() + Math.round(8 * density);
+
+            int minNameW = Math.round(55 * density);
+
+            if (freeForName < minNameW) {
+                if (logo.getVisibility() == View.VISIBLE) {
+                    logo.setVisibility(View.GONE);
+                    freeForName += (logo.getWidth() > 0 ? logo.getWidth() : Math.round(48 * density));
+                }
+                if (freeForName < minNameW && cpuText != null && cpuText.getVisibility() == View.VISIBLE) {
+                    cpuText.setVisibility(View.GONE);
+                    freeForName += (cpuText.getWidth() > 0 ? cpuText.getWidth() : Math.round(30 * density));
+                }
+                if (freeForName < minNameW && srText != null && srText.getVisibility() == View.VISIBLE) {
+                    srText.setVisibility(View.GONE);
+                }
+                headerBar.requestLayout();
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "applyTopBarCollapse failed", e);
+        }
+    }
+
+    private void showRenamePresetDialog() {
+        if (mainActivity == null || mainActivity.patchName == null) return;
+        final String current = mainActivity.patchName.getText().toString();
+        AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
+        builder.setTitle("Rename Preset");
+        final EditText input = new EditText(getContext());
+        input.setSingleLine(true);
+        input.setText(current);
+        input.setSelectAllOnFocus(true);
+        builder.setView(input);
+        builder.setNegativeButton("Cancel", null);
+        builder.setPositiveButton("Rename", (d, which) -> {
+            String name = input.getText().toString().trim();
+            if (name.isEmpty()) {
+                MainActivity.toast("Preset name cannot be empty.");
+                return;
+            }
+            mainActivity.patchName.setText(name);
+            updateTopBarPresetDisplay(currentPresetNumber, name);
+            LocalPresetManager lpm = new LocalPresetManager(getContext());
+            for (LocalPresetManager.Preset p : lpm.loadAllPresets()) {
+                if (p.name != null && p.name.equals(current)) {
+                    p.name = name;
+                    lpm.savePreset(p);
+                    break;
+                }
+            }
+            MainActivity.toast("Preset renamed to " + name);
+        });
+        builder.show();
+    }
+
+    private void showQuickSaveDialog() {
+        if (mainActivity == null) return;
+        AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
+        builder.setTitle("Save Preset");
+        LinearLayout layout = new LinearLayout(getContext());
+        layout.setOrientation(LinearLayout.VERTICAL);
+        int pad = dp(16);
+        layout.setPadding(pad, pad, pad, 0);
+
+        final EditText nameInput = new EditText(getContext());
+        nameInput.setSingleLine(true);
+        nameInput.setHint("Preset name");
+        nameInput.setText(mainActivity.patchName != null ? mainActivity.patchName.getText().toString() : "");
+
+        final EditText descInput = new EditText(getContext());
+        descInput.setSingleLine(true);
+        descInput.setHint("Description (optional)");
+
+        layout.addView(nameInput);
+        layout.addView(descInput, new LinearLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT));
+        builder.setView(layout);
+        builder.setNegativeButton("Cancel", null);
+        builder.setPositiveButton("Save", (d, which) -> {
+            String name = nameInput.getText().toString().trim();
+            if (name.isEmpty()) {
+                MainActivity.toast("Name of preset is required.");
+                return;
+            }
+            LocalPresetManager lpm = new LocalPresetManager(getContext());
+            LocalPresetManager.Preset p = buildPresetFromChain(name, descInput.getText().toString().trim());
+            boolean ok = lpm.savePreset(p);
+            if (ok) {
+                if (mainActivity.patchName != null) mainActivity.patchName.setText(name);
+            updateTopBarPresetDisplay(currentPresetNumber, name);
+                // Space saver: also snapshot the current chain into the selected scene slot
+                saveCurrentChainToScene();
+                MainActivity.toast("Preset saved.");
+            } else {
+                MainActivity.toast("Failed to save preset.");
+            }
+        });
+        builder.show();
+    }
+
+    private void saveCurrentChainToScene() {
+        if (mainActivity == null || getContext() == null) return;
+        try {
+            SharedPreferences scenePrefs = getContext().getSharedPreferences("giggingear_scenes", android.content.Context.MODE_PRIVATE);
+            String[] defaultSceneNames = getContext().getResources().getStringArray(R.array.scene_slots);
+            java.util.List<String> names = new java.util.ArrayList<>();
+            for (int i = 0; i < defaultSceneNames.length; i++) {
+                names.add(scenePrefs.getString("scene_name_" + i, defaultSceneNames[i]));
+            }
+            java.util.Map chainMap = mainActivity.presetToMap();
+            if (chainMap == null) return;
+            org.json.JSONObject json = new org.json.JSONObject();
+            for (Object k : chainMap.keySet()) {
+                Object p = chainMap.get(k);
+                json.put((String) k, new org.json.JSONObject((java.util.Map) p).toString());
+            }
+            int scene = currentSceneIndex;
+            if (scene < 0 || scene >= names.size()) scene = 0;
+            scenePrefs.edit().putString("scene_" + scene, json.toString()).apply();
+            MainActivity.toast("Saved to " + names.get(scene));
+        } catch (Exception e) {
+            Log.w(TAG, "saveCurrentChainToScene failed", e);
+        }
+    }
+
+    private LocalPresetManager.Preset buildPresetFromChain(String name, String desc) {
+        LocalPresetManager.Preset p = new LocalPresetManager.Preset();
+        p.name = name;
+        p.description = desc;
+        p.author = "GigginGear Stage";
+        p.favorite = false;
+        p.masterInputVolume = 1.0f;
+        p.masterOutputVolume = 1.0f;
+        java.util.List<LocalPresetManager.PluginItem> plugins = new java.util.ArrayList<>();
+        int total = AudioEngine.getActivePlugins();
+        for (int i = 0; i < total; i++) {
+            LocalPresetManager.PluginItem item = new LocalPresetManager.PluginItem();
+            item.name = AudioEngine.getActivePluginName(i);
+            item.uniqueId = AudioEngine.getActivePluginID(i);
+            item.enabled = AudioEngine.getActivePluginEnabled(i);
+            float[] values = AudioEngine.getActivePluginValues(i);
+            java.util.List<LocalPresetManager.ControlItem> controls = new java.util.ArrayList<>();
+            for (int k = 0; k < values.length; k++) {
+                LocalPresetManager.ControlItem ci = new LocalPresetManager.ControlItem();
+                ci.name = AudioEngine.getControlName(i, k);
+                ci.value = values[k];
+                controls.add(ci);
+            }
+            item.controls = controls;
+            plugins.add(item);
+        }
+        p.plugins = plugins;
+
+        // Persist real-time graph wiring and canvas node positions
+        try {
+            int[] graphEdges = AudioEngine.getGraphEdges();
+            if (graphEdges != null && graphEdges.length > 0) {
+                p.graph = graphEdges;
+            }
+        } catch (Exception ignored) {}
+
+        if (mainActivity != null && mainActivity.signalChainCanvas != null) {
+            for (SignalChainCanvasView.Node n : mainActivity.signalChainCanvas.getNodes()) {
+                if (n != null) {
+                    p.nodePositions.put(String.valueOf(n.id), new float[]{n.x, n.y});
+                }
+            }
+        }
+
+        return p;
     }
 
 

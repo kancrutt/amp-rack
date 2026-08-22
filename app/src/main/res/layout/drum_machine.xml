@@ -30,7 +30,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:fontFamily="@font/comfortaa"
+                android:fontFamily="@font/plus_jakarta_sans"
                 android:textColor="@color/white"
                 android:text="Beats Per Minute"
                 android:textAlignment="center"
@@ -58,7 +58,7 @@
                 android:text="Drumkit"
                 android:textAlignment="center"
                 android:textColor="@color/white"
-                android:fontFamily="@font/comfortaa"
+                android:fontFamily="@font/plus_jakarta_sans"
                 android:layout_gravity="center"/>
             <Spinner
                 android:layout_width="wrap_content"
@@ -79,7 +79,7 @@
                 android:text="Pattern"
                 android:textAlignment="center"
                 android:textColor="@color/white"
-                android:fontFamily="@font/comfortaa"
+                android:fontFamily="@font/plus_jakarta_sans"
                 android:layout_gravity="center"/>
             <Spinner
                 android:layout_width="wrap_content"

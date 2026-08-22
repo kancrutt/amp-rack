@@ -173,7 +173,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-public class MainActivity extends AppCompatActivity implements ActivityCompat.OnRequestPermissionsResultCallback, TextureView.SurfaceTextureListener {
+public class MainActivity extends AppCompatActivity implements ActivityCompat.OnRequestPermissionsResultCallback, TextureView.SurfaceTextureListener, androidx.preference.PreferenceFragmentCompat.OnPreferenceStartFragmentCallback {
     MidiOutputPort midiOutputPort;
     MyReceiver midiReciever;
     private CompanionDeviceManager deviceManager;
@@ -392,6 +392,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     public Rack rack;
     public Tracks tracks, drums;
     public Presets presets;
+    public SettingsHostFragment settingsHost;
     int nag = 0 ;
 //    public MyPresets quickPatch;
     public QuickPatch quickPatch ;
@@ -503,6 +504,21 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
         File downloadsDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
         if (downloadsDir == null) downloadsDir = getFilesDir();
+        // Global crash catcher — writes stacktrace to file so Hery can share it without adb
+        Thread.UncaughtExceptionHandler prevHandler = Thread.getDefaultUncaughtExceptionHandler();
+        Thread.setDefaultUncaughtExceptionHandler((t, e) -> {
+            try {
+                java.io.StringWriter sw = new java.io.StringWriter();
+                e.printStackTrace(new java.io.PrintWriter(sw));
+                Log.e(TAG, "CRASH on " + t.getName(), e);
+                File logFile = new File(getExternalFilesDir(null), "crash_last.txt");
+                java.io.FileWriter fw = new java.io.FileWriter(logFile, false);
+                fw.write(sw.toString());
+                fw.close();
+            } catch (Exception ignore) {}
+            if (prevHandler != null) prevHandler.uncaughtException(t, e);
+        });
+
         favPresetsDir = downloadsDir.getPath() + "/" + "favoritePresets";
         File f = new File(favPresetsDir) ;
         if (! f.exists())
@@ -723,6 +739,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             drums.isDrums = true ;
             presets = new Presets();
             quickPatch = new QuickPatch();
+            settingsHost = new SettingsHostFragment();
 
             getSupportFragmentManager()
                     .beginTransaction()
@@ -744,6 +761,10 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     .beginTransaction()
                     .add(R.id.fragment_container, drums, "drums")
                     .commit();
+            getSupportFragmentManager()
+                    .beginTransaction()
+                    .add(R.id.fragment_container, settingsHost, "settings_host")
+                    .commit();
         } else {
             Log.d(TAG, "onCreate: restoring fragments from FragmentManager");
             rack = (Rack) getSupportFragmentManager().findFragmentByTag("rack");
@@ -763,6 +784,14 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
             quickPatch = (QuickPatch) getSupportFragmentManager().findFragmentByTag("qp");
             if (quickPatch == null) quickPatch = new QuickPatch();
+
+            settingsHost = (SettingsHostFragment) getSupportFragmentManager().findFragmentByTag("settings_host");
+            if (settingsHost == null) settingsHost = new SettingsHostFragment();
+
+            // If a settings sub-screen was on the back stack, drop back to base state
+            if (getSupportFragmentManager().getBackStackEntryCount() > 0) {
+                try { getSupportFragmentManager().popBackStackImmediate(); } catch (Exception ignored) {}
+            }
         }
 
 //        LoadFragment(presets);
@@ -811,6 +840,10 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
             @Override
             public boolean onNavigationItemSelected(@NonNull MenuItem item) {
+                // Drop any open settings sub-screen before switching tabs
+                if (getSupportFragmentManager().getBackStackEntryCount() > 0) {
+                    try { getSupportFragmentManager().popBackStackImmediate(); } catch (Exception ignored) {}
+                }
                 if (item.getItemId() != R.id.page_tuner) {
                     FrameLayout tunerOverlay = findViewById(R.id.tuner_overlay_container);
                     if (tunerOverlay != null && tunerOverlay.getVisibility() == View.VISIBLE) {
@@ -828,6 +861,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                         if (presets != null) ftRack.hide(presets);
                         if (tracks != null) ftRack.hide(tracks);
                         if (drums != null) ftRack.hide(drums);
+                        if (settingsHost != null) ftRack.hide(settingsHost);
                         ftRack.commit();
                         return true;
                          /*
@@ -848,6 +882,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                         if (tracks != null) ftPreset.hide(tracks);
                         if (quickPatch != null) ftPreset.hide(quickPatch);
                         if (drums != null) ftPreset.hide(drums);
+                        if (settingsHost != null) ftPreset.hide(settingsHost);
                         ftPreset.commit();
                         return true;
 
@@ -858,18 +893,29 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                         if (quickPatch != null) ftTuner.hide(quickPatch);
                         if (tracks != null) ftTuner.hide(tracks);
                         if (drums != null) ftTuner.hide(drums);
+                        if (settingsHost != null) ftTuner.hide(settingsHost);
                         ftTuner.commit();
                         showTunerOverlay();
                         return true;
+                    case R.id.page_drums:
+                        androidx.fragment.app.FragmentTransaction ftDrums = getSupportFragmentManager().beginTransaction();
+                        if (drums != null) ftDrums.show(drums);
+                        if (rack != null) ftDrums.hide(rack);
+                        if (presets != null) ftDrums.hide(presets);
+                        if (quickPatch != null) ftDrums.hide(quickPatch);
+                        if (tracks != null) ftDrums.hide(tracks);
+                        if (settingsHost != null) ftDrums.hide(settingsHost);
+                        ftDrums.commit();
+                        return true;
                     case R.id.page_settings:
                         androidx.fragment.app.FragmentTransaction ftSettings = getSupportFragmentManager().beginTransaction();
-                        if (rack != null) ftSettings.show(rack);
+                        if (settingsHost != null) ftSettings.show(settingsHost);
+                        if (rack != null) ftSettings.hide(rack);
                         if (presets != null) ftSettings.hide(presets);
                         if (quickPatch != null) ftSettings.hide(quickPatch);
                         if (tracks != null) ftSettings.hide(tracks);
                         if (drums != null) ftSettings.hide(drums);
                         ftSettings.commit();
-                        startActivity(new Intent(MainActivity.this, SettingsActivity.class));
                         return true;
                         /*
                         if (presets.loginNotice == null)
@@ -898,6 +944,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         if (presets != null) ft.hide(presets);
         if (tracks != null) ft.hide(tracks);
         if (drums != null) ft.hide(drums);
+        if (settingsHost != null) ft.hide(settingsHost);
         ft.commit();
 
         bottomNavigationView.setSelectedItemId(R.id.page_rack);
@@ -917,7 +964,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         notificationManager.createNotificationChannel(channel);
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setSmallIcon(R.drawable.logo)
+                .setSmallIcon(R.drawable.ic_notification)
                 .setAutoCancel(false)
                 .setOngoing(true)
                 .setContentTitle(getString(R.string.app_name))
@@ -965,7 +1012,9 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         deviceWidth = getWindowManager().getDefaultDisplay().getWidth();
         deviceHeight = getWindowManager().getDefaultDisplay().getHeight();
 
-        tabletMode = defaultSharedPreferences.getBoolean("tablet_mode", true);
+        android.util.DisplayMetrics dm = getResources().getDisplayMetrics();
+        float smallestWidthDp = Math.min(dm.widthPixels, dm.heightPixels) / dm.density;
+        tabletMode = defaultSharedPreferences.getBoolean("tablet_mode", smallestWidthDp >= 600f);
         if (tabletMode && (float) (1.0f * deviceWidth / deviceHeight) > 0.7f)
             tabletMode = true ;
         else
@@ -1832,6 +1881,12 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                                     alert("Cannot create directory", "Error loading model: " + dir);
 
                             writeFile(dest, s);
+                            // FIX: the engine was never told about the model —
+                            // file landed on disk but no setAtomPort call existed,
+                            // so Browse appeared to do nothing to the sound.
+                            int atomCtrl = resolveAtomControl(plugin);
+                            AudioEngine.setAtomPort(plugin, atomCtrl, dest);
+                            Log.i(TAG, "[load atom] SAF pick -> plugin " + plugin + " ctrl " + atomCtrl + " file " + dest);
                             int position = setSpinnerFromDir(holder.modelSpinner, dir, basename);
                             holder.modelSpinner.setSelection(position);
                             //                            ((DataAdapter.ViewHolder) mainActivity.recyclerView.findViewHolderForAdapterPosition(plugin)).modelSpinnerLayout.setVisibility(View.GONE);
@@ -2555,6 +2610,32 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             preset.put(String.valueOf(i), jo);
         }
 
+        try {
+            int[] graphEdges = AudioEngine.getGraphEdges();
+            if (graphEdges != null && graphEdges.length > 0) {
+                java.util.List<Integer> gList = new ArrayList<>();
+                for (int g : graphEdges) gList.add(g);
+                Map<String, Object> gMap = new HashMap<>();
+                gMap.put("graph", gList);
+                preset.put("graph_meta", (Map) gMap);
+            }
+        } catch (Exception ignored) {}
+
+        if (signalChainCanvas != null) {
+            Map<String, Object> posMap = new HashMap<>();
+            for (SignalChainCanvasView.Node n : signalChainCanvas.getNodes()) {
+                if (n != null) {
+                    java.util.List<Float> xy = new ArrayList<>();
+                    xy.add(n.x);
+                    xy.add(n.y);
+                    posMap.put(String.valueOf(n.id), xy);
+                }
+            }
+            if (!posMap.isEmpty()) {
+                preset.put("node_positions", (Map) posMap);
+            }
+        }
+
         return preset;
     }
 
@@ -2728,11 +2809,26 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 }
             }
             if (gearRender != null) {
-                gearRender.setImageResource(getGearRenderRes(pluginName));
+                gearRender.setImageResource(CategoryHelper.getIconRes(pluginName));
+                gearRender.setColorFilter(CategoryHelper.getColor(pluginName), android.graphics.PorterDuff.Mode.SRC_IN);
+            }
+
+            TextView gearInfoType = findViewById(R.id.detail_gear_info_type);
+            TextView gearInfoDesc = findViewById(R.id.detail_gear_info_desc);
+            if (gearInfoType != null) {
+                gearInfoType.setText(isCab ? "CAB · SPEAKER" : isAmp ? "AMP · NAM" : "EFFECT · STOMPBOX");
+            }
+            if (gearInfoDesc != null) {
+                String fullDesc = getPluginFullDescription(pluginName);
+                if (fullDesc != null && !fullDesc.isEmpty()) {
+                    gearInfoDesc.setText(fullDesc);
+                } else {
+                    gearInfoDesc.setText(pluginName != null ? pluginName : "Standard Model");
+                }
             }
             if (badge != null) {
                 badge.setText("A" + (position + 1));
-                badge.setTextColor(isAmp ? Color.parseColor("#FFAA00") : Color.parseColor("#00FF66"));
+                badge.setTextColor(CategoryHelper.getColor(pluginName));
             }
 
             if (modelName != null) {
@@ -2740,16 +2836,29 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             }
 
             if (browseBtn != null) {
-                browseBtn.setOnClickListener(v -> {
-                    Intent intent_upload = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-                    intent_upload.setType("*/*");
-                    intent_upload.addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
-                    intent_upload.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                    startActivityForResult(intent_upload, 5000 + position);
-                });
+                browseBtn.setOnClickListener(v -> showModelPickerDialog(position));
             }
 
             boolean isActive = AudioEngine.getActivePluginEnabled(position);
+            com.google.android.material.switchmaterial.SwitchMaterial enabledSwitch = findViewById(R.id.detail_enabled_switch);
+            TextView enabledLabelView = findViewById(R.id.detail_enabled_label);
+            if (enabledSwitch != null) {
+                enabledSwitch.setOnCheckedChangeListener(null);
+                enabledSwitch.setChecked(isActive);
+                if (enabledLabelView != null) {
+                    enabledLabelView.setText(isActive ? "ON" : "OFF");
+                    enabledLabelView.setTextColor(isActive ? Color.parseColor("#00E676") : Color.parseColor("#888888"));
+                }
+                enabledSwitch.setOnCheckedChangeListener((btn, checked) -> {
+                    AudioEngine.togglePlugin(position, checked);
+                    if (enabledLabelView != null) {
+                        enabledLabelView.setText(checked ? "ON" : "OFF");
+                        enabledLabelView.setTextColor(checked ? Color.parseColor("#00E676") : Color.parseColor("#888888"));
+                    }
+                    if (dataAdapter != null) dataAdapter.notifyItemChanged(position);
+                    if (signalChainCanvas != null) signalChainCanvas.invalidate();
+                });
+            }
             if (enabledBtn != null) {
                 enabledBtn.setText(isActive ? "ENABLED" : "BYPASSED");
                 enabledBtn.setTextColor(isActive ? Color.parseColor("#00E676") : Color.parseColor("#888888"));
@@ -2757,6 +2866,21 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 enabledBtn.setOnClickListener(v -> {
                     boolean newActive = !AudioEngine.getActivePluginEnabled(position);
                     AudioEngine.togglePlugin(position, newActive);
+                    if (enabledSwitch != null) {
+                        enabledSwitch.setOnCheckedChangeListener(null);
+                        enabledSwitch.setChecked(newActive);
+                        enabledSwitch.setOnCheckedChangeListener((btn, checked) -> {
+                            AudioEngine.togglePlugin(position, checked);
+                            if (enabledLabelView != null) {
+                                enabledLabelView.setText(checked ? "ON" : "OFF");
+                                enabledLabelView.setTextColor(checked ? Color.parseColor("#00E676") : Color.parseColor("#888888"));
+                            }
+                        });
+                    }
+                    if (enabledLabelView != null) {
+                        enabledLabelView.setText(newActive ? "ON" : "OFF");
+                        enabledLabelView.setTextColor(newActive ? Color.parseColor("#00E676") : Color.parseColor("#888888"));
+                    }
                     enabledBtn.setText(newActive ? "ENABLED" : "BYPASSED");
                     enabledBtn.setTextColor(newActive ? Color.parseColor("#00E676") : Color.parseColor("#888888"));
                     enabledBtn.setStrokeColor(ColorStateList.valueOf(newActive ? Color.parseColor("#00E676") : Color.parseColor("#888888")));
@@ -2767,9 +2891,12 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             // Populate dynamic parameter panels with 3D Rotary Hero Knobs & readable dB readouts
             LinearLayout levelPanel = findViewById(R.id.panel_level);
             LinearLayout tonePanel = findViewById(R.id.panel_tone);
-            TextView tonePanelTitle = findViewById(R.id.panel_tone_title);
             LinearLayout levelContainer = findViewById(R.id.container_level_knobs);
             LinearLayout toneContainer = findViewById(R.id.container_tone_knobs);
+            LinearLayout rightCol = findViewById(R.id.parameter_right_column);
+            if (rightCol != null) {
+                rightCol.setVisibility(View.VISIBLE);
+            }
 
             if (levelContainer != null && toneContainer != null) {
                 levelContainer.removeAllViews();
@@ -2779,8 +2906,17 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 ArrayList<LinearLayout> toneCells = new ArrayList<>();
 
                 int numControls = AudioEngine.getPluginControls(position);
+                int knobDimPx = getResources().getDimensionPixelSize(
+                        numControls > 4 ? R.dimen.knob_size_small : R.dimen.knob_size_large);
+                float labelSizePx = getResources().getDimension(R.dimen.knob_label_size);
+                float valSizePx = getResources().getDimension(R.dimen.knob_val_size);
+                int panelPadPx = getResources().getDimensionPixelSize(R.dimen.param_panel_padding);
+
+                float density = getResources().getDisplayMetrics().density;
+
                 for (int i = 0; i < numControls; i++) {
-                    String cName = AudioEngine.getControlName(position, i);
+                    String rawName = AudioEngine.getControlName(position, i);
+                    String cName = prettyControlName(rawName);
                     if (cName == null || cName.toLowerCase().contains("bypass")) continue;
 
                     float val = AudioEngine.getActivePluginValue(position, i);
@@ -2788,16 +2924,16 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     LinearLayout knobCell = new LinearLayout(this);
                     knobCell.setOrientation(LinearLayout.VERTICAL);
                     knobCell.setGravity(Gravity.CENTER);
-                    knobCell.setPadding(8, 2, 8, 2);
+                    knobCell.setPadding(Math.round(2 * density), 0, Math.round(2 * density), 0);
 
                     TextView labelView = new TextView(this);
                     labelView.setText(cName.toUpperCase());
                     labelView.setTextColor(Color.parseColor("#8F94A0"));
-                    labelView.setTextSize(9);
+                    labelView.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, labelSizePx);
                     labelView.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
                     labelView.setSingleLine(false);
                     labelView.setMaxLines(2);
-                    labelView.setMinLines(1);
+                    labelView.setEllipsize(android.text.TextUtils.TruncateAt.END);
                     labelView.setGravity(Gravity.CENTER);
 
                     RotarySeekbar rKnob = new RotarySeekbar(this);
@@ -2805,22 +2941,23 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     rKnob.setMinValue(-12f);
                     rKnob.setMaxValue(12f);
                     rKnob.setValue(val);
-                    // Sizing: 140x140 for <=5 knobs (hero big size), 100x100 if multi-row
-                    int knobDim = (numControls > 5) ? 100 : 140;
-                    LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(knobDim, knobDim);
+                    rKnob.mKnobColor = CategoryHelper.getColor(pluginName);
+                    LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(knobDimPx, knobDimPx);
                     lp.gravity = Gravity.CENTER;
                     rKnob.setLayoutParams(lp);
 
+                    String unit = detectControlUnit(cName);
                     TextView valView = new TextView(this);
-                    valView.setText(String.format("%.2fdB", val));
+                    valView.setText(formatParamValue(val, unit));
                     valView.setTextColor(Color.parseColor("#FFFFFF"));
-                    valView.setTextSize(9);
+                    valView.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, valSizePx);
                     valView.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
 
                     int finalI = i;
+                    String unitFinal = unit;
                     rKnob.setOnValueChangedListener((source, value) -> {
                         AudioEngine.setPluginControl(position, finalI, value);
-                        valView.setText(String.format("%.2fdB", value));
+                        valView.setText(formatParamValue(value, unitFinal));
                     });
 
                     knobCell.addView(labelView);
@@ -2840,8 +2977,9 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     levelContainer.addView(cell);
                 }
 
-                // Populate TONE container (2 rows centered)
-                if (toneCells.size() > 5) {
+                // Populate TONE container
+                if (tabletMode && toneCells.size() > 4) {
+                    toneContainer.setOrientation(LinearLayout.VERTICAL);
                     int half = (int) Math.ceil(toneCells.size() / 2.0);
                     LinearLayout row1 = new LinearLayout(this);
                     row1.setOrientation(LinearLayout.HORIZONTAL);
@@ -2850,7 +2988,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     LinearLayout row2 = new LinearLayout(this);
                     row2.setOrientation(LinearLayout.HORIZONTAL);
                     row2.setGravity(Gravity.CENTER);
-                    row2.setPadding(0, 6, 0, 0);
+                    row2.setPadding(0, Math.round(2 * density), 0, 0);
 
                     for (int k = 0; k < toneCells.size(); k++) {
                         if (k < half) {
@@ -2862,13 +3000,12 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     toneContainer.addView(row1);
                     toneContainer.addView(row2);
                 } else {
-                    LinearLayout singleRow = new LinearLayout(this);
-                    singleRow.setOrientation(LinearLayout.HORIZONTAL);
-                    singleRow.setGravity(Gravity.CENTER);
+                    // Single row horizontal scrollable — directly add knob cells to horizontal container
+                    toneContainer.setOrientation(LinearLayout.HORIZONTAL);
+                    toneContainer.setGravity(Gravity.CENTER_VERTICAL);
                     for (LinearLayout cell : toneCells) {
-                        singleRow.addView(cell);
+                        toneContainer.addView(cell);
                     }
-                    toneContainer.addView(singleRow);
                 }
 
                 // Dynamically adjust panel visibility so we don't force empty "LEVEL" boxes
@@ -2877,16 +3014,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
                 if (levelPanel != null) {
                     levelPanel.setVisibility(hasLevel ? View.VISIBLE : View.GONE);
-                }
-
-                if (tonePanelTitle != null) {
-                    if (hasLevel && hasTone) {
-                        tonePanelTitle.setText("TONE");
-                    } else if (hasTone) {
-                        tonePanelTitle.setText("CONTROLS");
-                    } else {
-                        tonePanelTitle.setText("PARAMETERS");
-                    }
                 }
 
                 if (!hasLevel && !hasTone) {
@@ -2910,62 +3037,72 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     }
 
     public void updateRoutingUI(int mode) {
-        runOnUiThread(() -> {
-            MaterialButton btnSeries = findViewById(R.id.btn_routing_series);
-            MaterialButton btnParallel = findViewById(R.id.btn_routing_parallel);
-
-            if (btnSeries != null && btnParallel != null) {
-                if (mode == 1) {
-                    btnParallel.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#FFAA00")));
-                    btnParallel.setTextColor(Color.parseColor("#121214"));
-                    btnSeries.setBackgroundTintList(ColorStateList.valueOf(Color.TRANSPARENT));
-                    btnSeries.setTextColor(Color.parseColor("#AAAAAA"));
-                } else {
-                    btnSeries.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#FFAA00")));
-                    btnSeries.setTextColor(Color.parseColor("#121214"));
-                    btnParallel.setBackgroundTintList(ColorStateList.valueOf(Color.TRANSPARENT));
-                    btnParallel.setTextColor(Color.parseColor("#AAAAAA"));
-                }
-            }
-        });
+        // No routing buttons anymore - routing is implicit from node wiring
+        // This method kept for preset loading compatibility only
     }
 
     int getCategoryIconRes(String pluginName) {
-        if (pluginName == null) return R.drawable.ic_cat_volume;
-        String n = pluginName.toLowerCase();
-        if (dataAdapter != null && dataAdapter.isAmpBlock(pluginName)) return R.drawable.ic_cat_amp;
-        if (n.contains("cab") || n.contains("cabinet") || n.contains("ir") || n.contains("impulse"))
-            return R.drawable.ic_cat_cabinet;
-        if (n.contains("reverb") || n.contains("spring") || n.contains("hall") || n.contains("plate"))
-            return R.drawable.ic_cat_reverb;
-        if (n.contains("delay") || n.contains("echo") || n.contains("tape"))
-            return R.drawable.ic_cat_delay;
-        if (n.contains("modulation") || n.contains("chorus") || n.contains("phaser") || n.contains("flanger") || n.contains("tremolo"))
-            return R.drawable.ic_cat_modulation;
-        if (n.contains("distortion") || n.contains("overdrive") || n.contains("dist"))
-            return R.drawable.ic_cat_distortion;
-        if (n.contains("comp") || n.contains("dynamics") || n.contains("limiter"))
-            return R.drawable.ic_cat_dynamics;
-        if (n.contains("eq") || n.contains("equalizer") || n.contains("parametric"))
-            return R.drawable.ic_cat_eq;
-        if (n.contains("pitch") || n.contains("synth") || n.contains("harmonizer") || n.contains("octave"))
-            return R.drawable.ic_cat_pitch;
-        if (n.contains("wah") || n.contains("filter") || n.contains("auto-wah") || n.contains("envelope"))
-            return R.drawable.ic_cat_wah;
-        if (n.contains("volume") || n.contains("pan") || n.contains("boost") || n.contains("level"))
-            return R.drawable.ic_cat_volume;
-        if (n.contains("noise gate") || n.contains("gate"))
-            return R.drawable.ic_cat_gate;
-        return R.drawable.ic_cat_volume;
+        return CategoryHelper.getSelectorRes(pluginName);
     }
 
     int getGearRenderRes(String pluginName) {
-        if (pluginName == null) return R.drawable.gg_gear_placeholder;
-        if (dataAdapter != null && dataAdapter.isAmpBlock(pluginName)) return R.drawable.gg_gear_amp;
-        String n = pluginName.toLowerCase();
-        if (n.contains("cab") || n.contains("cabinet") || n.contains("ir") || n.contains("impulse"))
-            return R.drawable.gg_gear_cabinet;
-        return getCategoryIconRes(pluginName);
+        return CategoryHelper.getIconRes(pluginName);
+    }
+
+    static String prettyControlName(String cName) {
+        if (cName == null) return null;
+        String n = cName.trim();
+        if (n.isEmpty()) return n;
+        // Port-name cleanup: INPUT00 -> Input, OUTPUT00 -> Output, etc.
+        String low = n.toLowerCase();
+        if (low.matches("^(in|input)\\d*$")) return "Input";
+        if (low.matches("^(out|output)\\d*$")) return "Output";
+        if (low.matches("^g?ain\\d*$")) return "Gain";
+        // Title-case remaining: DELAY -> Delay, FEEDBACK -> Feedback, MIX -> Mix
+        StringBuilder sb = new StringBuilder();
+        boolean nextUpper = true;
+        for (char ch : n.toCharArray()) {
+            if (ch == '_' || ch == ' ' || ch == '-') {
+                nextUpper = true;
+                sb.append(' ');
+            } else if (nextUpper) {
+                sb.append(Character.toUpperCase(ch));
+                nextUpper = false;
+            } else {
+                sb.append(Character.toLowerCase(ch));
+            }
+        }
+        String result = sb.toString().trim();
+        if (result.length() > 22) result = result.substring(0, 22);
+        return result;
+    }
+
+    static String detectControlUnit(String cName) {
+        if (cName == null) return "dB";
+        String n = cName.toLowerCase();
+        if (n.contains("hz") || n.contains("freq") || n.contains("cutoff") || n.contains("tone") || n.contains("resonance")
+                || n.contains("rate") || n.contains("speed") || n.contains("pitch") || n.contains("depth"))
+            return "Hz";
+        if (n.contains("ms") || n.contains("time") || n.contains("delay") || n.contains("duration") || n.contains("period")
+                || n.contains("attack") || n.contains("release") || n.contains("hold"))
+            return "ms";
+        if (n.contains("mix") || n.contains("blend") || n.contains("wet") || n.contains("dry") || n.contains("ratio")
+                || n.contains("feedback") || n.contains("send") || n.contains("balance") || n.contains("spread"))
+            return "%";
+        if (n.contains("decimate") || n.contains("bend") || n.contains("type") || n.contains("model")
+                || n.contains("shape") || n.contains("style") || n.contains("select"))
+            return "";
+        return "dB";
+    }
+
+    static String formatParamValue(float val, String unit) {
+        if (unit == null || unit.isEmpty())
+            return String.format("%.0f", val);
+        if (unit.equals("Hz") || unit.equals("%"))
+            return String.format("%.0f%s", val, unit);
+        if (unit.equals("ms"))
+            return String.format("%.1f%s", val, unit);
+        return String.format("%.2fdB", val);
     }
 
     void loadPreset(Map map) {
@@ -2980,12 +3117,17 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             return;
         }
 
-        // legacy map form: {name, desc, uid, path, controls:{...}}
+        // legacy map form: {name, desc, uid, path, controls:{...}} or scene map
         JSONObject jsonObject = new JSONObject(map);
         String controls;
         try {
-            controls = (String) jsonObject.get("controls").toString();
-            loadPreset(controls.toString());
+            if (jsonObject.has("controls")) {
+                controls = (String) jsonObject.get("controls").toString();
+                loadPreset(controls.toString());
+            } else {
+                // Scene map directly contains keys "0", "1", ... and metadata
+                loadPreset(jsonObject.toString());
+            }
         } catch (JSONException e) {
             MainActivity.toast("Cannot load preset: " + e.getMessage());
             e.printStackTrace();
@@ -3053,6 +3195,14 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 legacy.put(String.valueOf(plugin), jo.toString());
                 plugin++;
             }
+
+            // Carry over graph edges & node positions if present in map
+            if (map.containsKey("graph") && map.get("graph") instanceof java.util.List) {
+                legacy.put("graph", new JSONArray((java.util.List<?>) map.get("graph")));
+            }
+            if (map.containsKey("node_positions") && map.get("node_positions") instanceof Map) {
+                legacy.put("node_positions", new JSONObject((Map<?, ?>) map.get("node_positions")));
+            }
         } catch (JSONException e) {
             MainActivity.toast("Cannot load preset: " + e.getMessage());
             Log.e(TAG, "loadSchemaV1Preset: ", e);
@@ -3093,6 +3243,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             updateRoutingUI(rMode);
         }
 
+        final List<Integer> savedGraphEdges = new ArrayList<>();
         if (jsonObject.has("graph")) {
             JSONArray graphArr = jsonObject.optJSONArray("graph");
             if (graphArr != null && graphArr.length() % 2 == 0) {
@@ -3104,6 +3255,8 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     try {
                         from[i] = graphArr.getInt(i * 2);
                         to[i] = graphArr.getInt(i * 2 + 1);
+                        savedGraphEdges.add(from[i]);
+                        savedGraphEdges.add(to[i]);
                     } catch (JSONException e) {
                         ok = false;
                         break;
@@ -3112,6 +3265,21 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 if (ok) {
                     AudioEngine.setGraph(from, to);
                     Log.d(TAG, "loadPreset: restored graph edges (" + half + ")");
+                }
+            }
+        }
+
+        final Map<String, float[]> customNodePos = new HashMap<>();
+        if (jsonObject.has("node_positions")) {
+            JSONObject np = jsonObject.optJSONObject("node_positions");
+            if (np != null) {
+                Iterator<String> keys = np.keys();
+                while (keys.hasNext()) {
+                    String k = keys.next();
+                    JSONArray arr = np.optJSONArray(k);
+                    if (arr != null && arr.length() >= 2) {
+                        customNodePos.put(k, new float[]{(float) arr.optDouble(0, 0), (float) arr.optDouble(1, 0)});
+                    }
                 }
             }
         }
@@ -3248,6 +3416,416 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         }
 
         AudioEngine.bypass(false);
+
+        // Refresh visual chain and select the first active block in the editor
+        if (signalChainCanvas != null) {
+            signalChainCanvas.postDelayed(() -> {
+                signalChainCanvas.loadFromActivePlugins();
+                if (!savedGraphEdges.isEmpty()) {
+                    int half = savedGraphEdges.size() / 2;
+                    int[] from = new int[half];
+                    int[] to = new int[half];
+                    for (int i = 0; i < half; i++) {
+                        from[i] = savedGraphEdges.get(i * 2);
+                        to[i] = savedGraphEdges.get(i * 2 + 1);
+                    }
+                    signalChainCanvas.setGraphEdges(from, to);
+                }
+                if (!customNodePos.isEmpty()) {
+                    signalChainCanvas.setCustomNodePositions(customNodePos);
+                }
+                int activeCount = AudioEngine.getActivePlugins();
+                if (activeCount > 0) {
+                    populateInlineParameterEditor(0, AudioEngine.getActivePluginName(0));
+                }
+            }, 300);
+        }
+        if (dataAdapter != null) {
+            dataAdapter.notifyDataSetChanged();
+        }
+    }
+
+    void syncTopBarPresetInfo() {
+        syncTopBarPresetInfo(-1);
+    }
+
+    void syncTopBarPresetInfo(int explicitNumber) {
+        if (patchName == null) return;
+        TextView tn = findViewById(R.id.top_preset_display);
+        if (tn != null) {
+            int num = explicitNumber > 0 ? explicitNumber : 1;
+            if (explicitNumber <= 0 && dataAdapter != null) {
+                int sel = dataAdapter.getSelectedPosition();
+                if (sel >= 0) num = sel + 1;
+            }
+            android.text.SpannableStringBuilder sb = new android.text.SpannableStringBuilder();
+            String numStr = String.valueOf(num) + "  ";
+            int start = sb.length();
+            sb.append(numStr);
+            sb.setSpan(new android.text.style.StyleSpan(android.graphics.Typeface.BOLD),
+                    start, start + numStr.length(), android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+            sb.setSpan(new android.text.style.ForegroundColorSpan(android.graphics.Color.parseColor("#FFAA00")),
+                    start, start + numStr.length(), android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+            String pText = patchName.getText() != null ? patchName.getText().toString() : "CLEAN";
+            // Strip any legacy prefix like "2 GIGGIN' GEAR" if present to avoid duplicate numbers
+            if (pText.matches("^\\d+\\s+.*")) {
+                pText = pText.replaceFirst("^\\d+\\s+", "");
+            }
+            sb.append(pText);
+            tn.setText(sb);
+        }
+    }
+
+    // ---- BPM: real app-level tempo state driving time-based effect controls ----
+    public static final String PREF_BPM = "giggingear_bpm";
+    public static final String PREF_BPM_DIV = "giggingear_bpm_div";
+    private float bpmValue = 120f;
+    private float bpmDivision = 1f; // multiplier of quarter note (0.5=8th, 0.75=dotted 8th, 2=half)
+
+    public float getBpm() { return bpmValue; }
+
+    public String getBpmDisplay() {
+        SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(this);
+        bpmValue = sp.getFloat(PREF_BPM, 120f);
+        bpmDivision = sp.getFloat(PREF_BPM_DIV, 1f);
+        return (int) bpmValue + " BPM";
+    }
+
+    /** Push new tempo into every delay-time control of active blocks (real engine values). */
+    public void syncTimeBlocksToBpm(float bpm) {
+        try {
+            int n = AudioEngine.getActivePlugins();
+            float quarterSec = 60f / Math.max(30f, Math.min(300f, bpm));
+            int hits = 0;
+            for (int p = 0; p < n; p++) {
+                int controls;
+                try { controls = AudioEngine.getPluginControls(p); } catch (Exception e) { continue; }
+                String blockName;
+                try { blockName = AudioEngine.getActivePluginName(p); } catch (Exception e) { blockName = "?"; }
+                for (int c = 0; c < controls; c++) {
+                    String cn;
+                    try { cn = AudioEngine.getControlName(p, c); } catch (Exception e) { continue; }
+                    if (cn == null) continue;
+                    String s = cn.toLowerCase();
+                    boolean timeCtl = s.contains("delay") && !s.contains("feedback")
+                            && !s.contains("range") && !s.contains("spread")
+                            && (s.contains("time") || s.contains("second") || s.contains("(s)"));
+                    if (!timeCtl) continue;
+                    float val = quarterSec * bpmDivision;
+                    val = Math.max(0.005f, Math.min(10f, val));
+                    try {
+                        AudioEngine.setPluginControl(p, c, val);
+                        hits++;
+                        Log.i(TAG, "syncTimeBlocksToBpm: " + blockName + " [" + cn + "] -> " + val + "s");
+                    } catch (Exception e) {
+                        Log.w(TAG, "bpm set failed " + cn, e);
+                    }
+                }
+            }
+            toast(hits > 0 ? ("Tempo synced to " + hits + " delay control(s)")
+                           : "No delay blocks to sync");
+        } catch (Exception e) {
+            Log.w(TAG, "syncTimeBlocksToBpm failed", e);
+        }
+    }
+
+    /** BPM dialog: slider + tap-tempo + note-division selector for delay sync. */
+    public void showBpmDialog() {
+        SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(this);
+        final float[] currentBpm = {sp.getFloat(PREF_BPM, 120f)};
+        final long[] taps = {-1};
+
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        int pad = (int) (20 * getResources().getDisplayMetrics().density);
+        box.setPadding(pad, pad / 2, pad, 0);
+
+        final com.google.android.material.slider.Slider slider =
+                new com.google.android.material.slider.Slider(this);
+        slider.setValueFrom(40);
+        slider.setValueTo(240);
+        slider.setStepSize(1);
+        slider.setValue(currentBpm[0]);
+        box.addView(slider);
+
+        TextView readout = new TextView(this);
+        readout.setText(String.valueOf((int) currentBpm[0]));
+        readout.setTextSize(34);
+        readout.setGravity(android.view.Gravity.CENTER);
+        readout.setTextColor(Color.parseColor("#FFAA00"));
+        box.addView(readout);
+
+        slider.addOnChangeListener((s, value, fromUser) -> {
+            currentBpm[0] = value;
+            readout.setText(String.valueOf((int) value));
+        });
+
+        android.widget.Button tapBtn = new android.widget.Button(this);
+        tapBtn.setText("TAP TEMPO");
+        tapBtn.setOnClickListener(v -> {
+            long now = android.os.SystemClock.elapsedRealtime();
+            if (taps[0] > 0 && now - taps[0] < 2500) {
+                long interval = now - taps[0];
+                float tapped = 60000f / interval;
+                tapped = Math.max(40f, Math.min(240f, tapped));
+                currentBpm[0] = Math.round(tapped);
+                slider.setValue(currentBpm[0]);
+            }
+            taps[0] = now;
+        });
+        box.addView(tapBtn);
+
+        String[] divisions = {"Half", "Quarter", "Dotted 8th", "Eighth", "16th"};
+        float[] mults = {2f, 1f, 0.75f, 0.5f, 0.25f};
+        int preselect = 1;
+        for (int i = 0; i < mults.length; i++)
+            if (Math.abs(mults[i] - bpmDivision) < 0.01f) { preselect = i; break; }
+        android.widget.Spinner divSpin = new android.widget.Spinner(this);
+        divSpin.setAdapter(new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_dropdown_item, divisions));
+        divSpin.setSelection(preselect);
+        android.widget.TextView divLabel = new android.widget.TextView(this);
+        divLabel.setText("Delay sync division");
+        divLabel.setTextSize(12);
+        divLabel.setTextColor(Color.parseColor("#8F94A0"));
+        box.addView(divLabel);
+        box.addView(divSpin);
+
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Tempo")
+                .setView(box)
+                .setPositiveButton("Apply", (d, w) -> {
+                    float bpm = currentBpm[0];
+                    float mult = mults[divSpin.getSelectedItemPosition()];
+                    sp.edit().putFloat(PREF_BPM, bpm).putFloat(PREF_BPM_DIV, mult).apply();
+                    bpmDivision = mult;
+                    TextView chip = findViewById(R.id.top_bpm_text);
+                    if (chip != null) chip.setText((int) bpm + " BPM");
+                    syncTimeBlocksToBpm(bpm);
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    /** Lookup full description from all_plugins.json or lv2_plugins.json */
+    public String getPluginFullDescription(String pluginName) {
+        if (pluginName == null) return null;
+        try {
+            if (availablePlugins != null) {
+                Iterator<String> keys = availablePlugins.keys();
+                while (keys.hasNext()) {
+                    String k = keys.next();
+                    JSONObject o = availablePlugins.optJSONObject(k);
+                    if (o != null && pluginName.equalsIgnoreCase(o.optString("name"))) {
+                        String d = o.optString("desc", o.optString("description", null));
+                        if (d != null && !d.trim().isEmpty()) return d;
+                    }
+                }
+            }
+            if (availablePluginsLV2 != null) {
+                Iterator<String> keys = availablePluginsLV2.keys();
+                while (keys.hasNext()) {
+                    String k = keys.next();
+                    JSONObject o = availablePluginsLV2.optJSONObject(k);
+                    if (o != null && pluginName.equalsIgnoreCase(o.optString("name"))) {
+                        String d = o.optString("desc", o.optString("description", null));
+                        if (d != null && !d.trim().isEmpty()) return d;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "getPluginFullDescription failed for " + pluginName, e);
+        }
+        return null;
+    }
+
+    /** Find the atom/file-port control index of a block (for setAtomPort model loading). */
+    private int resolveAtomControl(int plugin) {
+        try {
+            int controls = AudioEngine.getPluginControls(plugin);
+            // Heuristic by control name: NAM/LV2 file ports are named Model/File/nam
+            for (int c = 0; c < controls; c++) {
+                String cn;
+                try { cn = AudioEngine.getControlName(plugin, c); } catch (Exception e) { continue; }
+                if (cn == null) continue;
+                String s = cn.toLowerCase();
+                if (s.contains("file") || s.contains("model") || s.equals("nam") || s.contains("config")) {
+                    Log.i(TAG, "resolveAtomControl: plugin " + plugin + " -> control " + c + " (" + cn + ")");
+                    return c;
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "resolveAtomControl failed for " + plugin, e);
+        }
+        return 0; // fallback: single-file-port plugins typically use index 0
+    }
+
+    /** Apply an already-on-disk model file to the given active block via its atom port. */
+    private void applyLocalModelToPlugin(int plugin, File srcFile) {
+        try {
+            String dirName = AudioEngine.getActivePluginName(plugin);
+            if (dirName == null) dirName = "Model" + plugin;
+            File dir = new File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), dirName);
+            if (!dir.exists() && !dir.mkdirs()) {
+                toast("Cannot create model directory");
+                return;
+            }
+            File dest = new File(dir, srcFile.getName());
+            if (!srcFile.getAbsolutePath().equals(dest.getAbsolutePath())) {
+                java.nio.file.Files.copy(srcFile.toPath(), dest.toPath(),
+                        java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
+            int ctrl = resolveAtomControl(plugin);
+            AudioEngine.setAtomPort(plugin, ctrl, dest.getAbsolutePath());
+            Log.i(TAG, "[load atom] " + srcFile.getName() + " -> plugin " + plugin + " ctrl " + ctrl);
+            toast("Model loaded: " + srcFile.getName());
+        } catch (Exception e) {
+            Log.e(TAG, "applyLocalModelToPlugin failed", e);
+            toast("Failed to load model: " + e.getMessage());
+        }
+    }
+
+    /**
+     * In-app plugin/model selector dialog:
+     * - For NAM / IR blocks: browse locally stored .nam models + SAF storage picker.
+     * - For standard effects (Reverb, Delay, Modulation, Distortion, EQ, etc.): list all
+     *   built-in plugins matching that category so the user can swap models directly.
+     */
+    public void showModelPickerDialog(int position) {
+        String pluginName;
+        try { pluginName = AudioEngine.getActivePluginName(position); }
+        catch (Exception e) { pluginName = null; }
+        if (pluginName == null) pluginName = "Plugin " + position;
+
+        CategoryHelper.Category category = CategoryHelper.getCategory(pluginName);
+        boolean isFileBasedBlock = (category == CategoryHelper.Category.AMP
+                || category == CategoryHelper.Category.CABINET
+                || pluginName.toLowerCase().contains("neural")
+                || pluginName.toLowerCase().contains("nam")
+                || pluginName.toLowerCase().contains("ir")
+                || pluginName.toLowerCase().contains("impulse"));
+
+        if (isFileBasedBlock) {
+            // File-based model selection (NAM / IR cabinets)
+            File baseDir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+            ArrayList<File> models = new ArrayList<>();
+            ArrayList<String> labels = new ArrayList<>();
+
+            File ownDir = new File(baseDir, pluginName);
+            File[] own = ownDir.listFiles((d, n) -> n.toLowerCase().endsWith(".nam") || n.toLowerCase().endsWith(".wav"));
+            if (own != null) {
+                java.util.Arrays.sort(own);
+                for (File f : own) { models.add(f); labels.add(f.getName()); }
+            }
+
+            File[] dirs = baseDir.listFiles(File::isDirectory);
+            if (dirs != null) {
+                java.util.Arrays.sort(dirs, (a, b) -> a.getName().compareToIgnoreCase(b.getName()));
+                for (File d : dirs) {
+                    if (d.getName().equals(pluginName)) continue;
+                    File[] fs = d.listFiles((dd, n) -> n.toLowerCase().endsWith(".nam") || n.toLowerCase().endsWith(".wav"));
+                    if (fs == null) continue;
+                    for (File f : fs) { models.add(f); labels.add("[" + d.getName() + "] " + f.getName()); }
+                }
+            }
+            labels.add("Load from storage…");
+
+            final ArrayList<File> finalModels = models;
+            new androidx.appcompat.app.AlertDialog.Builder(this)
+                    .setTitle("Choose " + category.name() + " Model")
+                    .setItems(labels.toArray(new CharSequence[0]), (d, which) -> {
+                        if (which < finalModels.size()) {
+                            applyLocalModelToPlugin(position, finalModels.get(which));
+                            TextView mn = findViewById(R.id.detail_model_name);
+                            if (mn != null) mn.setText(finalModels.get(which).getName());
+                        } else {
+                            Intent intent_upload = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                            intent_upload.setType("*/*");
+                            intent_upload.addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+                            intent_upload.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                            startActivityForResult(intent_upload, 5000 + position);
+                        }
+                    })
+                    .setNegativeButton("Cancel", null)
+                    .show();
+        } else {
+            // Built-in plugin selection for Reverb, Delay, Modulation, Drive, EQ, etc.
+            ArrayList<String> categoryPluginNames = new ArrayList<>();
+            ArrayList<String> displayLabels = new ArrayList<>();
+
+            // Scan all available LADSPA & LV2 plugins matching this category
+            JSONObject[] pluginSources = {availablePlugins, availablePluginsLV2};
+            for (JSONObject source : pluginSources) {
+                if (source == null) continue;
+                Iterator<String> keys = source.keys();
+                while (keys.hasNext()) {
+                    String k = keys.next();
+                    JSONObject obj = source.optJSONObject(k);
+                    if (obj == null) continue;
+                    String pName = obj.optString("name", "");
+                    if (pName.isEmpty()) continue;
+                    CategoryHelper.Category pCat = CategoryHelper.getCategory(pName);
+                    if (pCat == category && !categoryPluginNames.contains(pName)) {
+                        categoryPluginNames.add(pName);
+                        String desc = obj.optString("desc", obj.optString("description", ""));
+                        if (!desc.isEmpty() && desc.length() > 50) desc = desc.substring(0, 47) + "…";
+                        displayLabels.add(pName + (desc.isEmpty() ? "" : "\n" + desc));
+                    }
+                }
+            }
+
+            if (categoryPluginNames.isEmpty()) {
+                toast("No alternative " + category.name() + " plugins found");
+                return;
+            }
+
+            new androidx.appcompat.app.AlertDialog.Builder(this)
+                    .setTitle("Choose " + category.name() + " Plugin")
+                    .setItems(displayLabels.toArray(new CharSequence[0]), (d, which) -> {
+                        String selectedPlugin = categoryPluginNames.get(which);
+                        swapActivePlugin(position, selectedPlugin);
+                    })
+                    .setNegativeButton("Cancel", null)
+                    .show();
+        }
+    }
+
+    /** Swap the active plugin at a given slot with another plugin and refresh UI. */
+    public void swapActivePlugin(int position, String newPluginName) {
+        try {
+            // Save state of enabled before delete
+            boolean wasEnabled = AudioEngine.getActivePluginEnabled(position);
+            // Replace plugin: delete current, add new
+            AudioEngine.deletePlugin(position);
+            addPluginByName(newPluginName);
+
+            // Re-populate inline parameter editor with the newly loaded plugin
+            int newPosition = AudioEngine.getActivePlugins() - 1;
+            if (newPosition >= 0) {
+                populateInlineParameterEditor(newPosition, newPluginName);
+            }
+            if (signalChainCanvas != null) {
+                signalChainCanvas.postDelayed(signalChainCanvas::loadFromActivePlugins, 100);
+            }
+            toast("Loaded: " + newPluginName);
+        } catch (Exception e) {
+            Log.e(TAG, "swapActivePlugin failed", e);
+            toast("Error loading " + newPluginName);
+        }
+    }
+
+    @Override
+    public boolean onPreferenceStartFragment(androidx.preference.PreferenceFragmentCompat caller, androidx.preference.Preference pref) {        // Mirror SettingsActivity.onPreferenceStartFragment: open sub-screens
+        // in fragment_container using the same static preference fragments.
+        final Bundle args = pref.getExtras();
+        final androidx.fragment.app.Fragment fragment = getSupportFragmentManager().getFragmentFactory().instantiate(
+                getClassLoader(), pref.getFragment());
+        fragment.setArguments(args);
+        getSupportFragmentManager().beginTransaction()
+                .replace(R.id.fragment_container, fragment)
+                .addToBackStack(null)
+                .commit();
+        return true;
     }
 
     private boolean LoadFragment(Fragment fragment) {
@@ -3414,7 +3992,8 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     }
 
     public static void applyWallpaper(Context _context, Window window, Resources resources, ImageView imageView, int width, int height) {
-        String mTheme = PreferenceManager.getDefaultSharedPreferences(context).getString("color_scheme", "Theme.AmpRack") ;
+        boolean darkMode = PreferenceManager.getDefaultSharedPreferences(context).getBoolean("dark_mode", true) ;
+        String mTheme = darkMode ? "Theme.AmpRack" : "Theme.Light" ;
         Log.d(TAG, "applyWallpaper: setting native theme " + mTheme);
         SkinEngine.setColorScheme((MainActivity) context, mTheme);
 
@@ -3470,7 +4049,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 }
 
                 bitmap = scaleBackground(bitmap, width, height);
-                context.setTheme(R.style.Theme_Bright);
+                context.setTheme(R.style.Theme_AmpRack);
                 break;
             case "Space":
                 if (lowMemoryMode)
@@ -3492,7 +4071,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 break;
             case "a1":
                 bitmap = BitmapFactory.decodeResource(resources, R.drawable.a1);
-                context.setTheme(R.style.Theme_1);
+                context.setTheme(R.style.Theme_AmpRack);
                 break;
             case "700032":
                 bitmap = BitmapFactory.decodeResource(resources, R.drawable.bg);
@@ -3500,19 +4079,19 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 break;
             case "a2":
                 bitmap = BitmapFactory.decodeResource(resources, R.drawable.a2);
-                context.setTheme(R.style.Theme_2);
+                context.setTheme(R.style.Theme_AmpRack);
                 break;
             case "a3":
                 bitmap = BitmapFactory.decodeResource(resources, R.drawable.a3);
-                context.setTheme(R.style.Theme_3);
+                context.setTheme(R.style.Theme_AmpRack);
                 break;
             case "a4":
                 bitmap = BitmapFactory.decodeResource(resources, R.drawable.a4);
-                context.setTheme(R.style.Theme_4);
+                context.setTheme(R.style.Theme_AmpRack);
                 break;
             case "2.9 Beta":
                 bitmap = BitmapFactory.decodeResource(resources, R.drawable.bg);
-                context.setTheme(R.style.Theme_29beta);
+                context.setTheme(R.style.Theme_AmpRack);
                 break;
         }
 
@@ -3838,7 +4417,10 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 if (indicator != null) {
                     float clamp = (float) Math.max(-50, Math.min(50, finalCents));
                     float frac = (clamp + 50f) / 100f;
-                    indicator.setTranslationX((frac - 0.5f) * 2f * 120f);
+                    // Travel proportional to density so the sweep matches the bar
+                    // width on every DPI (was fixed ±120 raw px).
+                    float d = mainActivity.getResources().getDisplayMetrics().density;
+                    indicator.setTranslationX((frac - 0.5f) * 2f * 120f * d);
                     indicator.setBackgroundColor(inTune ? 0xFF00E676 : 0xFFFFAA00);
                 }
             }

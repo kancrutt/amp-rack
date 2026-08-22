@@ -105,10 +105,23 @@ public class MyPresets extends Fragment {
                 }
             }
             myPresetsAdapter.presets = mapList;
+            myPresetsAdapter.allPresets = new ArrayList<>(mapList);
             myPresetsAdapter.notifyDataSetChanged();
         }
+        updateEmptyState();
         if (myPresetsAdapter != null) {
             myPresetsAdapter.quick = quick;
+        }
+    }
+
+    /** Show a friendly message instead of a silent blank list. */
+    void updateEmptyState () {
+        View root = getView();
+        if (root == null) return;
+        View empty = root.findViewById(R.id.presets_empty_state);
+        if (empty != null) {
+            boolean isEmpty = myPresetsAdapter == null || myPresetsAdapter.getItemCount() == 0;
+            empty.setVisibility(isEmpty ? View.VISIBLE : View.GONE);
         }
     }
 
@@ -117,26 +130,40 @@ public class MyPresets extends Fragment {
      * (schema-v1 JSON, same shape as LocalPresetManager output).
      */
     void loadFactoryPresets (ArrayList<Map> mapList) {
+        int loaded = 0;
         try {
             String[] files = mainActivity.getAssets().list("factory_presets");
             if (files == null) {
-                Log.w(TAG, "loadFactoryPresets: no factory_presets dir");
+                Log.w(TAG, "loadFactoryPresets: no factory_presets dir in assets");
+                MainActivity.toast("No factory presets bundled");
                 return;
             }
             java.util.Arrays.sort(files);
             for (String f : files) {
                 if (!f.endsWith(".json"))
                     continue;
-                org.json.JSONObject jo = ConnectGuitar.loadJSONFromAssetFile(mainActivity, "factory_presets/" + f);
-                if (jo == null) {
-                    Log.e(TAG, "loadFactoryPresets: cannot parse " + f);
-                    continue;
+                // Per-file isolation: one bad asset must not blank the whole tab
+                try {
+                    org.json.JSONObject jo = ConnectGuitar.loadJSONFromAssetFile(mainActivity, "factory_presets/" + f);
+                    if (jo == null) {
+                        Log.e(TAG, "loadFactoryPresets: cannot parse " + f);
+                        continue;
+                    }
+                    HashMap<String, Object> map = new Gson().fromJson(jo.toString(), HashMap.class);
+                    mapList.add(map);
+                    loaded++;
+                } catch (Exception e) {
+                    Log.e(TAG, "loadFactoryPresets: failed on " + f, e);
                 }
-                HashMap<String, Object> map = new Gson().fromJson(jo.toString(), HashMap.class);
-                mapList.add(map);
             }
         } catch (Exception e) {
             Log.e(TAG, "loadFactoryPresets: ", e);
+        }
+        if (loaded == 0) {
+            Log.w(TAG, "loadFactoryPresets: 0 factory presets loaded");
+            MainActivity.toast("No factory presets could be loaded");
+        } else {
+            Log.i(TAG, "loadFactoryPresets: loaded " + loaded + " factory presets");
         }
     }
 
@@ -165,9 +192,7 @@ public class MyPresets extends Fragment {
 
             }
         });
-        int columns = 2;
-        if (mainActivity.tabletMode && factory) columns = 2;
-        recyclerView.setLayoutManager(new GridLayoutManager(mainActivity, columns));
+        recyclerView.setLayoutManager(new LinearLayoutManager(mainActivity));
         LinearLayoutManager linearLayoutManager = (LinearLayoutManager) recyclerView.getLayoutManager();
         recyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
@@ -183,11 +208,12 @@ public class MyPresets extends Fragment {
                 }
             }
         });
-        quickHeader = (LinearLayout) ((LinearLayout) view).getChildAt(0);
+                quickHeader = (LinearLayout) ((LinearLayout) view).getChildAt(0);
         myPresetsAdapter = new MyPresetsAdapter();
         myPresetsAdapter.setMainActivity(mainActivity);
         myPresetsAdapter.loadProgress = loadProgress;
         recyclerView.setAdapter(myPresetsAdapter);
+        myPresetsAdapter.onListChanged = this::updateEmptyState;
         if (mainActivity.rack != null) {
             myPresetsAdapter.quickPatchProgress = mainActivity.rack.quickPatchProgress;
         }

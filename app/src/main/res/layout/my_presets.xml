@@ -17,7 +17,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:fontFamily="@font/comfortaa"
+            android:fontFamily="@font/plus_jakarta_sans"
             android:text="Collection"
             android:textColor="@color/gg_text"/>
 
@@ -65,10 +65,23 @@
     <androidx.recyclerview.widget.RecyclerView
         android:layout_width="match_parent"
         android:id="@+id/my_presets_recycler"
-        android:layout_height="wrap_content"
+        android:layout_height="0dp"
         android:padding="6dp"
         android:clipToPadding="false"
         android:layout_weight="1"/>
+
+    <!-- Empty state: shown when the preset list has zero items -->
+    <TextView
+        android:id="@+id/presets_empty_state"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:gravity="center"
+        android:padding="32dp"
+        android:visibility="gone"
+        android:text="No presets yet.\nTap the save icon on the Board (top bar) to create one."
+        android:textColor="#8F94A0"
+        android:textSize="13sp"/>
 
     <LinearLayout
         android:visibility="gone"

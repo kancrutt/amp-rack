@@ -108,4 +108,31 @@
         <!-- The margin between the zoomed on-touch view and the screen edges. Default=4dp -->
         <attr name="overlayBorderMargin" format="dimension" />
     </declare-styleable>
+
+    <!-- Category icon tint attributes (UI/UX spec 4.2 two-axis color system) -->
+    <attr name="color_cat_amp_active" format="color" />
+    <attr name="color_cat_cab_active" format="color" />
+    <attr name="color_cat_distortion_active" format="color" />
+    <attr name="color_cat_modulation_active" format="color" />
+    <attr name="color_cat_delay_active" format="color" />
+    <attr name="color_cat_reverb_active" format="color" />
+    <attr name="color_cat_dynamics_active" format="color" />
+    <attr name="color_cat_eq_active" format="color" />
+    <attr name="color_cat_pitch_active" format="color" />
+    <attr name="color_cat_wah_active" format="color" />
+    <attr name="color_cat_volume_active" format="color" />
+    <attr name="color_cat_noisegate_active" format="color" />
+
+    <attr name="color_cat_amp_inactive" format="color" />
+    <attr name="color_cat_cab_inactive" format="color" />
+    <attr name="color_cat_distortion_inactive" format="color" />
+    <attr name="color_cat_modulation_inactive" format="color" />
+    <attr name="color_cat_delay_inactive" format="color" />
+    <attr name="color_cat_reverb_inactive" format="color" />
+    <attr name="color_cat_dynamics_inactive" format="color" />
+    <attr name="color_cat_eq_inactive" format="color" />
+    <attr name="color_cat_pitch_inactive" format="color" />
+    <attr name="color_cat_wah_inactive" format="color" />
+    <attr name="color_cat_volume_inactive" format="color" />
+    <attr name="color_cat_noisegate_inactive" format="color" />
 </resources>

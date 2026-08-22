@@ -9,20 +9,20 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Run Program Commands"
-        android:fontFamily="@font/comfortaa"
+        android:fontFamily="@font/plus_jakarta_sans"
         android:layout_marginBottom="10dp"/>
 
     <AutoCompleteTextView
         android:layout_width="match_parent"
         android:id="@+id/hash_command_text"
         android:completionThreshold="1"
-        android:fontFamily="@font/comfortaa"
+        android:fontFamily="@font/plus_jakarta_sans"
         android:layout_height="wrap_content"/>
 
 <!--    <EditText-->
 <!--        android:layout_width="match_parent"-->
 <!--        android:id="@+id/hash_command_text"-->
-<!--        android:fontFamily="@font/comfortaa"-->
+<!--        android:fontFamily="@font/plus_jakarta_sans"-->
 <!--        android:layout_height="wrap_content"/>-->
 
     <Button

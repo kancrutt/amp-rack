@@ -39,7 +39,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:fontFamily="@font/gruppo"
+                android:fontFamily="@font/plus_jakarta_sans"
                 android:textSize="40dp"
                 android:layout_marginLeft="10dp"
                 android:text="Amp Rack"/>
@@ -54,7 +54,7 @@
             android:orientation="vertical">
 
             <TextView
-                android:fontFamily="@font/start"
+                android:fontFamily="@font/plus_jakarta_sans"
                 android:layout_width="wrap_content"
                 android:layout_marginTop="10dp"
                 android:textSize="11sp"
@@ -65,7 +65,7 @@
                 android:layout_width="10dp"
                 android:layout_height="wrap_content"/>
             <TextView
-                android:fontFamily="@font/gruppo"
+                android:fontFamily="@font/plus_jakarta_sans"
                 android:layout_marginTop="10dp"
                 android:textSize="15sp"
                 android:layout_width="wrap_content"
@@ -81,7 +81,7 @@
             android:gravity="center"
             android:textSize="17dp"
             android:layout_marginTop="10dp"
-            android:fontFamily="@font/comfortaa"
+            android:fontFamily="@font/plus_jakarta_sans"
             android:text="Advanced High Performance\nGuitar Effects Processor"/>
 
         <ScrollView
@@ -96,7 +96,7 @@
                 android:gravity="left"
                 android:textSize="17dp"
                 android:layout_marginTop="20dp"
-                android:fontFamily="@font/comfortaa"
+                android:fontFamily="@font/plus_jakarta_sans"
                 android:text="@string/onboard_description"/>
         </ScrollView>
     </LinearLayout>
@@ -134,7 +134,7 @@
                     android:layout_height="wrap_content"
                     android:layout_gravity="center"
                     android:layout_marginLeft="10dp"
-                    android:fontFamily="@font/comfortaa"
+                    android:fontFamily="@font/plus_jakarta_sans"
                     android:text="Usage Guide"
                     android:textSize="24dp" />
 
@@ -142,7 +142,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_gravity="center"
-                    android:fontFamily="@font/comfortaa"
+                    android:fontFamily="@font/plus_jakarta_sans"
                     android:textSize="14dp"
                     android:text="Find your guitar tone in 4 easy steps"
                     android:textStyle="bold" />

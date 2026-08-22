@@ -1,112 +1,125 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Compact list row (not a card): name+tags left, favorite/delete right.
+     Tap anywhere on the row loads the preset (quickLoad is bound to root). -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:orientation="vertical"
+    android:id="@+id/preset_row_root"
+    android:orientation="horizontal"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_margin="6dp"
-    android:padding="12dp"
+    android:minHeight="56dp"
+    android:layout_marginStart="8dp"
+    android:layout_marginEnd="8dp"
+    android:layout_marginTop="3dp"
+    android:layout_marginBottom="3dp"
+    android:paddingStart="12dp"
+    android:paddingEnd="6dp"
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp"
+    android:gravity="center_vertical"
     android:background="@drawable/gg_card_bg"
-    android:elevation="2dp">
-
-    <TextView
-        android:id="@+id/preset_title"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:fontFamily="sans-serif-medium"
-        android:textSize="16sp"
-        android:textColor="@color/gg_text"
-        android:maxLines="1"
-        android:ellipsize="end"
-        android:text="Rig Title"/>
-
-    <TextView
-        android:id="@+id/preset_desc"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="2dp"
-        android:fontFamily="sans-serif"
-        android:textSize="12sp"
-        android:textColor="@color/gg_secondary"
-        android:maxLines="2"
-        android:ellipsize="end"
-        android:text="Preset description"/>
+    android:foreground="?attr/selectableItemBackground">
 
     <LinearLayout
-        android:id="@+id/preset_tags"
-        android:layout_width="match_parent"
+        android:orientation="vertical"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:orientation="horizontal"/>
+        android:layout_weight="1">
 
-    <TextView
-        android:id="@+id/preset_meta"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:fontFamily="sans-serif"
-        android:textSize="11sp"
-        android:textColor="@color/gg_hint"
-        android:maxLines="1"
-        android:ellipsize="end"
-        android:text="Aug 2026 - GigginGear Stage"/>
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:orientation="horizontal">
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/preset_quick_load"
-            android:layout_width="wrap_content"
+        <TextView
+            android:id="@+id/preset_title"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_gravity="start"
-            android:text="Quick Load"
-            android:textSize="12sp"
-            android:textColor="@color/black"
-            app:backgroundTint="@color/gg_accent"
-            app:cornerRadius="8dp"
-            android:drawableLeft="@drawable/ic_baseline_play_arrow_24"
-            android:minWidth="0dp"
-            android:minHeight="0dp"
-            android:paddingLeft="12dp"
-            android:paddingRight="12dp"
-            android:paddingTop="6dp"
-            android:paddingBottom="6dp"/>
+            android:fontFamily="@font/plus_jakarta_sans"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:textColor="@color/gg_text"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:text="Rig Title"/>
 
-        <Space
-            android:layout_width="0dp"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"/>
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
 
-        <ToggleButton
-            android:id="@+id/preset_favorite"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:backgroundTint="@android:color/transparent"
-            android:background="@android:color/transparent"
-            android:drawable="@drawable/ic_baseline_favorite_border_24"
-            android:textOff=""
-            android:textOn=""
-            android:layout_gravity="center_vertical"/>
+            <TextView
+                android:id="@+id/preset_desc"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="@font/plus_jakarta_sans"
+                android:textSize="11sp"
+                android:textColor="@color/gg_secondary"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:text="Description"/>
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/preset_delete"
-            android:layout_width="wrap_content"
+            <TextView
+                android:id="@+id/preset_meta"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:fontFamily="@font/plus_jakarta_sans"
+                android:textSize="10sp"
+                android:textColor="@color/gg_hint"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:text=""/>
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/preset_tags"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:minWidth="0dp"
-            android:minHeight="0dp"
-            android:text="Delete"
-            android:textSize="12sp"
-            android:textColor="@color/dark_red"
-            android:layout_gravity="center_vertical"
-            app:backgroundTint="@color/gg_card"
-            app:cornerRadius="8dp"
-            android:drawableLeft="@drawable/ic_baseline_delete_forever_24"
-            android:paddingLeft="10dp"
-            android:paddingRight="10dp"
-            android:paddingTop="6dp"
-            android:paddingBottom="6dp"/>
+            android:layout_marginTop="2dp"
+            android:orientation="horizontal"/>
     </LinearLayout>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/preset_quick_load"
+        style="@style/Widget.Material3.Button.OutlinedButton"
+        android:layout_width="wrap_content"
+        android:layout_height="32dp"
+        android:layout_marginStart="8dp"
+        android:minWidth="0dp"
+        android:minHeight="0dp"
+        android:insetTop="0dp"
+        android:insetBottom="0dp"
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp"
+        android:text="LOAD"
+        android:textSize="10sp"
+        android:textStyle="bold"
+        android:textColor="#FFAA00"
+        app:cornerRadius="8dp"
+        app:strokeColor="#FFAA00"
+        app:strokeWidth="1dp"/>
+
+    <ToggleButton
+        android:id="@+id/preset_favorite"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:backgroundTint="@android:color/transparent"
+        android:background="@android:color/transparent"
+        android:drawable="@drawable/ic_baseline_favorite_border_24"
+        android:textOff=""
+        android:textOn=""
+        android:layout_gravity="center_vertical"/>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/preset_delete"
+        style="@style/Widget.Material3.Button.TextButton"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:minWidth="0dp"
+        android:minHeight="0dp"
+        android:insetTop="0dp"
+        android:insetBottom="0dp"
+        android:padding="0dp"
+        android:contentDescription="Delete preset"
+        app:icon="@drawable/ic_baseline_delete_forever_24"
+        app:iconTint="#FF3B30"
+        app:iconGravity="textStart"
+        app:iconPadding="0dp"/>
 </LinearLayout>

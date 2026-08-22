@@ -19,7 +19,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:fontFamily="@font/gruppo"
+            android:fontFamily="@font/plus_jakarta_sans"
             android:text="Nam Model Downloader"/>
         <ProgressBar
             android:layout_margin="10dp"

@@ -14,39 +14,10 @@
         android:defaultValue="true"
         android:summary="Optimise UI to make use of large displays (e.g. tablets)"/>
 
-    <ListPreference
-        android:title="Theme"
-        android:key="theme"
-        android:defaultValue="TubeAmp"
-        app:entryValues="@array/themes"
-        app:entries="@array/themes"/>
-    <Preference
-        android:title="Load Theme From Folder"
-        android:summary="Load a theme from a folder on your device"
-        android:key="theme_custom"/>
-    <Preference
-        android:title="Load Theme From File"
-        android:summary="Load a theme from a file on your device"
-        android:key="theme_file"/>
-    <Preference
-        android:title="Set Wallpaper"
-        android:key="background_custom"/>
-
-    <Preference
-        android:summary="Restart the app for theme change to take effect."/>
-
-    <ListPreference
-        android:title="Color Scheme"
-        app:key="color_scheme"
-        android:summary="Choose a color scheme for Material Theme"
-        android:entries="@array/mstyles"
-        app:defaultValue="Theme.AmpRack"
-        android:defaultValue="Theme.AmpRack"
-        android:entryValues="@array/mstyles"/>
-
-    <Preference
-        android:title="More themes online"
-        android:summary="Tap to download more themes from the web"
-        android:key="more_themes_online"/>
+    <SwitchPreference
+        android:title="Dark Mode"
+        android:key="dark_mode"
+        android:defaultValue="true"
+        android:summary="Use the dark color scheme. Turn off for the light scheme."/>
 
 </PreferenceScreen>

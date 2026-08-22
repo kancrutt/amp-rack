@@ -26,7 +26,7 @@
             android:layout_weight="@integer/material_motion_duration_long_1"
             android:layout_height="wrap_content"
             android:textColor="@color/white"
-            android:fontFamily="@font/comfortaa"
+            android:fontFamily="@font/plus_jakarta_sans"
             android:textSize="20dp"
             android:layout_margin="10dp"
             android:text="Add Plugins to Rack"/>
@@ -90,7 +90,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:fontFamily="@font/gruppo"
+                android:fontFamily="@font/plus_jakarta_sans"
                 android:text="Sort by"
                 android:textSize="12dp"/>
             <Spinner

@@ -3,19 +3,32 @@
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
-    <!-- VU meter arc -->
+
+    <!-- Warning triangle -->
     <path
-        android:strokeColor="#FFFFFF"
+        android:pathData="M12,3 L22,20 L2,20 Z"
+        android:strokeColor="#FF1744"
         android:strokeWidth="2"
         android:strokeLineCap="round"
-        android:pathData="M4,18 A10,10 0 0 1 20,18" />
-    <!-- CLIP mark above threshold -->
+        android:strokeLineJoin="round"
+        android:fillColor="@android:color/transparent" />
+
+    <!-- Exclamation mark line -->
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M8,5 L9,7 L15,7 L16,5 Z" />
-    <path
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="1.5"
+        android:pathData="M12,9 L12,14"
+        android:strokeColor="#FF1744"
+        android:strokeWidth="2.5"
         android:strokeLineCap="round"
-        android:pathData="M10,4 L10,5 M14,4 L14,5" />
+        android:strokeLineJoin="round"
+        android:fillColor="@android:color/transparent" />
+
+    <!-- Exclamation dot -->
+    <path
+        android:pathData="M12,17 L12.01,17"
+        android:strokeColor="#FF1744"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="@android:color/transparent" />
+
 </vector>

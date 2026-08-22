@@ -17,7 +17,7 @@
             android:layout_height="wrap_content"
             android:layout_gravity="center"
             android:layout_margin="10dp"
-            android:fontFamily="@font/comfortaa"
+            android:fontFamily="@font/plus_jakarta_sans"
             android:text="Trigger MIDI control to auto fill values"/>
 
         <ToggleButton

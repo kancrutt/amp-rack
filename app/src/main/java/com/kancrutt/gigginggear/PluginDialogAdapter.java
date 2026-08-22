@@ -65,9 +65,15 @@ public class PluginDialogAdapter extends RecyclerView.Adapter <PluginDialogAdapt
 //                    return;
                 }
 
-                final int pluginID = plugins.get(holder.getAdapterPosition());
+                int pos = holder.getAdapterPosition();
+                if (pos < 0 || pos >= plugins.size()) return;
+                final int pluginID = plugins.get(pos);
                 Log.d(TAG, "Adding plugin ID: " + pluginID) ;
-                mainActivity.addPluginToRack(pluginID);
+                try {
+                    mainActivity.addPluginToRack(pluginID);
+                } catch (Exception e) {
+                    Log.e(TAG, "addPluginToRack crashed", e);
+                }
                 if (! mainActivity.defaultSharedPreferences.getBoolean("keep_plugindialog_open", false))
                     mainActivity.pluginDialog.hide();
                 mainActivity.recyclerView.scrollToPosition(mainActivity.dataAdapter.getItemCount() - 1);
@@ -232,20 +238,19 @@ public class PluginDialogAdapter extends RecyclerView.Adapter <PluginDialogAdapt
                 String desc = descriptionsAll.get(i).toLowerCase();
                 boolean matches = false;
 
+                CategoryHelper.Category c = CategoryHelper.getCategory(name);
                 if (cat.contains("amp") || cat.contains("cab")) {
-                    matches = name.contains("amp") || name.contains("cab") || name.contains("nam") || name.contains("aida") || desc.contains("amplifier") || desc.contains("cabinet");
-                } else if (cat.contains("overdrive")) {
-                    matches = name.contains("drive") || name.contains("screamer") || name.contains("boost") || desc.contains("overdrive");
-                } else if (cat.contains("distortion")) {
-                    matches = name.contains("dist") || name.contains("fuzz") || name.contains("rat") || name.contains("muff") || desc.contains("distortion") || desc.contains("fuzz");
+                    matches = (c == CategoryHelper.Category.AMP || c == CategoryHelper.Category.CABINET);
+                } else if (cat.contains("overdrive") || cat.contains("distortion")) {
+                    matches = (c == CategoryHelper.Category.DISTORTION);
                 } else if (cat.contains("modulation") || cat.contains("modulator")) {
-                    matches = name.contains("chorus") || name.contains("flang") || name.contains("phas") || name.contains("vibe") || name.contains("trem") || name.contains("pitch") || name.contains("wah") || desc.contains("modulation");
+                    matches = (c == CategoryHelper.Category.MODULATION || c == CategoryHelper.Category.PITCH || c == CategoryHelper.Category.WAH);
                 } else if (cat.contains("delay")) {
-                    matches = name.contains("delay") || name.contains("echo") || desc.contains("delay") || desc.contains("echo");
+                    matches = (c == CategoryHelper.Category.DELAY);
                 } else if (cat.contains("reverb")) {
-                    matches = name.contains("reverb") || name.contains("hall") || name.contains("plate") || name.contains("space") || desc.contains("reverb");
+                    matches = (c == CategoryHelper.Category.REVERB);
                 } else if (cat.contains("utility")) {
-                    matches = name.contains("eq") || name.contains("gate") || name.contains("comp") || name.contains("limit") || name.contains("filter") || desc.contains("equalizer") || desc.contains("compressor") || desc.contains("noise");
+                    matches = (c == CategoryHelper.Category.EQ || c == CategoryHelper.Category.DYNAMICS || c == CategoryHelper.Category.GATE || c == CategoryHelper.Category.VOLUME);
                 }
 
                 if (matches) {

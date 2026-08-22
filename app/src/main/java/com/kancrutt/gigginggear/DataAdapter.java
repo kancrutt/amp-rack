@@ -109,13 +109,7 @@ public class DataAdapter extends RecyclerView.Adapter<DataAdapter.ViewHolder> {
 
             if (holder.pedalIcon != null) {
                 holder.pedalIcon.setImageResource(getCategoryIconRes(pluginName));
-                boolean active = AudioEngine.getActivePluginEnabled(position);
-                if (active) {
-                    holder.pedalIcon.clearColorFilter();
-                } else {
-                    // Mute baked category colors, don't replace them
-                    holder.pedalIcon.setColorFilter(getCategoryInactiveColor(pluginName), PorterDuff.Mode.MULTIPLY);
-                }
+                holder.pedalIcon.setActivated(AudioEngine.getActivePluginEnabled(position));
             }
 
             if (holder.pedalLed != null) {
@@ -175,35 +169,6 @@ public class DataAdapter extends RecyclerView.Adapter<DataAdapter.ViewHolder> {
         return Math.min(plugins.size(), active);
     }
 
-    int getCategoryIconRes(String pluginName) {
-        if (pluginName == null) return R.drawable.ic_cat_volume;
-        String n = pluginName.toLowerCase();
-        if (isAmpBlock(pluginName)) return R.drawable.ic_cat_amp;
-        if (n.contains("cab") || n.contains("cabinet") || n.contains("ir") || n.contains("impulse"))
-            return R.drawable.ic_cat_cabinet;
-        if (n.contains("reverb") || n.contains("spring") || n.contains("hall") || n.contains("plate"))
-            return R.drawable.ic_cat_reverb;
-        if (n.contains("delay") || n.contains("echo") || n.contains("tape") || n.contains("digital delay"))
-            return R.drawable.ic_cat_delay;
-        if (n.contains("modulation") || n.contains("chorus") || n.contains("phaser") || n.contains("flanger") || n.contains("tremolo"))
-            return R.drawable.ic_cat_modulation;
-        if (n.contains("distortion") || n.contains("overdrive") || n.contains("dist"))
-            return R.drawable.ic_cat_distortion;
-        if (n.contains("comp") || n.contains("dynamics") || n.contains("limiter"))
-            return R.drawable.ic_cat_dynamics;
-        if (n.contains("eq") || n.contains("equalizer") || n.contains("parametric"))
-            return R.drawable.ic_cat_eq;
-        if (n.contains("pitch") || n.contains("synth") || n.contains("harmonizer") || n.contains("octave"))
-            return R.drawable.ic_cat_pitch;
-        if (n.contains("wah") || n.contains("filter") || n.contains("auto-wah") || n.contains("envelope"))
-            return R.drawable.ic_cat_wah;
-        if (n.contains("noise gate") || n.contains("gate"))
-            return R.drawable.ic_cat_gate;
-        if (n.contains("volume") || n.contains("pan") || n.contains("boost") || n.contains("level"))
-            return R.drawable.ic_cat_volume;
-        return R.drawable.ic_cat_volume;
-    }
-
     public class ViewHolder extends RecyclerView.ViewHolder {
         public LinearLayout root;
         public TextView pluginName;
@@ -244,67 +209,19 @@ public class DataAdapter extends RecyclerView.Adapter<DataAdapter.ViewHolder> {
         primaryColor = color;
     }
 
+    int getCategoryIconRes(String pluginName) {
+        return CategoryHelper.getSelectorRes(pluginName);
+    }
+
     boolean isAmpBlock(String pluginName) {
-        if (pluginName == null) return false;
-        String n = pluginName.toLowerCase();
-        return n.contains("neural amp") || n.contains("aida") || n.equals("amp") || n.contains("amp head") || n.contains("amplifier");
+        return CategoryHelper.getCategory(pluginName) == CategoryHelper.Category.AMP;
     }
 
     int getCategoryActiveColor(String pluginName) {
-        if (pluginName == null) return Color.parseColor("#8F94A0");
-        String n = pluginName.toLowerCase();
-        if (isAmpBlock(pluginName)) return context.getResources().getColor(R.color.cat_amp_sel);
-        if (n.contains("cab") || n.contains("cabinet") || n.contains("ir") || n.contains("impulse"))
-            return context.getResources().getColor(R.color.cat_cab_sel);
-        if (n.contains("distortion") || n.contains("overdrive") || n.contains("dist"))
-            return context.getResources().getColor(R.color.cat_dist_sel);
-        if (n.contains("modulation") || n.contains("chorus") || n.contains("phaser") || n.contains("flanger") || n.contains("tremolo"))
-            return context.getResources().getColor(R.color.cat_mod_sel);
-        if (n.contains("delay") || n.contains("echo") || n.contains("tape") || n.contains("digital delay"))
-            return context.getResources().getColor(R.color.cat_delay_sel);
-        if (n.contains("reverb") || n.contains("spring") || n.contains("hall") || n.contains("plate"))
-            return context.getResources().getColor(R.color.cat_reverb_sel);
-        if (n.contains("comp") || n.contains("dynamics") || n.contains("limiter") || n.contains("gate") || n.contains("compressor"))
-            return context.getResources().getColor(R.color.cat_dynamics_sel);
-        if (n.contains("eq") || n.contains("equalizer") || n.contains("parametric"))
-            return context.getResources().getColor(R.color.cat_eq_sel);
-        if (n.contains("pitch") || n.contains("synth") || n.contains("harmonizer") || n.contains("octave"))
-            return context.getResources().getColor(R.color.cat_pitch_sel);
-        if (n.contains("wah") || n.contains("filter") || n.contains("auto-wah") || n.contains("envelope"))
-            return context.getResources().getColor(R.color.cat_wah_sel);
-        if (n.contains("volume") || n.contains("pan") || n.contains("boost") || n.contains("level"))
-            return context.getResources().getColor(R.color.cat_vol_sel);
-        if (n.contains("noise gate") || n.contains("gate"))
-            return context.getResources().getColor(R.color.cat_gate_sel);
-        return Color.parseColor("#8F94A0");
+        return CategoryHelper.getColor(pluginName);
     }
 
     int getCategoryInactiveColor(String pluginName) {
-        if (pluginName == null) return Color.parseColor("#3A3D45");
-        String n = pluginName.toLowerCase();
-        if (isAmpBlock(pluginName)) return context.getResources().getColor(R.color.cat_amp_dim);
-        if (n.contains("cab") || n.contains("cabinet") || n.contains("ir") || n.contains("impulse"))
-            return context.getResources().getColor(R.color.cat_cab_dim);
-        if (n.contains("distortion") || n.contains("overdrive") || n.contains("dist"))
-            return context.getResources().getColor(R.color.cat_dist_dim);
-        if (n.contains("modulation") || n.contains("chorus") || n.contains("phaser") || n.contains("flanger") || n.contains("tremolo"))
-            return context.getResources().getColor(R.color.cat_mod_dim);
-        if (n.contains("delay") || n.contains("echo") || n.contains("tape") || n.contains("digital delay"))
-            return context.getResources().getColor(R.color.cat_delay_dim);
-        if (n.contains("reverb") || n.contains("spring") || n.contains("hall") || n.contains("plate"))
-            return context.getResources().getColor(R.color.cat_reverb_dim);
-        if (n.contains("comp") || n.contains("dynamics") || n.contains("limiter") || n.contains("gate") || n.contains("compressor"))
-            return context.getResources().getColor(R.color.cat_dynamics_dim);
-        if (n.contains("eq") || n.contains("equalizer") || n.contains("parametric"))
-            return context.getResources().getColor(R.color.cat_eq_dim);
-        if (n.contains("pitch") || n.contains("synth") || n.contains("harmonizer") || n.contains("octave"))
-            return context.getResources().getColor(R.color.cat_pitch_dim);
-        if (n.contains("wah") || n.contains("filter") || n.contains("auto-wah") || n.contains("envelope"))
-            return context.getResources().getColor(R.color.cat_wah_dim);
-        if (n.contains("volume") || n.contains("pan") || n.contains("boost") || n.contains("level"))
-            return context.getResources().getColor(R.color.cat_vol_dim);
-        if (n.contains("noise gate") || n.contains("gate"))
-            return context.getResources().getColor(R.color.cat_gate_dim);
         return Color.parseColor("#3A3D45");
     }
 

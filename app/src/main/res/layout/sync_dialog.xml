@@ -7,7 +7,7 @@
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:fontFamily="@font/gruppo"
+        android:fontFamily="@font/plus_jakarta_sans"
         android:text="Amp Rack for PC is included for free with Amp Rack Premium"
         android:textAlignment="center"
         android:textSize="24dp"
@@ -18,7 +18,7 @@
         android:layout_height="wrap_content"
         android:text="Download from amprack.in"
         android:layout_margin="10dp"
-        android:fontFamily="@font/comfortaa"
+        android:fontFamily="@font/plus_jakarta_sans"
         android:id="@+id/download"/>
     <LinearLayout
         android:layout_width="match_parent"
@@ -36,7 +36,7 @@
             android:text="Sync"
             android:id="@+id/sync"
             android:layout_margin="10dp"
-            android:fontFamily="@font/gruppo"/>
+            android:fontFamily="@font/plus_jakarta_sans"/>
     </LinearLayout>
     <TextView
         android:layout_width="match_parent"

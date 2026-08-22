@@ -1,19 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
-<menu xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent">
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
     <item
         android:id="@+id/page_rack"
         android:enabled="true"
         android:visible="true"
         android:icon="@drawable/ic_nav_rig"
-        android:title="Giggin' Gear"/>
+        android:title="Board"/>
     <item
         android:visible="true"
         android:id="@+id/page_preset"
         android:enabled="true"
         android:icon="@drawable/ic_nav_presets"
-        android:title="Presets"/>
+        android:title="Preset"/>
     <item
         android:visible="true"
         android:id="@+id/page_tuner"
@@ -22,9 +20,15 @@
         android:title="Tuner"/>
     <item
         android:visible="true"
+        android:id="@+id/page_drums"
+        android:enabled="true"
+        android:icon="@drawable/ic_nav_drum"
+        android:title="Loops &amp; Drum"/>
+    <item
+        android:visible="true"
         android:id="@+id/page_settings"
         android:enabled="true"
         android:icon="@drawable/ic_nav_settings"
-        android:title="Settings"/>
+        android:title="Setting"/>
 
 </menu>

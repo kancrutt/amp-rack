@@ -13,6 +13,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.LinearLayout;
+import android.widget.TextView;
 import android.widget.ToggleButton;
 
 import androidx.annotation.NonNull;
@@ -108,33 +109,8 @@ public class TracksAdapter extends RecyclerView.Adapter<TracksAdapter.ViewHolder
             });
         }
 
-        if (mainActivity.useTheme) {
-            mainActivity.skinEngine.cardText(holder.fileButton);
-            linearLayout.post(new Runnable() {
-                @Override
-                public void run() {
-                    mainActivity.skinEngine.card (linearLayout);
-
-                }
-            });
-
-            if (tracks.themeInit == false) {
-                Log.d(TAG, "onBindViewHolder: tracks for " + tracks.filesDir);
-                tracks.themeInit = true ;
-                if (tracks.filesDir == "assets://drums") {
-                    Log.i(TAG, "onBindViewHolder: fixing drums player");
-                    tracks.playerWindow.setBackground(null);
-                }
-                mainActivity.skinEngine.card (tracks.playerWindow);
-                tracks.playerWindow.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        mainActivity.skinEngine.card (tracks.playerWindow);
-                    }
-                });
-
-            }
-        }
+        // Skeuomorphic SkinEngine disabled for this screen (design system: dark
+        // flat/vector). Rows keep their gg_card_bg from track_file.xml.
     }
 
     @Override
@@ -143,14 +119,15 @@ public class TracksAdapter extends RecyclerView.Adapter<TracksAdapter.ViewHolder
     }
 
     public class ViewHolder extends RecyclerView.ViewHolder {
-        Button fileButton, deleteButton ;
+        TextView fileButton;
+        android.widget.ImageButton deleteButton;
         LinearLayout linearLayout;
 
         public ViewHolder(@NonNull View itemView) {
             super(itemView);
             linearLayout = (LinearLayout) itemView;
-            fileButton = (Button) linearLayout.getChildAt(0);
-            deleteButton = (Button) linearLayout.getChildAt(1);
+            fileButton = (TextView) linearLayout.getChildAt(0);
+            deleteButton = (android.widget.ImageButton) linearLayout.getChildAt(1);
         }
     }
 

@@ -1,11 +1,48 @@
-<?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
-    <!-- Material Symbols "collections_bookmark" — stacked card deck with bookmark -->
+
+    <!-- Back card peeking top -->
     <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M4,6H2v14c0,1.1 0.9,2 2,2h14v-2H4V6zM20,2H8C6.9,2 6,2.9 6,4v12c0,1.1 0.9,2 2,2h12c1.1,0 2,-0.9 2,-2V4C22,2.9 21.1,2 20,2zM19,11l-2.5,-1.5L14,11V4h5V11z" />
+        android:pathData="M6,4 L18,4 L18,6"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+
+    <!-- Front card -->
+    <path
+        android:pathData="M4,6 L20,6 L20,20 L4,20 Z"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="@android:color/transparent" />
+
+    <!-- Preset line 1 -->
+    <path
+        android:pathData="M7,10 L17,10"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+
+    <!-- Preset line 2 -->
+    <path
+        android:pathData="M7,13.5 L17,13.5"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+
+    <!-- Preset line 3 (shorter) -->
+    <path
+        android:pathData="M7,17 L13,17"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+
 </vector>

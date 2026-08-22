@@ -38,7 +38,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:fontFamily="@font/comfortaa"
+                    android:fontFamily="@font/plus_jakarta_sans"
                     android:id="@+id/media_filename"
                     android:text="File Name"/>
 
@@ -65,11 +65,11 @@
                 android:textAlignment="viewStart"
                 android:id="@+id/share_file"
                 android:text=" Share"
-                android:fontFamily="@font/comfortaa"
+                android:fontFamily="@font/plus_jakarta_sans"
                 android:drawableLeft="@drawable/ic_baseline_share_24"/>
             <Button
                 android:text="Delete"
-                android:fontFamily="@font/comfortaa"
+                android:fontFamily="@font/plus_jakarta_sans"
                 android:layout_width="wrap_content"
                 android:id="@+id/delete_file"
                 android:layout_height="wrap_content"
@@ -82,7 +82,7 @@
             android:layout_gravity="center"
             android:layout_height="wrap_content"
             android:textAlignment="center"
-            android:fontFamily="@font/comfortaa"
+            android:fontFamily="@font/plus_jakarta_sans"
             android:textColor="@color/white"
             android:layout_marginBottom="10dp"
             android:text=" Tap video to close"/>

@@ -666,13 +666,48 @@ public class RotarySeekbar extends View {
         setMeasuredDimension(w, h);
     }
 
+    private float mInitialDownX, mInitialDownY;
+    private boolean mIsDraggingVertically = false;
+
     @Override
     public boolean onTouchEvent(MotionEvent event) {
-        int action = event.getAction();
-        if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_MOVE) {
-            if (getParent() != null) {
-                getParent().requestDisallowInterceptTouchEvent(true);
-            }
+        int action = event.getActionMasked();
+
+        switch (action) {
+            case MotionEvent.ACTION_DOWN:
+                mInitialDownX = event.getX();
+                mInitialDownY = event.getY();
+                mIsDraggingVertically = false;
+                break;
+
+            case MotionEvent.ACTION_MOVE:
+                float dx = Math.abs(event.getX() - mInitialDownX);
+                float dy = Math.abs(event.getY() - mInitialDownY);
+
+                if (!mIsDraggingVertically) {
+                    if (dy > dx && dy > 10) {
+                        // User is dragging vertically to turn the knob -> lock parent scroll
+                        mIsDraggingVertically = true;
+                        if (getParent() != null) {
+                            getParent().requestDisallowInterceptTouchEvent(true);
+                        }
+                    } else if (dx > dy && dx > 10) {
+                        // User is swiping horizontally to scroll the knob list -> allow HorizontalScrollView to scroll
+                        if (getParent() != null) {
+                            getParent().requestDisallowInterceptTouchEvent(false);
+                        }
+                        return false;
+                    }
+                }
+                break;
+
+            case MotionEvent.ACTION_UP:
+            case MotionEvent.ACTION_CANCEL:
+                mIsDraggingVertically = false;
+                if (getParent() != null) {
+                    getParent().requestDisallowInterceptTouchEvent(false);
+                }
+                break;
         }
 
         boolean result = mDetector.onTouchEvent(event);
@@ -686,7 +721,7 @@ public class RotarySeekbar extends View {
                     mListener.onValueChanged(this, mValue);
             }
         }
-        return result;
+        return true;
     }
 
     public float getSeekbarRotation() {
@@ -905,9 +940,6 @@ public class RotarySeekbar extends View {
 
         @Override
         public boolean onDown(MotionEvent e) {
-            if (getParent() != null) {
-                getParent().requestDisallowInterceptTouchEvent(true);
-            }
             mbScrolling = true;
             mStartScrollValue = mValue;
             mAccumulatedAngleChange = 0.0f;
@@ -933,9 +965,6 @@ public class RotarySeekbar extends View {
 
         @Override
         public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX, float distanceY) {
-            if (getParent() != null) {
-                getParent().requestDisallowInterceptTouchEvent(true);
-            }
             // Vertical drag gesture: drag up (distanceY > 0) increases value, drag down (distanceY < 0) decreases value
             float sensitivity = (mMaxValue - mMinValue) / 300.0f;
             float delta = distanceY * sensitivity;
@@ -1217,11 +1246,10 @@ public class RotarySeekbar extends View {
                     canvas.drawLine(nx1 + knobRadius*0.08f, ny1 + knobRadius*0.08f,
                             nx2 + knobRadius*0.08f, ny2 + knobRadius*0.08f, mNeedleShadowPaint);
                 }
-                canvas.drawLine(nx1, ny1, nx2, ny2, mNeedlePaint);
+                Paint dynamicNeedle = new Paint(mNeedlePaint);
+                dynamicNeedle.setColor(mKnobColor);
+                canvas.drawLine(nx1, ny1, nx2, ny2, dynamicNeedle);
             }
-
-            if (!mNeedleOnTop && drawKnob)
-                canvas.drawCircle(mSeekbarCenter.x, mSeekbarCenter.y, mRadius * mKnobRadius, mKnobPaint);
 
             canvas.rotate(-rot, mSeekbarCenter.x, mSeekbarCenter.y);
             if(mShowValue)

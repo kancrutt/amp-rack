@@ -187,6 +187,24 @@ public class LocalPresetManager {
             }
         }
         root.put("plugins", pluginsArr);
+
+        // Persist routing graph edges and node positions (preserves custom parallel routing layout)
+        if (p.graph != null && p.graph.length > 0) {
+            JSONArray gArr = new JSONArray();
+            for (int g : p.graph) gArr.put(g);
+            root.put("graph", gArr);
+        }
+        if (p.nodePositions != null && !p.nodePositions.isEmpty()) {
+            JSONObject npObj = new JSONObject();
+            for (Map.Entry<String, float[]> e : p.nodePositions.entrySet()) {
+                JSONArray xyArr = new JSONArray();
+                xyArr.put((double) e.getValue()[0]);
+                xyArr.put((double) e.getValue()[1]);
+                npObj.put(e.getKey(), xyArr);
+            }
+            root.put("node_positions", npObj);
+        }
+
         return root;
     }
 
@@ -257,6 +275,29 @@ public class LocalPresetManager {
                 p.plugins.add(item);
             }
         }
+
+        // Restore graph edges if present
+        JSONArray gArr = json.optJSONArray("graph");
+        if (gArr != null && gArr.length() > 0) {
+            int[] g = new int[gArr.length()];
+            for (int i = 0; i < gArr.length(); i++) g[i] = gArr.optInt(i, 0);
+            p.graph = g;
+        }
+
+        // Restore custom node positions
+        JSONObject npObj = json.optJSONObject("node_positions");
+        if (npObj != null) {
+            Iterator<String> keys = npObj.keys();
+            while (keys.hasNext()) {
+                String k = keys.next();
+                JSONArray xyArr = npObj.optJSONArray(k);
+                if (xyArr != null && xyArr.length() >= 2) {
+                    float[] xy = new float[]{(float) xyArr.optDouble(0, 0.0), (float) xyArr.optDouble(1, 0.0)};
+                    p.nodePositions.put(k, xy);
+                }
+            }
+        }
+
         return p;
     }
 
@@ -339,6 +380,8 @@ public class LocalPresetManager {
         public float masterOutputVolume = 1.0f;
         public List<String> tags = new ArrayList<>();
         public List<PluginItem> plugins = new ArrayList<>();
+        public int[] graph;
+        public Map<String, float[]> nodePositions = new HashMap<>(); // pluginName/id -> [x, y]
     }
 
     public static class PluginItem {

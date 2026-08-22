@@ -32,7 +32,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Connect Guitar to Phone"
-                    android:fontFamily="@font/comfortaa"
+                    android:fontFamily="@font/plus_jakarta_sans"
                     android:textSize="22dp"
                     android:layout_weight="1"
                     android:layout_marginRight="10dp"
@@ -41,7 +41,7 @@
                 <Button
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:fontFamily="@font/comfortaa"
+                    android:fontFamily="@font/plus_jakarta_sans"
                     android:id="@+id/connect_guide"
                     android:drawableLeft="@drawable/ic_baseline_open_in_browser_24"
                     android:background="@color/fui_transparent"

@@ -218,28 +218,55 @@
          ============================================================ -->
 
     <!-- Selectors (lightweight wrappers) -->
-    <color name="cat_amp_sel">#E8543C</color>
-    <color name="cat_amp_dim">#5A2A1E</color>
-    <color name="cat_cab_sel">#B0B0B0</color>
-    <color name="cat_cab_dim">#3A3A3A</color>
-    <color name="cat_dist_sel">#F2A03D</color>
-    <color name="cat_dist_dim">#5E3A18</color>
-    <color name="cat_mod_sel">#3D8BF2</color>
-    <color name="cat_mod_dim">#1E3A60</color>
-    <color name="cat_delay_sel">#4CD97B</color>
-    <color name="cat_delay_dim">#1A4028</color>
-    <color name="cat_reverb_sel">#B85CF2</color>
-    <color name="cat_reverb_dim">#3E1A60</color>
+    <!-- Category Colors (Synced 100% to Zero-Trust Mockup Grid) -->
+    <color name="cat_amp_sel">#FF3D00</color>
+    <color name="cat_amp_dim">#5A1800</color>
+    <color name="cat_cab_sel">#ECEFF1</color>
+    <color name="cat_cab_dim">#455A64</color>
+    <color name="cat_dist_sel">#FF5252</color>
+    <color name="cat_dist_dim">#5C1D1D</color>
+    <color name="cat_mod_sel">#7C4DFF</color>
+    <color name="cat_mod_dim">#281B54</color>
+    <color name="cat_delay_sel">#00E5FF</color>
+    <color name="cat_delay_dim">#004D40</color>
+    <color name="cat_reverb_sel">#E040FB</color>
+    <color name="cat_reverb_dim">#4A154B</color>
     <color name="cat_dynamics_sel">#FFB74D</color>
-    <color name="cat_dynamics_dim">#5E3A18</color>
+    <color name="cat_dynamics_dim">#5C3A14</color>
     <color name="cat_eq_sel">#A5D6A7</color>
-    <color name="cat_eq_dim">#2A4028</color>
-    <color name="cat_pitch_sel">#8B5CF2</color>
-    <color name="cat_pitch_dim">#2E1A50</color>
-    <color name="cat_wah_sel">#3DE8F2</color>
-    <color name="cat_wah_dim">#0E3A40</color>
-    <color name="cat_vol_sel">#3DE8C1</color>
-    <color name="cat_vol_dim">#0E3A30</color>
-    <color name="cat_gate_sel">#FFE0B2</color>
-    <color name="cat_gate_dim">#2A2010</color>
+    <color name="cat_eq_dim">#2E4C2E</color>
+    <color name="cat_pitch_sel">#D500F9</color>
+    <color name="cat_pitch_dim">#4A148C</color>
+    <color name="cat_wah_sel">#FF9100</color>
+    <color name="cat_wah_dim">#5E3600</color>
+    <color name="cat_vol_sel">#00E5FF</color>
+    <color name="cat_vol_dim">#004D54</color>
+    <color name="cat_gate_sel">#FFB300</color>
+    <color name="cat_gate_dim">#593E00</color>
+
+    <color name="color_cat_amp_active">#FF3D00</color>
+    <color name="color_cat_cab_active">#ECEFF1</color>
+    <color name="color_cat_distortion_active">#FF5252</color>
+    <color name="color_cat_modulation_active">#7C4DFF</color>
+    <color name="color_cat_delay_active">#00E5FF</color>
+    <color name="color_cat_reverb_active">#E040FB</color>
+    <color name="color_cat_dynamics_active">#FFB74D</color>
+    <color name="color_cat_eq_active">#A5D6A7</color>
+    <color name="color_cat_pitch_active">#D500F9</color>
+    <color name="color_cat_wah_active">#FF9100</color>
+    <color name="color_cat_volume_active">#00E5FF</color>
+    <color name="color_cat_noisegate_active">#FFB300</color>
+
+    <color name="color_cat_amp_inactive">#5A1800</color>
+    <color name="color_cat_cab_inactive">#455A64</color>
+    <color name="color_cat_distortion_inactive">#5C1D1D</color>
+    <color name="color_cat_modulation_inactive">#281B54</color>
+    <color name="color_cat_delay_inactive">#004D40</color>
+    <color name="color_cat_reverb_inactive">#4A154B</color>
+    <color name="color_cat_dynamics_inactive">#5C3A14</color>
+    <color name="color_cat_eq_inactive">#2E4C2E</color>
+    <color name="color_cat_pitch_inactive">#4A148C</color>
+    <color name="color_cat_wah_inactive">#5E3600</color>
+    <color name="color_cat_volume_inactive">#004D54</color>
+    <color name="color_cat_noisegate_inactive">#593E00</color>
 </resources>

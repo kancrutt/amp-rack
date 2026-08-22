@@ -34,7 +34,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:fontFamily="@font/comfortaa"
+                    android:fontFamily="@font/plus_jakarta_sans"
                     android:text="Amp Rack"
                     android:textSize="24dp"
                     android:layout_marginLeft="10dp"/>
@@ -50,14 +50,14 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:hint="Feature / Bug description"
-            android:fontFamily="@font/comfortaa"
+            android:fontFamily="@font/plus_jakarta_sans"
             android:id="@+id/bug_title"/>
         <EditText
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:hint="Details of the problem.\n\nKindly include what you were doing when the problem occurred"
             android:lines="5"
-            android:fontFamily="@font/comfortaa"
+            android:fontFamily="@font/plus_jakarta_sans"
             android:id="@+id/bug_description"/>
 
 
@@ -69,7 +69,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:fontFamily="@font/comfortaa"
+                android:fontFamily="@font/plus_jakarta_sans"
                 android:inputType="textEmailAddress"
                 android:hint="Email (optional)"
                 android:id="@+id/bug_email"/>
@@ -89,7 +89,7 @@
                 android:layout_height="wrap_content"
                 android:text="Submit"
                 android:id="@+id/bug_submit"
-                android:fontFamily="@font/comfortaa"
+                android:fontFamily="@font/plus_jakarta_sans"
                 android:layout_margin="10dp"/>
 
         </LinearLayout>
@@ -98,7 +98,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
-            android:fontFamily="@font/comfortaa"
+            android:fontFamily="@font/plus_jakarta_sans"
             android:text="Made with ♥"/>
 
     </LinearLayout>

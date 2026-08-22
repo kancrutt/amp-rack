@@ -26,7 +26,7 @@
     <LinearLayout
         android:id="@+id/bottom_nav_wrapper"
         android:layout_width="match_parent"
-        android:layout_height="64dp"
+        android:layout_height="52dp"
         android:background="#0B0B0C"
         android:gravity="center_vertical"
         android:orientation="horizontal"
@@ -67,6 +67,7 @@
             android:layout_weight="1"
             android:background="#0B0B0C"
             app:elevation="0dp"
+            app:labelVisibilityMode="labeled"
             app:itemIconTint="@color/bottom_nav_icon_tint"
             app:itemTextColor="@color/white"
             app:itemActiveIndicatorStyle="@android:style/Widget"

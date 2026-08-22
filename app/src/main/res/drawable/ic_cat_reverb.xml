@@ -1,25 +1,39 @@
-<?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
+
+    <!-- Source dot (filled). All geometry stays within a 2..22 box so the
+         2px strokes never clip against the 24x24 viewport. -->
     <path
-        android:pathData="M3,12 C4.5,7 7.5,7 9,12"
+        android:pathData="M4.5,10.5 A1.5,1.5 0 1,1 4.5,13.5 A1.5,1.5 0 1,1 4.5,10.5 Z"
+        android:fillColor="#EC407A"
+        android:strokeColor="#EC407A"
+        android:strokeWidth="0" />
+
+    <!-- Arc 1 (small, r=3.5, rightmost x=11.5) -->
+    <path
+        android:pathData="M8,8.5 A3.5,3.5 0 0,1 8,15.5"
+        android:strokeColor="#EC407A"
         android:strokeWidth="2"
         android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:strokeColor="@color/cat_reverb_sel" />
+        android:fillColor="@android:color/transparent" />
+
+    <!-- Arc 2 (medium, r=5.5, rightmost x=16.5) -->
     <path
-        android:pathData="M11,13.5 C12.2,10.5 14.8,10.5 16,13.5"
+        android:pathData="M11,6.5 A5.5,5.5 0 0,1 11,17.5"
+        android:strokeColor="#EC407A"
         android:strokeWidth="2"
         android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:strokeColor="@color/cat_reverb_dim" />
+        android:fillColor="@android:color/transparent" />
+
+    <!-- Arc 3 (large, r=7.5, rightmost x=21.5 + 1px stroke = 22.5 < 24) -->
     <path
-        android:pathData="M18,14.5 C18.9,12.5 21.1,12.5 22,14.5"
+        android:pathData="M14,4.5 A7.5,7.5 0 0,1 14,19.5"
+        android:strokeColor="#EC407A"
         android:strokeWidth="2"
         android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:strokeColor="@color/cat_reverb_dim" />
+        android:fillColor="@android:color/transparent" />
+
 </vector>

@@ -1,31 +1,34 @@
-<?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
-    <!-- Cabinet frame -->
+
+    <!-- Outer cabinet -->
     <path
-        android:pathData="M4,5 H20 C21.1,5 22,5.9 22,7 V17 C22,18.1 21.1,19 20,19 H4 C2.9,19 2,18.1 2,17 V7 C2,5.9 2.9,5 4,5 Z"
+        android:pathData="M5,3 L19,3 C20.1,3 21,3.9 21,5 L21,19 C21,20.1 20.1,21 19,21 L5,21 C3.9,21 3,20.1 3,19 L3,5 C3,3.9 3.9,3 5,3 Z"
+        android:strokeColor="#E53935"
         android:strokeWidth="2"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
-        android:strokeColor="@color/cat_cab_sel" />
-    <!-- Grill frame -->
+        android:fillColor="@android:color/transparent" />
+
+    <!-- Speaker cone -->
     <path
-        android:pathData="M5,8 H19 V16 H5 Z"
+        android:pathData="M12,6.5 A5.5,5.5 0 1,1 12,17.5 A5.5,5.5 0 1,1 12,6.5 Z"
+        android:strokeColor="#E53935"
         android:strokeWidth="2"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
-        android:strokeColor="@color/cat_cab_sel" />
-    <!-- 4 speaker cones -->
+        android:fillColor="@android:color/transparent" />
+
+    <!-- Dust cap -->
     <path
-        android:pathData="M8.5,10.5 m-2.3,0 a2.3,2.3 0 1 0 4.6,0 a2.3,2.3 0 1 0 -4.6,0 M15.5,10.5 m-2.3,0 a2.3,2.3 0 1 0 4.6,0 a2.3,2.3 0 1 0 -4.6,0 M8.5,14.5 m-2.3,0 a2.3,2.3 0 1 0 4.6,0 a2.3,2.3 0 1 0 -4.6,0 M15.5,14.5 m-2.3,0 a2.3,2.3 0 1 0 4.6,0 a2.3,2.3 0 1 0 -4.6,0"
-        android:strokeWidth="1.5"
+        android:pathData="M12,10.5 A1.5,1.5 0 1,1 12,13.5 A1.5,1.5 0 1,1 12,10.5 Z"
+        android:strokeColor="#E53935"
+        android:strokeWidth="2"
         android:strokeLineCap="round"
-        android:strokeColor="@color/cat_cab_sel" />
-    <!-- cone centers -->
-    <path
-        android:pathData="M8.5,10.5 m-1,0 a1,1 0 1 0 2,0 a1,1 0 1 0 -2,0 M15.5,10.5 m-1,0 a1,1 0 1 0 2,0 a1,1 0 1 0 -2,0 M8.5,14.5 m-1,0 a1,1 0 1 0 2,0 a1,1 0 1 0 -2,0 M15.5,14.5 m-1,0 a1,1 0 1 0 2,0 a1,1 0 1 0 -2,0"
-        android:fillColor="@color/cat_cab_sel" />
+        android:strokeLineJoin="round"
+        android:fillColor="@android:color/transparent" />
+
 </vector>

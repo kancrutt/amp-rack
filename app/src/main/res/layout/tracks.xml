@@ -3,6 +3,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:id="@+id/tracks_master"
+    android:background="#121214"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <LinearLayout
@@ -12,6 +13,123 @@
         app:layout_constraintTop_toTopOf="parent"
         android:orientation="vertical"
         app:layout_constraintRight_toRightOf="parent">
+
+        <!-- Guitar Stompbox Looper Panel (REC / DUB / PLAY / STOP / CLEAR) -->
+        <LinearLayout
+            android:id="@+id/tracks_rec_row"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="#1A1C20"
+            android:gravity="center_vertical"
+            android:orientation="vertical"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="8dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="GUITAR LOOPER"
+                    android:textColor="#FFAA00"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+
+                <View
+                    android:layout_width="0dp"
+                    android:layout_height="1dp"
+                    android:layout_weight="1" />
+
+                <TextView
+                    android:id="@+id/tracks_rec_status"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Tap REC to loop guitar playing"
+                    android:textColor="#8F94A0"
+                    android:textSize="10.5sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <!-- REC / OVERDUB Button -->
+                <ToggleButton
+                    android:id="@+id/tracks_rec"
+                    android:layout_width="0dp"
+                    android:layout_height="38dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="4dp"
+                    android:textOff="● REC"
+                    android:textOn="■ STOP REC"
+                    android:textSize="11sp"
+                    android:textStyle="bold"
+                    android:textColor="#FF3B30"
+                    android:background="@drawable/gg_card_bg" />
+
+                <!-- PLAY / LOOP REPLAY Button -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/looper_play_btn"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="38dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="4dp"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:text="▶ PLAY LOOP"
+                    android:textColor="#00E676"
+                    android:textSize="10.5sp"
+                    android:textStyle="bold"
+                    app:cornerRadius="8dp"
+                    app:strokeColor="#00E676"
+                    app:strokeWidth="1dp" />
+
+                <!-- STOP Button -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/looper_stop_btn"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="38dp"
+                    android:layout_marginEnd="4dp"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:text="STOP"
+                    android:textColor="#ECEFF1"
+                    android:textSize="10.5sp"
+                    android:textStyle="bold"
+                    app:cornerRadius="8dp" />
+
+                <!-- CLEAR Button -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/looper_clear_btn"
+                    style="@style/Widget.Material3.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="38dp"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:text="CLEAR"
+                    android:textColor="#FF3B30"
+                    android:textSize="10.5sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+        </LinearLayout>
+
         <FrameLayout
             android:layout_width="wrap_content"
             android:id="@+id/vframe"
@@ -36,17 +154,17 @@
             android:id="@+id/share_tip"
             android:orientation="horizontal">
             <ImageView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_margin="10dp"
-                android:src="@drawable/ic_baseline_info_24"/>
+                android:layout_width="14dp"
+                android:layout_height="14dp"
+                android:layout_marginEnd="6dp"
+                android:src="@drawable/ic_baseline_info_24"
+                app:tint="#8F94A0"/>
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Long press to share file"
-                android:layout_gravity="center"
-                android:textColor="@color/white"
-                android:fontFamily="@font/gruppo"/>
+                android:textColor="#8F94A0"
+                android:textSize="11sp"/>
         </LinearLayout>
 
         <LinearLayout
@@ -54,7 +172,7 @@
             android:layout_width="match_parent"
             android:id="@+id/tracks_player"
             android:layout_height="wrap_content"
-            android:background="@drawable/rounded_corners_transparent"
+            android:background="@drawable/gg_card_bg"
             android:orientation="horizontal">
             <LinearLayout
                 android:layout_width="wrap_content"
@@ -62,26 +180,30 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical">
                 <ToggleButton
-                    android:layout_width="wrap_content"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
                     android:textOn=" "
                     android:id="@+id/tracks_play"
                     android:textOff=" "
-                    android:background="@drawable/ic_baseline_play_arrow_24"
-                    android:layout_height="wrap_content"/>
+                    android:background="@drawable/ic_modern_play_btn"/>
                 <CheckBox
                     android:id="@+id/loop"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:fontFamily="@font/gruppo"
+                    android:textSize="11sp"
+                    android:textColor="#8F94A0"
+                    android:buttonTint="#FFAA00"
                     android:text="Loop"/>
                 <CheckBox
                     android:id="@+id/gapless"
                     android:visibility="gone"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:fontFamily="@font/gruppo"
+                    android:textSize="11sp"
+                    android:textColor="#8F94A0"
+                    android:buttonTint="#FFAA00"
                     android:tooltipText="Truncate silence for gapless playback"
-                    android:text="Trun"/>
+                    android:text="Trim"/>
             </LinearLayout>
             <LinearLayout
                 android:layout_width="wrap_content"
@@ -95,10 +217,11 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Vol"
+                        android:text="VOL"
                         android:layout_gravity="center"
-                        android:fontFamily="@font/gruppo"
-                        android:textColor="@color/white"/>
+                        android:textSize="9sp"
+                        android:textStyle="bold"
+                        android:textColor="#8F94A0"/>
                     <com.google.android.material.slider.Slider
                         android:layout_margin="10dp"
                         android:layout_width="match_parent"
@@ -106,6 +229,9 @@
                         android:foregroundGravity="center"
                         android:background="@color/fui_transparent"
                         android:layout_weight="1"
+                        app:trackColorActive="#FFAA00"
+                        app:trackColorInactive="#363942"
+                        app:thumbColor="#ECEFF1"
                         android:id="@+id/tracks_volume"
                         android:layout_height="wrap_content"/>
                 </LinearLayout>
@@ -118,8 +244,9 @@
                         android:layout_height="wrap_content"
                         android:text="BPM"
                         android:layout_gravity="center"
-                        android:fontFamily="@font/gruppo"
-                        android:textColor="@color/white"/>
+                        android:textSize="9sp"
+                        android:textStyle="bold"
+                        android:textColor="#8F94A0"/>
                     <com.google.android.material.slider.Slider
                         android:layout_margin="10dp"
                         android:layout_width="match_parent"
@@ -127,13 +254,20 @@
                         android:foregroundGravity="center"
                         android:background="@color/fui_transparent"
                         android:layout_weight="1"
+                        app:trackColorActive="#FFAA00"
+                        app:trackColorInactive="#363942"
+                        app:thumbColor="#ECEFF1"
                         android:id="@+id/tracks_bpm"
                         android:layout_height="wrap_content"/>
-                    <Button
-                        android:layout_width="36dp"
-                        android:layout_height="36dp"
+                    <ImageButton
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
                         android:layout_gravity="center"
-                        android:background="@drawable/ic_baseline_refresh_24"
+                        android:layout_marginEnd="8dp"
+                        android:background="@drawable/gg_card_bg"
+                        android:src="@drawable/ic_baseline_refresh_24"
+                        app:tint="#8F94A0"
+                        android:contentDescription="Reset BPM"
                         android:id="@+id/tracks_reset_bpm"/>
                 </LinearLayout>
             </LinearLayout>
@@ -142,17 +276,25 @@
             android:id="@+id/add_track_ll"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_margin="10dp"
-            android:gravity="center"
+            android:layout_marginStart="10dp"
+            android:layout_marginEnd="10dp"
+            android:layout_marginBottom="10dp"
+            android:gravity="center_vertical"
             android:layout_gravity="center"
             android:orientation="horizontal">
-            <Button
+            <com.google.android.material.button.MaterialButton
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                android:layout_height="40dp"
+                style="@style/Widget.Material3.Button.OutlinedButton"
                 android:id="@+id/load_file"
-                android:drawableLeft="@drawable/baseline_file_open_24"
-                android:background="@color/fui_transparent"
-                android:text="Load file"/>
+                app:icon="@drawable/baseline_file_open_24"
+                app:iconTint="#FFAA00"
+                android:textColor="#FFAA00"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                app:cornerRadius="10dp"
+                app:strokeColor="#3A3D45"
+                android:text="Load File"/>
 
             <Space
                 android:layout_width="wrap_content"
@@ -163,19 +305,22 @@
                 android:layout_height="wrap_content"
                 android:text="Skip Silence"
                 android:id="@+id/skip_silence_label"
-                android:fontFamily="@font/comfortaa"
-                android:layout_marginLeft="10dp"/>
+                android:textColor="#8F94A0"
+                android:textSize="11sp"
+                android:layout_marginEnd="8dp"/>
             <ToggleButton
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:padding="0dp"
                 android:layout_margin="0dp"
+                android:textSize="11sp"
+                android:textColor="#8F94A0"
+                android:background="@drawable/gg_card_bg"
                 android:id="@+id/skip_silence"/>
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:fontFamily="@font/major_mono_display"
                 android:layout_margin="10dp"
                 android:visibility="gone"
                 android:text="AA" />

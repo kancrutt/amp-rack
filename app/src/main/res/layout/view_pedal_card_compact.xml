@@ -50,7 +50,7 @@
             android:layout_marginStart="8dp"
             android:layout_weight="1"
             android:ellipsize="end"
-            android:fontFamily="sans-serif-black"
+            android:fontFamily="@font/plus_jakarta_sans"
             android:maxLines="1"
             android:text="TS9 TUBE SCREAMER"
             android:textColor="#FFFFFF"

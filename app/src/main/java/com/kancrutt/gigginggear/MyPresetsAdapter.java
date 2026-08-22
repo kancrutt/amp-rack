@@ -30,6 +30,8 @@ public class MyPresetsAdapter extends RecyclerView.Adapter<MyPresetsAdapter.View
     String TAG = this.getClass().getSimpleName();
     Context context = null ;
     ArrayList<Map> presets = new ArrayList<>();
+    /** Invoked after list mutations (e.g. delete) so the host can refresh empty-state UI. */
+    public Runnable onListChanged;
     MainActivity mainActivity = null;
     LocalPresetManager localPresetManager;
     ProgressBar progressBar , loadProgress;
@@ -225,7 +227,8 @@ public class MyPresetsAdapter extends RecyclerView.Adapter<MyPresetsAdapter.View
             addTagPill(holder.tags, t);
 
         String meta = metaText(preset);
-        holder.meta.setText(meta.isEmpty() ? "GigginGear Stage" : meta);
+        holder.meta.setText(meta);
+        holder.meta.setVisibility(meta.isEmpty() ? View.GONE : View.VISIBLE);
 
         boolean isSchemaV1 = preset.containsKey("plugins");
         boolean isLocal = "local_user".equals(value(preset, "uid"));
@@ -241,27 +244,28 @@ public class MyPresetsAdapter extends RecyclerView.Adapter<MyPresetsAdapter.View
             holder.favorite.setVisibility(isLocal ? View.GONE : View.VISIBLE);
         }
 
-        holder.quickLoad.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                mainActivity.loadPreset(preset);
-                Log.d(TAG, "onClick: loading preset " + preset);
-                mainActivity.patchName.setText(fPresetName);
-                mainActivity.patchDesc.setText(fPresetDesc != null ? fPresetDesc : "");
+        View.OnClickListener loadListener = v -> {
+            mainActivity.loadPreset(preset);
+            Log.d(TAG, "onClick: loading preset " + preset);
+            mainActivity.patchName.setText(fPresetName);
+            mainActivity.patchDesc.setText(fPresetDesc != null ? fPresetDesc : "");
 
-                if (preset.containsKey("uid") && preset.containsKey("path")) {
-                    mainActivity.lastPresetLoadedPath = ((String) preset.get("path")).split("/")[1];
-                    mainActivity.lastPresetLoadedUID = (String) preset.get("uid");
-                }
-
-                if (quick)
-                    mainActivity.patchNo.setText(String.valueOf(position));
-                else
-                    mainActivity.patchNo.setText("-");
-
-                MainActivity.toast("Loaded preset " + fPresetName);
+            if (preset.containsKey("uid") && preset.containsKey("path")) {
+                mainActivity.lastPresetLoadedPath = ((String) preset.get("path")).split("/")[1];
+                mainActivity.lastPresetLoadedUID = (String) preset.get("uid");
             }
-        });
+
+            // patchNo was retired by the top-bar preset display redesign
+            // (set to null in Rack) — guard to avoid NPE on every card tap.
+            if (mainActivity.patchNo != null)
+                mainActivity.patchNo.setText(quick ? String.valueOf(position) : "-");
+
+            mainActivity.syncTopBarPresetInfo(position + 1);
+            MainActivity.toast("Loaded preset " + fPresetName);
+        };
+        holder.quickLoad.setOnClickListener(loadListener);
+        // Whole row is the tap target (list interaction model)
+        holder.root.setOnClickListener(loadListener);
 
         holder.favorite.setOnCheckedChangeListener(null);
         String key = presetKey(preset);
@@ -290,31 +294,42 @@ public class MyPresetsAdapter extends RecyclerView.Adapter<MyPresetsAdapter.View
             }
         });
 
-        holder.delete.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                AlertDialog.Builder builder = new AlertDialog.Builder(mainActivity);
-                builder.setPositiveButton("Delete", new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface dialog, int id) {
-                        if (preset.containsKey("id")) {
-                            localPresetManager.deletePreset(preset.get("id").toString());
+        holder.delete.setOnClickListener(v -> {
+            int pos = holder.getAdapterPosition();
+            if (pos < 0 || pos >= presets.size()) return;
+            Map<String, Object> target = presets.get(pos);
+            String targetName = value(target, "name", "Untitled");
+
+            AlertDialog.Builder builder = new AlertDialog.Builder(mainActivity);
+            builder.setTitle("Delete this preset?");
+            builder.setMessage("Delete \"" + targetName + "\"? This cannot be undone.");
+            builder.setPositiveButton("Delete", (dialog, which) -> {
+                int currentPos = holder.getAdapterPosition();
+                if (currentPos < 0 || currentPos >= presets.size()) return;
+                Map<String, Object> itemToDelete = presets.get(currentPos);
+                if (itemToDelete != null) {
+                    String idStr = null;
+                    if (itemToDelete.containsKey("id") && itemToDelete.get("id") != null) {
+                        idStr = itemToDelete.get("id").toString();
+                    } else if (itemToDelete.containsKey("name") && itemToDelete.get("name") != null) {
+                        idStr = itemToDelete.get("name").toString();
+                    }
+                    if (idStr != null && localPresetManager != null) {
+                        try {
+                            localPresetManager.deletePreset(idStr);
+                        } catch (Exception e) {
+                            Log.e(TAG, "delete failed", e);
                         }
-                        presets.remove(position);
-                        allPresets.remove(position);
-                        notifyItemRemoved(position);
                     }
-                });
-                builder.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface dialog, int id) {
-                    }
-                });
-
-                builder.setTitle("Delete this preset?");
-                builder.setMessage("Are you sure you want to delete this preset? This action cannot be undone.") ;
-
-                AlertDialog dialog = builder.create();
-                dialog.show();
-            }
+                }
+                presets.remove(currentPos);
+                if (currentPos < allPresets.size()) allPresets.remove(currentPos);
+                notifyItemRemoved(currentPos);
+                if (onListChanged != null) onListChanged.run();
+                MainActivity.toast("Deleted " + targetName);
+            });
+            builder.setNegativeButton("Cancel", null);
+            builder.show();
         });
     }
 

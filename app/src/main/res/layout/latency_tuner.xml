@@ -12,7 +12,7 @@
         android:layout_gravity="center"
         android:id="@+id/latency"
         android:padding="10dp"
-        android:fontFamily="@font/gruppo"
+        android:fontFamily="@font/plus_jakarta_sans"
         android:text=""
         android:textSize="34dp"/>
 

@@ -1,6 +1,11 @@
 <resources>
-    <dimen name="dialog_gear_width">150dp</dimen>
-    <dimen name="dialog_gear_height">180dp</dimen>
-    <dimen name="dialog_knob_grid_max_height">600dp</dimen>
-    <dimen name="dialog_control_row_height">70dp</dimen>
+    <!-- Regular phones (~400-599dp smallestWidth) -->
+    <dimen name="signal_chain_height">90dp</dimen>
+    <dimen name="param_gear_col_width">118dp</dimen>
+    <dimen name="rack_top_bar_height">34dp</dimen>
+    <dimen name="knob_size_large">52dp</dimen>
+    <dimen name="knob_size_small">46dp</dimen>
+    <dimen name="knob_label_size">8sp</dimen>
+    <dimen name="knob_val_size">7.5sp</dimen>
+    <dimen name="param_panel_padding">3dp</dimen>
 </resources>

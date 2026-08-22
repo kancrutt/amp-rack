@@ -20,7 +20,11 @@ import android.widget.CheckBox;
 import android.widget.CompoundButton;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
+import android.widget.TextView;
 import android.widget.ToggleButton;
+
+import com.google.android.exoplayer2.MediaItem;
+import com.google.android.exoplayer2.Player;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -156,15 +160,11 @@ public class Tracks extends Fragment {
                 }
 
                 if (!b) {
-                    playPause.setBackgroundDrawable(getResources().getDrawable(R.drawable.ic_baseline_play_arrow_24));
+                    playPause.setBackgroundDrawable(getResources().getDrawable(R.drawable.ic_modern_play_btn));
                     player.pause();
                     frameLayout.setVisibility(View.GONE);
-                    if (mainActivity.useTheme) {
-                        if (pause != null)
-                            playPause.setCompoundDrawables(pause, null, null, null);
-                    }
                 } else {
-                    playPause.setBackgroundDrawable(getResources().getDrawable(R.drawable.ic_baseline_pause_24));
+                    playPause.setBackgroundDrawable(getResources().getDrawable(R.drawable.ic_modern_pause_btn));
                     player.play();
                     try {
                         if (player.getCurrentMediaItem() != null && player.getCurrentMediaItem().localConfiguration.uri.toString().endsWith(".mp4")) {
@@ -173,12 +173,6 @@ public class Tracks extends Fragment {
                     } catch (NullPointerException e) {
                         Log.e(TAG, "onCheckedChanged: ", e);
                         return;
-                    }
-
-                    if (mainActivity.useTheme) {
-                        if (pause != null)
-                            playPause.setCompoundDrawables(play, null, null, null);
-
                     }
                 }
 
@@ -216,23 +210,27 @@ public class Tracks extends Fragment {
         });
 
         Slider bpm = view.findViewById(R.id.tracks_bpm);
-        bpm.setValueFrom(0.5f);
-        bpm.setValueTo(1.5f);
-        bpm.setValue(1.0f);
+        bpm.setValueFrom(40f);
+        bpm.setValueTo(240f);
+        bpm.setStepSize(1f);
+        bpm.setValue(120f);
+        bpm.setLabelFormatter(value -> String.valueOf((int) value));
         bpm.addOnChangeListener(new Slider.OnChangeListener() {
             @Override
             public void onValueChange(@NonNull Slider slider, float value, boolean fromUser) {
-                Log.d(TAG, "onValueChange: " + value);
-                PlaybackParameters param = new PlaybackParameters(value);
+                Log.d(TAG, "onValueChange BPM: " + (int) value);
+                // Map 40-240 BPM relative to 120 baseline for playback speed (0.33x to 2.0x)
+                float speed = value / 120f;
+                PlaybackParameters param = new PlaybackParameters(speed);
                 player.setPlaybackParameters(param);
             }
         });
 
-        Button resetBPM = view.findViewById(R.id.tracks_reset_bpm);
+        android.widget.ImageButton resetBPM = view.findViewById(R.id.tracks_reset_bpm);
         resetBPM.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                bpm.setValue(1.0f);
+                bpm.setValue(120f);
             }
         });
 
@@ -320,35 +318,8 @@ public class Tracks extends Fragment {
         });
 
         playerWindow = view.findViewById(R.id.tracks_player);
-        if (mainActivity.useTheme) {
-            play = mainActivity.skinEngine.bitmapDrawable("icons", "play");
-            pause = mainActivity.skinEngine.bitmapDrawable("icons", "pause");
-            reset = mainActivity.skinEngine.bitmapDrawable("icons", "reset");
-            if (play != null)
-                playPause.setCompoundDrawables(play, null, null, null);
-
-
-            if (reset != null)
-                resetBPM.setBackground(reset);
-
-            mainActivity.skinEngine.slider(slider);
-            mainActivity.skinEngine.slider(bpm);
-
-            mainActivity.skinEngine.button(loadFile, SkinEngine.Resize.Width, 1);
-            mainActivity.skinEngine.card (view.findViewById(R.id.skip_silence_label));
-
-            /*
-            LinearLayout loadTrack = view.findViewById(R.id.add_track_ll);
-            view.post(new Runnable() {
-                @Override
-                public void run() {
-                    mainActivity.skinEngine.card(loadTrack);
-                }
-            });
-
-             */
-//            mainActivity.skinEngine.toggle(skipSilence, skipSilence.isChecked());
-        }
+        // Skeuomorphic skin engine disabled for this screen: the design system
+        // is dark flat/vector. Controls are styled in tracks.xml directly.
 
         loadFile.setOnClickListener(new View.OnClickListener() {
             boolean finalD = isDrums;
@@ -369,6 +340,130 @@ public class Tracks extends Fragment {
 
         if (! isDrums)
             addDrumsLooper();
+
+        // Guitar Stompbox Looper controls (REC / PLAY / STOP / CLEAR)
+        ToggleButton recToggle = view.findViewById(R.id.tracks_rec);
+        TextView recStatus = view.findViewById(R.id.tracks_rec_status);
+        View playBtn = view.findViewById(R.id.looper_play_btn);
+        View stopBtn = view.findViewById(R.id.looper_stop_btn);
+        View clearBtn = view.findViewById(R.id.looper_clear_btn);
+
+        if (recToggle != null && mainActivity != null && mainActivity.record != null) {
+            recToggle.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                if (mainActivity.record.isChecked() != isChecked) {
+                    mainActivity.record.setChecked(isChecked);
+                }
+                if (recStatus != null) {
+                    recStatus.setText(isChecked ? "● RECORDING GUITAR LOOP…" : "Tap REC to loop guitar playing");
+                    recStatus.setTextColor(isChecked ? 0xFFFF3B30 : 0xFF8F94A0);
+                }
+                buttonView.postDelayed(() -> {
+                    boolean actual = mainActivity.recording;
+                    if (recToggle.isChecked() != actual) {
+                        recToggle.setChecked(actual);
+                        if (recStatus != null) {
+                            recStatus.setText(actual ? "● RECORDING GUITAR LOOP…" : "Tap REC to loop guitar playing");
+                            recStatus.setTextColor(actual ? 0xFFFF3B30 : 0xFF8F94A0);
+                        }
+                    } else if (!actual && recStatus != null) {
+                        if (mainActivity.lastRecordedFileName != null) {
+                            recStatus.setText("Loop saved: " + new File(mainActivity.lastRecordedFileName).getName());
+                            // Auto-register saved guitar loop to player adapter for instant playback
+                            try {
+                                tracksAdapter.add(mainActivity.lastRecordedFileName);
+                            } catch (Exception ignore) {}
+                        }
+                    }
+                }, 400);
+            });
+        }
+
+        if (playBtn != null) {
+            playBtn.setOnClickListener(v -> {
+                if (mainActivity != null && mainActivity.lastRecordedFileName != null) {
+                    File f = new File(mainActivity.lastRecordedFileName);
+                    if (f.exists()) {
+                        try {
+                            MediaItem mediaItem = MediaItem.fromUri(Uri.fromFile(f));
+                            player.setMediaItem(mediaItem);
+                            player.setRepeatMode(Player.REPEAT_MODE_ONE); // Stompbox seamless loop mode
+                            player.prepare();
+                            player.play();
+                            if (playPause != null) {
+                                playPause.setChecked(true);
+                            }
+                            if (recStatus != null) {
+                                recStatus.setText("▶ Playing Guitar Loop (" + f.getName() + ")");
+                                recStatus.setTextColor(0xFF00E676);
+                            }
+                        } catch (Exception e) {
+                            Log.e(TAG, "play loop failed", e);
+                        }
+                    } else {
+                        MainActivity.toast("No recorded loop found. Tap REC first!");
+                    }
+                } else {
+                    MainActivity.toast("No recorded loop found. Tap REC first!");
+                }
+            });
+        }
+
+        if (stopBtn != null) {
+            stopBtn.setOnClickListener(v -> {
+                if (player != null) {
+                    player.pause();
+                }
+                if (playPause != null) {
+                    playPause.setChecked(false);
+                }
+                if (recStatus != null) {
+                    recStatus.setText("Loop stopped");
+                    recStatus.setTextColor(0xFF8F94A0);
+                }
+            });
+        }
+
+        if (clearBtn != null) {
+            clearBtn.setOnClickListener(v -> {
+                if (player != null) {
+                    player.stop();
+                    player.clearMediaItems();
+                }
+                if (playPause != null) {
+                    playPause.setChecked(false);
+                }
+                if (mainActivity != null && mainActivity.lastRecordedFileName != null) {
+                    try {
+                        File f = new File(mainActivity.lastRecordedFileName);
+                        if (f.exists()) f.delete();
+                    } catch (Exception ignore) {}
+                    mainActivity.lastRecordedFileName = null;
+                }
+                if (recStatus != null) {
+                    recStatus.setText("Loop cleared. Ready for new recording.");
+                    recStatus.setTextColor(0xFF8F94A0);
+                }
+                MainActivity.toast("Guitar loop cleared");
+            });
+        }
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        // Keep REC visual in sync with actual engine state when returning to this tab
+        View v = getView() != null ? getView() : constraintLayout;
+        if (v == null || mainActivity == null || mainActivity.record == null) return;
+        ToggleButton recToggle = v.findViewById(R.id.tracks_rec);
+        TextView recStatus = v.findViewById(R.id.tracks_rec_status);
+        if (recToggle != null && recToggle.isChecked() != mainActivity.recording) {
+            recToggle.setChecked(mainActivity.recording);
+        }
+        if (recStatus != null) {
+            boolean active = mainActivity.recording;
+            recStatus.setText(active ? "Recording…" : "Capture your playing");
+            recStatus.setTextColor(active ? 0xFFFF3B30 : 0xFF8F94A0);
+        }
     }
 
     public void addDrumsLooper () {

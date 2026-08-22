@@ -1,7 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <dimen name="fab_margin">200dp</dimen>
-    <dimen name="dialog_gear_width">220dp</dimen>
-    <dimen name="dialog_gear_height">260dp</dimen>
-    <dimen name="dialog_knob_grid_max_height">1000dp</dimen>
-    <dimen name="dialog_control_row_height">100dp</dimen>
+    <dimen name="fab_margin">16dp</dimen>
+    <dimen name="signal_chain_height">190dp</dimen>
+    <dimen name="param_gear_col_width">220dp</dimen>
+    <dimen name="rack_top_bar_height">52dp</dimen>
+
+    <!-- Dynamic Rotary Knob & Label Scaling for 10-12"+ Large Tablets / Desktops -->
+    <dimen name="knob_size_large">88dp</dimen>
+    <dimen name="knob_size_small">72dp</dimen>
+    <dimen name="knob_label_size">11sp</dimen>
+    <dimen name="knob_val_size">11sp</dimen>
+    <dimen name="param_panel_padding">8dp</dimen>
 </resources>

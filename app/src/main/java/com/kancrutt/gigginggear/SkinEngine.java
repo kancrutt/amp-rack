@@ -651,7 +651,7 @@ public class SkinEngine {
         seekBar.setMaxValue(max);
         seekBar.setMinValue(min);
         seekBar.setValue(value);
-        seekBar.setRotation((float) value/max);
+        // View rotation removed so RotarySeekbar internal canvas handles rotary angle
         /*
         Log.d(TAG, "rotary: " + String.format(
                 "[%f %f]: %f (%f)", min, max, value, seekBar.valueToRotation()

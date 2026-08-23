@@ -92,7 +92,7 @@ public class AudioEngine {
     public static native int getRoutingMode ();
     public static native void setGraph (int[] from, int[] to);
     public static native int[] getGraphEdges ();
-    public static native void setPluginFilename (String filename, int plugin);
+    public static native String setPluginFilename (String filename, int plugin);
     public static native String tuneLatency ();
 
     static void setDefaultStreamValues(Context context) {

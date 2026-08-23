@@ -3,7 +3,7 @@
     <dimen name="fab_margin">16dp</dimen>
     <dimen name="signal_chain_height">190dp</dimen>
     <dimen name="param_gear_col_width">220dp</dimen>
-    <dimen name="rack_top_bar_height">52dp</dimen>
+    <dimen name="rack_top_bar_height">56dp</dimen>
 
     <!-- Dynamic Rotary Knob & Label Scaling for 10-12"+ Large Tablets / Desktops -->
     <dimen name="knob_size_large">88dp</dimen>

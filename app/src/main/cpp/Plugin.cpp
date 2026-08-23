@@ -4,6 +4,8 @@
 
 #include <cstring>
 using namespace nlohmann ;
+
+std::string Plugin::lastLoadError;
 void replaceAll(std::string& str, const std::string& from, const std::string& to) {
     if(from.empty())
         return;
@@ -172,9 +174,18 @@ void Plugin::load () {
 #endif
     //~ LOGD ("parsing json: %s\n", json_.c_str ());
     json j = json::parse(json_);
-    lv2_name = j ["-1"]["pluginName"];
-    if (j["-1"].contains("prefix"))
-        prefix = j ["-1"]["prefix"];
+    if (j.contains("-1") && !j["-1"].is_null()) {
+        if (j["-1"].contains("pluginName") && j["-1"]["pluginName"].is_string()) {
+            lv2_name = j["-1"]["pluginName"].get<std::string>();
+        } else {
+            lv2_name = "Unknown Plugin";
+        }
+        if (j["-1"].contains("prefix") && j["-1"]["prefix"].is_string()) {
+            prefix = j["-1"]["prefix"].get<std::string>();
+        }
+    } else {
+        lv2_name = "Unknown Plugin";
+    }
 
     //~ LOGD("[LV2 JSON] %s", std::string (j ["1"]["name"]).c_str());
     for (auto& el : j.items())
@@ -186,7 +197,12 @@ void Plugin::load () {
         }
 
         json jsonPort = json::parse (el.value ().dump ());
-        std::string portNameStr = std::string (jsonPort ["name"]);
+        std::string portNameStr = "Unknown Port";
+        if (jsonPort.contains("name") && jsonPort["name"].is_string()) {
+            portNameStr = jsonPort["name"].get<std::string>();
+        } else {
+            LOGW("Port name is missing or null");
+        }
         const char * portName = portNameStr.c_str ();
         // ayyo why ...?
         // this used to be the following
@@ -194,7 +210,13 @@ void Plugin::load () {
         const char * pluginName = sharedLibrary->so_file.c_str() ;
 //        const char * pluginName = lv2_name.c_str();
 
-        LADSPA_PortDescriptor port = jsonPort .find ("index").value();
+        LADSPA_PortDescriptor port = 0;
+        if (jsonPort.contains("index") && jsonPort["index"].is_number_integer()) {
+            port = jsonPort.value("index", 0);
+        } else {
+            LOGW("Port index missing or invalid");
+            continue;
+        }
         LOGD("[%s %s:%d]", pluginName, portName, port);
         if (jsonPort.find ("AudioPort") != jsonPort.end ()) {
             if (jsonPort.find ("InputPort")  != jsonPort.end ()) {
@@ -225,7 +247,7 @@ void Plugin::load () {
         } else if (jsonPort.find ("AtomPort") != jsonPort.end() && jsonPort.find ("InputPort") != jsonPort.end()) {
             LOGD ("configuring atom control port");
             if (filePort == nullptr) {
-                int portSize = (int) jsonPort.find("minimumSize").value() + sizeof(LV2_Atom_Sequence) + sizeof (LV2_Atom) + 1 ;
+                int portSize = jsonPort.value("minimumSize", 8192) + sizeof(LV2_Atom_Sequence) + sizeof (LV2_Atom) + 1 ;
                 filePort = (LV2_Atom_Sequence *) malloc(portSize);
                 filePort->atom.size = portSize - 1;
                 LOGD ("file port allocated ok");
@@ -253,8 +275,8 @@ void Plugin::load () {
             LOGD("[%s %d/%d]: found possible atom port", lv2Descriptor->URI, port, pluginIndex);
         } else if (jsonPort.find ("AtomPort") != jsonPort.end() && jsonPort.find ("OutputPort") != jsonPort.end()) {
             if (notifyPort == nullptr) {
-                notifyPort = (LV2_Atom_Sequence *) malloc((int) jsonPort.find("minimumSize").value() + sizeof (LV2_Atom_Sequence) + sizeof (LV2_Atom) + 1);
-                notifyPort->atom.size = (int) jsonPort.find("minimumSize").value() + sizeof (LV2_Atom_Sequence) + sizeof (LV2_Atom)  ;
+                notifyPort = (LV2_Atom_Sequence *) malloc(jsonPort.value("minimumSize", 8192) + sizeof (LV2_Atom_Sequence) + sizeof (LV2_Atom) + 1);
+                notifyPort->atom.size = jsonPort.value("minimumSize", 8192) + sizeof (LV2_Atom_Sequence) + sizeof (LV2_Atom)  ;
 //                notifyPort->atom.type =
 
             }
@@ -278,7 +300,13 @@ void Plugin::load () {
     /*
     recursive_iterate(*this, j, [*this, &j](Plugin *plugin, json::const_iterator it){
         json jsonPort = (json) it.value() ;
-        const char * portName = std::string (jsonPort ["name"]).c_str ();
+        std::string pName = "Unknown Port";
+        if (jsonPort.contains("name") && jsonPort["name"].is_string()) {
+            pName = jsonPort["name"].get<std::string>();
+        } else {
+            LOGW("Port name is missing or null");
+        }
+        const char * portName = pName.c_str ();
         const char * pluginName = plugin->sharedLibrary->so_file.c_str() ;
 
         LADSPA_PortDescriptor port = jsonPort ["index"];
@@ -399,14 +427,34 @@ void Plugin::setBufferStereo (float * buffer_left, int read_bytes_left, float * 
     OUT
 }
 
-void Plugin::setFileName (std::string filename) {
+bool Plugin::setFileName (std::string filename) {
     IN
-    float s = filename.size() ;
-    lv2Descriptor->connect_port(handle, 99, (void *) &s);
-    lv2Descriptor->connect_port(handle, 100, (void *) filename.c_str());
     loadedFileName = std::string (filename);
+    // Persist size and string buffers as members so the pointers passed 
+    // to connect_port remain valid for the lifetime of the plugin instance.
+    // Passing pointers to stack variables (local float s, local c_str()) 
+    // causes use-after-free crashes when the worker reads port 100.
+    loadedFileNameSize = loadedFileName.size();
+    
+    // Safety check: ensure lv2Descriptor is valid before connecting ports
+    if (lv2Descriptor != nullptr) {
+        try {
+            lv2Descriptor->connect_port(handle, 99, (void *) &loadedFileNameSize);
+            lv2Descriptor->connect_port(handle, 100, (void *) loadedFileName.c_str());
+        } catch (const std::exception& e) {
+            LOGE("Caught std::exception while loading model: %s", e.what());
+            Plugin::lastLoadError = std::string("Model error: ") + e.what();
+            return false;
+        } catch (...) {
+            LOGE("Caught unknown exception while loading model");
+            Plugin::lastLoadError = "Unknown error loading model";
+            return false;
+        }
+    }
+    
     loadedFileType = 1 ;
     OUT
+    return true ;
 }
 
 void Plugin::lv2FeaturesURID () {

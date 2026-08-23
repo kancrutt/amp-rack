@@ -132,7 +132,8 @@ private:
 public:
     double getLatency(bool input);
 
-    void setPluginFilename(std::string filename, int plugin);
+    bool setPluginFilename(std::string filename, int plugin);
+    std::string lastLoadError;
 
     void popFunction();
 

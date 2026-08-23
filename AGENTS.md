@@ -135,18 +135,26 @@ This section exists because of a recurring pattern across this project: work get
 
 ---
 
-## Reporting Standard (applies to every phase)
+## Current Status (Updated — reflects actual state, not original phase plan)
+
+Phase 2 has expanded substantially beyond the original screen-by-screen plan and is still open — not yet gated to Phase 3. Recorded here so status doesn't have to be reconstructed from scrollback.
+
+**Navigation model changed from the original spec.** Phase 1's "Rig View / Tone Library / Settings" 3-tab plan was superseded by a 5-tab model: **BOARD / PRESET / TUNER / LOOPS & DRUM / SETTING** (icon + text label, not icon-only). This is the current approved navigation — treat it as canonical over the older Phase 1 wireframe language.
+
+**Signal chain is now a full node-graph canvas, not a static horizontal card row.** Built across C1 (GraphSolver DAG engine, native JNI topology bridge, series/parallel execution) and C2 (SignalChainCanvasView — draggable nodes, port-to-port wire creation/deletion, visual branching for parallel routing, explicit INPUT/OUTPUT anchor nodes). This is core functionality now, not a visual nice-to-have — do not let future UI passes silently regress it back to a linear chain (this happened once already during the 5-tab redesign and had to be confirmed-not-broken via code citation).
+
+**Icon system finalized:** two-axis color model — HUE = category identity (Amp/Cabinet/Distortion/Modulation/Delay/Reverb/Dynamics/EQ/Pitch/Wah/Volume/Noise Gate each have a fixed hue), SATURATION/GLOW = state (dimmed when inactive, full+glow when active). Documented in UI_UX_SPEC.md Section 4 (superseded any earlier ToneX-referenced or monochrome-only language). Implemented via real `colors.xml` resources and `android:state_activated` selectors — never generic `?attr/colorControlNormal`, which was a recurring root cause of "icons all render one color" bugs early on.
+
+**Device testing has expanded beyond the Pixel 3.** Hery is now also testing on a Samsung S23 and an Android tablet, and most recently an Alldocube iPlay 60 mini Pro (LineageOS) surfaced in a crash log. Pixel 3 remains the target for eventual Phase 3 kiosk provisioning, but responsive-layout correctness now needs to hold across all these form factors, not just Pixel 3 — a recurring class of bug (content clipped on phone-class screens, fine on tablets) has resurfaced multiple times and needs verification per-device-class going forward, not just on whichever device happened to be tested most recently.
+
+**Known standing risk:** release builds (signed, non-debuggable, used to avoid Play Protect scan prompts on sideload) must be checked for R8/minification interference with any reflection- or name-based native/JNI lookups before being treated as equivalent to debug builds for testing purposes.
+
+**Not yet gated to Phase 3.** Kiosk packaging has not started. Do not begin Phase 3 work until Phase 2's outstanding responsive-layout and native-crash issues (see current round) are resolved and confirmed across device classes.
+
+---
+
+
 
 - Evidence over assertion: command output, screenshots, benchmarks — not "it should work now."
 - Explicit pass/fail against the phase's stated acceptance criteria.
 - Flag any deviation from this plan immediately rather than silently improvising — especially if Phase 0 findings suggest the theme system or audio engine is structured differently than assumed here.
-
-## Git Commit Discipline (standing practice, mandatory)
-
-This project has repeatedly lost the ability to diff against "last known good" because 15+ build rounds accumulated 172 uncommitted changes (the entire package rename + UI overhaul was a single giant working-tree delta with no intermediate history). That is a standing risk for every fix, not a one-off. Going forward:
-
-1. **Commit after every device-confirmed fix.** Only commit a change once Hery's device testing confirms it works. Do NOT commit unverified guesses as if they were stable — an unverified change is not a completed unit of work.
-2. **Every commit = a real rollback point.** If the working tree is so large that a single fix cannot be isolated, first commit the current known state as an explicit checkpoint with a `checkpoint: known-broken/known-working` message (state clearly which), then commit the fix on top once confirmed. A clean diff trail beats a clean git log.
-3. **Before any regression investigation, `git diff` against the last checkpoint.** The recurring node-text bug (overflow → fixed → single-char wrap) was only diagnosable once a baseline existed. Never investigate a regression from memory; always diff against the commit graph.
-4. **Never commit scratch.** `WIP/`, `*.diff` scratch files, and throwaway artifacts stay out of git (`.gitignore` already covers WIP/). This is the file-hygiene rule from the universal protocol, applied to git.
-5. **Verify the working tree is clean before closing a round.** `git status --short` empty (or only intentional staging) is part of the evidence, not a nicety.

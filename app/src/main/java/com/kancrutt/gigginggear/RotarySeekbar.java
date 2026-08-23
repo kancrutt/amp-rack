@@ -66,7 +66,7 @@ public class RotarySeekbar extends View {
     private float mTextHeight = 0.0f;
 
     private boolean mNeedleOnTop = true;
-    public float mKnobRadius = 0.5f;
+    public float mKnobRadius = 0.60f;
 
     private int mSectorRotation = 0; // degrees. Extra rotation of the Seekbar. User set.
     private float mSectorHalfOpening = 30; // degrees
@@ -76,8 +76,8 @@ public class RotarySeekbar extends View {
     private float mTickMajRadiusScale = 1.0f;
 
     private boolean mShowValue = false;
-    private boolean mShowNeedle = true;
-    private boolean mShowKnob = false;
+    private boolean mShowNeedle = false;
+    private boolean mShowKnob = true;
     private boolean mShowTicks = false;
     private boolean mShowSector = false;
     private boolean mSubtractTicks = false;
@@ -90,10 +90,30 @@ public class RotarySeekbar extends View {
 
     public int mKnobColor = 0xff666666;
     private int mTextColor = 0xff000000;
+
+    private static android.graphics.Bitmap sKnobBitmap = null;
+    private static android.graphics.Bitmap sDialBitmap = null;
+    private static android.graphics.Paint sKnobBitmapPaint = null;
+    private static boolean sBitmapInitAttempted = false;
+
+    public static void ensureKnobBitmap(android.content.Context ctx) {
+        if (!sBitmapInitAttempted && ctx != null) {
+            sBitmapInitAttempted = true;
+            try {
+                sKnobBitmap = android.graphics.BitmapFactory.decodeResource(ctx.getResources(), R.drawable.knob_metal);
+                sDialBitmap = android.graphics.BitmapFactory.decodeResource(ctx.getResources(), R.drawable.knob_dial_bg);
+                if (sKnobBitmapPaint == null) {
+                    sKnobBitmapPaint = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG | android.graphics.Paint.FILTER_BITMAP_FLAG);
+                }
+            } catch (Throwable t) {
+                android.util.Log.w("RotarySeekbar", "Could not decode knob drawables", t);
+            }
+        }
+    }
     private int mSectorColor = 0xffdddddd;
     private int mValueSectorColor = 0xffaaaaaa;
     private int mTicksColor = 0xff006699;
-    public int mNeedleColor = 0xff00e676;
+    public int mNeedleColor = 0xffffffff;
 
     private int mOverlaySurfaceColor = 0xffffffff;
 
@@ -151,6 +171,14 @@ public class RotarySeekbar extends View {
         void onValueChanged(RotarySeekbar sourceSeekbar, float value);
     }
 
+    public interface OnKnobClickListener {
+        void onKnobClicked(RotarySeekbar seekbar);
+    }
+    private OnKnobClickListener mOnKnobClickListener;
+    public void setOnKnobClickListener(OnKnobClickListener listener) {
+        mOnKnobClickListener = listener;
+    }
+
     public RotarySeekbar(Context context) {
         this(context, null);
     }
@@ -171,6 +199,7 @@ public class RotarySeekbar extends View {
     public RotarySeekbar(@NonNull Context context, @NonNull AttributeSet attributeSet, int defStyleAttr) {
         super(wrap(context, attributeSet, defStyleAttr, DEFAULT_STYLE_RES), attributeSet, defStyleAttr);
         context = getContext();
+        ensureKnobBitmap(context);
 
         final TypedArray a = context.obtainStyledAttributes(attributeSet, R.styleable.RotarySeekbar, defStyleAttr, DEFAULT_STYLE_RES);
         try{
@@ -954,6 +983,15 @@ public class RotarySeekbar extends View {
         }
 
         @Override
+        public boolean onSingleTapConfirmed(MotionEvent e) {
+            if (mOnKnobClickListener != null) {
+                mOnKnobClickListener.onKnobClicked(RotarySeekbar.this);
+                return true;
+            }
+            return performClick();
+        }
+
+        @Override
         public boolean onDoubleTap(MotionEvent e) {
             float defaultValue = (mMaxValue + mMinValue) / 2.0f;
             setValue(defaultValue);
@@ -1204,7 +1242,13 @@ public class RotarySeekbar extends View {
                 canvas.drawPath(mValuePath, mValueSectorPaint);
             }
 
-            if(mShowTicks && mNumTicks > 0) {
+            // 1. Draw authentic static dial dots/ticks from the original knob artwork
+            if (sDialBitmap != null && !sDialBitmap.isRecycled()) {
+                float dialSize = mRadius * 2.0f;
+                RectF dialDst = new RectF(mSeekbarCenter.x - dialSize/2f, mSeekbarCenter.y - dialSize/2f,
+                                          mSeekbarCenter.x + dialSize/2f, mSeekbarCenter.y + dialSize/2f);
+                canvas.drawBitmap(sDialBitmap, null, dialDst, sKnobBitmapPaint);
+            } else if (mShowTicks && mNumTicks > 0) {
                 float tickAngle = (270- mSectorHalfOpening)*(float)Math.PI/180.0f;
                 float tickAngleIncrement = (float)Math.PI/180.0f*(360-2* mSectorHalfOpening)/(mNumTicks-1);
                 for(int i=0; i<mNumTicks; i++) {
@@ -1219,21 +1263,36 @@ public class RotarySeekbar extends View {
             }
 
             final boolean drawKnob = mShowKnob && mKnobRadius > 0.01f;
-            final float knobRadius = mRadius * mKnobRadius;
+            // Knob cap radius relative to dial (original artwork ratio: 417 / 600 ~ 0.70)
+            final float knobRadius = mRadius * Math.min(mKnobRadius, 0.70f);
 
+            // 2. Draw rotating metallic knob cap in the center
             if (drawKnob) {
-                // Metallic bezel ring.
-                canvas.drawCircle(mSeekbarCenter.x, mSeekbarCenter.y, knobRadius, mBezelPaint);
-                // Dark inner cap.
-                float capRadius = knobRadius * 0.82f;
-                canvas.drawCircle(mSeekbarCenter.x, mSeekbarCenter.y, capRadius, mCapPaint);
-                // Gloss highlight (top-left).
-                canvas.drawCircle(mSeekbarCenter.x, mSeekbarCenter.y, capRadius, mHighlightPaint);
-                // Inner bottom-right shadow for depth.
-                canvas.drawCircle(mSeekbarCenter.x, mSeekbarCenter.y, capRadius, mCapShadowPaint);
+                if (sKnobBitmap != null && !sKnobBitmap.isRecycled()) {
+                    float bSize = knobRadius * 2.0f;
+                    RectF bDst = new RectF(mSeekbarCenter.x - bSize/2f, mSeekbarCenter.y - bSize/2f,
+                                           mSeekbarCenter.x + bSize/2f, mSeekbarCenter.y + bSize/2f);
+                    canvas.save();
+                    // The knob bitmap's built-in needle notch is at 12 o'clock (90 deg).
+                    // Rotating the canvas by (90 - mRotation) turns the knob's built-in needle smoothly with value.
+                    canvas.rotate(90.0f - mRotation, mSeekbarCenter.x, mSeekbarCenter.y);
+                    canvas.drawBitmap(sKnobBitmap, null, bDst, sKnobBitmapPaint);
+                    canvas.restore();
+                } else {
+                    // Metallic bezel ring fallback.
+                    canvas.drawCircle(mSeekbarCenter.x, mSeekbarCenter.y, knobRadius, mBezelPaint);
+                    // Dark inner cap.
+                    float capRadius = knobRadius * 0.82f;
+                    canvas.drawCircle(mSeekbarCenter.x, mSeekbarCenter.y, capRadius, mCapPaint);
+                    // Gloss highlight (top-left).
+                    canvas.drawCircle(mSeekbarCenter.x, mSeekbarCenter.y, capRadius, mHighlightPaint);
+                    // Inner bottom-right shadow for depth.
+                    canvas.drawCircle(mSeekbarCenter.x, mSeekbarCenter.y, capRadius, mCapShadowPaint);
+                }
             }
 
-            if (mShowNeedle) {
+            // Only draw artificial needle line if bitmap knob is NOT used
+            if (mShowNeedle && (sKnobBitmap == null || sKnobBitmap.isRecycled())) {
                 final float needleAngle = mRotation * (float) Math.PI / 180.f; // convert to radians
                 final float cosNA = (float)Math.cos(needleAngle);
                 final float sinNA = (float)Math.sin(needleAngle);
@@ -1246,9 +1305,7 @@ public class RotarySeekbar extends View {
                     canvas.drawLine(nx1 + knobRadius*0.08f, ny1 + knobRadius*0.08f,
                             nx2 + knobRadius*0.08f, ny2 + knobRadius*0.08f, mNeedleShadowPaint);
                 }
-                Paint dynamicNeedle = new Paint(mNeedlePaint);
-                dynamicNeedle.setColor(mKnobColor);
-                canvas.drawLine(nx1, ny1, nx2, ny2, dynamicNeedle);
+                canvas.drawLine(nx1, ny1, nx2, ny2, mNeedlePaint);
             }
 
             canvas.rotate(-rot, mSeekbarCenter.x, mSeekbarCenter.y);

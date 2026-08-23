@@ -143,20 +143,22 @@
 
 #### Category hues (final, approved)
 
-| Category | Hue | Approx hex |
-|---|---|---|
-| Amp | Warm red | `#E8543C` |
-| Cabinet/IR | Neutral gray-white (intentionally not hue-coded) | `#8E8E93` |
-| Distortion/Overdrive | Orange-red | `#F2A03D` |
-| Modulation | Blue | `#3D8BF2` |
-| Delay | Green | `#4CD97B` |
-| Reverb | Magenta-purple | `#B85CF2` |
-| Dynamics/Compressor | Amber-orange | `#FFCC80` |
-| EQ | Lime-green | `#A5D6A7` |
-| Pitch/Synth | Purple | `#8B5CF2` |
-| Wah/Filter | Cyan | `#3DE8F2` |
-| Volume/Pan | Teal | `#3DE8C1` |
-| Noise Gate | Amber-orange, same family as Dynamics — **distinguish primarily by glyph shape, not hue** | `#FFE0B2` |
+| Category | Hue | Approved pastel hex | Inactive dim hex |
+|---|---|---|---|
+| Amp | Warm muted rose | `#D96B58` | `#5A2C26` |
+| Cabinet/IR | Neutral silver (not hue-coded) | `#D0D0D0` | `#555555` |
+| Distortion/Overdrive | Dusty coral | `#E07A5F` | `#5E3326` |
+| Modulation | Muted blue | `#5C82E6` | `#24345E` |
+| Delay | Sage green | `#52B788` | `#214A37` |
+| Reverb | Muted purple | `#9D65C9` | `#3E2752` |
+| Dynamics/Compressor | Warm amber | `#E09F3E` | `#5C4119` |
+| EQ | Olive green | `#8CB369` | `#384729` |
+| Pitch/Synth | Dusty violet | `#7B52AE` | `#322247` |
+| Wah/Filter | Soft teal | `#4EA8DE` | `#1F455C` |
+| Volume/Pan | Muted mint | `#45B89D` | `#1C4A3D` |
+| Noise Gate | Pale amber (same family as Dynamics — distinguish by glyph shape) | `#D4A853` | `#5C4721` |
+
+*Approved 2026-08-23. These muted/pastel tones replace the earlier fully-saturated hues per Hery's review.*
 
 #### State encoding
 - **Inactive/bypassed:** desaturated/dimmed version of the category hue (~40% saturation, muted). Applied via multiply/desaturate, never by swapping to a flat unrelated dim color and never via `PorterDuff.Mode.SRC_IN` on a multi-tone icon (SRC_IN flattens all non-transparent pixels to one color and will destroy any icon with more than one tone, e.g. Reverb's 3-arc decay glyph).

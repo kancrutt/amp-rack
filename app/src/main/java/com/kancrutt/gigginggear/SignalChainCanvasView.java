@@ -40,6 +40,7 @@ public class SignalChainCanvasView extends View {
         public int categoryColor;
         public int categoryIconRes;
         public NodeType nodeType = NodeType.PLUGIN;
+        public boolean bypassed;
 
         public Node(int id, int pluginId, String name, float x, float y) {
             this.id = id;
@@ -172,7 +173,16 @@ public class SignalChainCanvasView extends View {
 
         paintText.setColor(TEXT_COLOR);
         paintText.setTextAlign(Paint.Align.CENTER);
-        paintText.setTypeface(android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.BOLD));
+                try {
+            android.graphics.Typeface tf = androidx.core.content.res.ResourcesCompat.getFont(getContext(), R.font.plus_jakarta_sans);
+            if (tf != null) {
+                paintText.setTypeface(android.graphics.Typeface.create(tf, android.graphics.Typeface.BOLD));
+            } else {
+                paintText.setTypeface(android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.BOLD));
+            }
+        } catch (Throwable t) {
+            paintText.setTypeface(android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.BOLD));
+        }
         paintText.setTextSize(20f);
 
         paintWire.setColor(WIRE_COLOR);
@@ -297,9 +307,14 @@ public class SignalChainCanvasView extends View {
         inputNode.categoryColor = COLOR_INPUT;
         inputNode.width = nodeW;
         inputNode.height = nodeH;
+        // Preserve INPUT anchor position if it existed before
+        if (oldNodes.containsKey(inputNode.id)) {
+            inputNode.x = oldNodes.get(inputNode.id).x;
+            inputNode.y = oldNodes.get(inputNode.id).y;
+        }
         nodes.add(inputNode);
         nodeMap.put(inputNode.id, inputNode);
-        xCursor += nodeW + spacing;
+        xCursor = inputNode.x + inputNode.width + spacing;
 
         // 2) Plugin blocks from AudioEngine
 
@@ -318,9 +333,12 @@ public class SignalChainCanvasView extends View {
             n.width = nodeW;
             n.height = nodeH;
             
-            // Preserve selection
+            // Preserve selection AND position from previous layout
             if (oldNodes.containsKey(i)) {
                 n.selected = oldNodes.get(i).selected;
+                n.x = oldNodes.get(i).x;
+                n.y = oldNodes.get(i).y;
+                n.bypassed = oldNodes.get(i).bypassed;
             }
             
             nodes.add(n);
@@ -335,6 +353,11 @@ public class SignalChainCanvasView extends View {
         outputNode.categoryColor = COLOR_OUTPUT;
         outputNode.width = nodeW;
         outputNode.height = nodeH;
+        // Preserve OUTPUT anchor position if it existed before
+        if (oldNodes.containsKey(outputNode.id)) {
+            outputNode.x = oldNodes.get(outputNode.id).x;
+            outputNode.y = oldNodes.get(outputNode.id).y;
+        }
         nodes.add(outputNode);
         nodeMap.put(outputNode.id, outputNode);
         outputAnchor = outputNode;
@@ -342,7 +365,7 @@ public class SignalChainCanvasView extends View {
         // Safety clamp: all nodes inside canvas bounds (fixes dangling off-canvas lines)
         if (getWidth() > 0 && getHeight() > 0) {
             for (Node n : nodes) {
-                n.x = Math.max(0, Math.min(n.x, getWidth() - n.width));
+                n.x = Math.max(0, Math.min(n.x, getWidth() - n.width - fabReserved));
                 n.y = Math.max(0, Math.min(n.y, getHeight() - n.height));
             }
         }
@@ -496,7 +519,9 @@ public class SignalChainCanvasView extends View {
                         try {
                             boolean en = AudioEngine.getActivePluginEnabled(hit.id);
                             AudioEngine.togglePlugin(hit.id, !en);
+                            hit.bypassed = en;
                             toastBypass(hit, !en);
+                            invalidate();
                         } catch (Exception ex) {
                             Log.w("SignalChainCanvas", "bypass toggle failed", ex);
                         }
@@ -564,8 +589,9 @@ public class SignalChainCanvasView extends View {
                         float dy = ty - lastY;
                         float nx = dragNode.x + dx;
                         float ny = dragNode.y + dy;
-                        // Clamp ke dalam bounds canvas (A1)
-                        nx = Math.max(0, Math.min(nx, getWidth() - dragNode.width));
+                        // Clamp: left=0, right=canvas-fabReserved (don't overlap "+" button)
+                        float fabR = 85f * getResources().getDisplayMetrics().density;
+                        nx = Math.max(0, Math.min(nx, getWidth() - dragNode.width - fabR));
                         ny = Math.max(0, Math.min(ny, getHeight() - dragNode.height));
                         dragNode.x = nx;
                         dragNode.y = ny;
@@ -777,23 +803,34 @@ public class SignalChainCanvasView extends View {
         canvas.drawCircle(n.getOutputX(), n.getOutputY(), pr, paintOutputDot);
     }
 
+    private int dimColor(int color, float factor) {
+        float[] hsv = new float[3];
+        Color.colorToHSV(color, hsv);
+        hsv[1] *= factor;
+        hsv[2] = Math.min(hsv[2] * 1.1f, 1.0f);
+        return Color.HSVToColor(200, hsv);
+    }
+
     private void drawNode(Canvas canvas, Node n) {
         RectF r = new RectF(n.x, n.y, n.x + n.width, n.y + n.height);
 
         paintNodeBody.setColor(Color.parseColor("#1E1E22"));
         canvas.drawRoundRect(r, 12, 12, paintNodeBody);
 
+        // Bypassed nodes use dimmed/desaturated category color
+        int drawColor = n.bypassed ? dimColor(n.categoryColor, 0.35f) : n.categoryColor;
+
         if (n.selected) {
             Paint selGlow = new Paint(Paint.ANTI_ALIAS_FLAG);
             selGlow.setStyle(Paint.Style.STROKE);
             selGlow.setStrokeWidth(5f);
-            selGlow.setColor(n.categoryColor);
+            selGlow.setColor(drawColor);
             canvas.drawRoundRect(r, 12, 12, selGlow);
         } else {
             Paint normBorder = new Paint(Paint.ANTI_ALIAS_FLAG);
             normBorder.setStyle(Paint.Style.STROKE);
             normBorder.setStrokeWidth(2.5f);
-            normBorder.setColor(n.categoryColor);
+            normBorder.setColor(drawColor);
             canvas.drawRoundRect(r, 12, 12, normBorder);
         }
 
@@ -810,14 +847,14 @@ public class SignalChainCanvasView extends View {
 
         // Label (compact, crisp, inside block bottom)
         String code = getCategoryCode(n.name);
-        paintText.setColor(Color.parseColor("#ECEFF1"));
+        paintText.setColor(n.bypassed ? Color.parseColor("#80FFFFFF") : Color.parseColor("#ECEFF1"));
         paintText.setTextSize(12f * d);
         canvas.drawText(code, n.x + n.width / 2f, n.y + n.height - 8f * d, paintText);
 
         // Port dots — density-scaled to match anchor nodes
         float pr = 4.5f * getResources().getDisplayMetrics().density;
-        paintInputDot.setColor(n.categoryColor);
-        paintOutputDot.setColor(n.categoryColor);
+        paintInputDot.setColor(drawColor);
+        paintOutputDot.setColor(drawColor);
         canvas.drawCircle(n.getInputX(), n.getInputY(), pr, paintInputDot);
         canvas.drawCircle(n.getOutputX(), n.getOutputY(), pr, paintOutputDot);
 

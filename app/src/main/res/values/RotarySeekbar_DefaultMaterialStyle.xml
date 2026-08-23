@@ -1,13 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="RotarySeekbar_DefaultMaterialStyle">
-        <item name="showTicks">true</item>
-        <item name="showNeedle">true</item>
+        <item name="showTicks">false</item>
+        <item name="showNeedle">false</item>
+        <item name="showSector">false</item>
 
         <item name="textSize">20sp</item>
 
-        <item name="ticksColor">?attr/colorPrimaryVariant</item>
-        <item name="needleColor">?attr/colorPrimaryVariant</item>
+        <item name="ticksColor">#00000000</item>
+        <item name="needleColor">#00000000</item>
         <item name="knobColor">?attr/colorPrimary</item>
         <item name="sectorRangeColor">@color/sector_range_color</item>
         <item name="sectorValueColor">@color/sector_value_color</item>
@@ -27,6 +28,6 @@
         <item name="valueNumSteps">100</item>
         <item name="valueNumDigits">0</item>
         <item name="unit">%</item>
-        <item name="numTicks">11</item>
+        <item name="numTicks">0</item>
     </style>
 </resources>

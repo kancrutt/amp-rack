@@ -215,18 +215,31 @@ void PluginControl::freeMemory () {
 
 PluginControl::PluginControl(const LV2_Descriptor *descriptor, nlohmann::json j) {
     IN ;
-    if (j.contains("logarithmic") and j.find ("logarithmic").value ()) {
+    if (j.value("logarithmic", false)) {
         isLogarithmic = true;
     }
 
-    int _port = j .find("index").value();
-    name = strdup (j.find("name").value().dump().c_str());
-    name_allocated = true ;
-    lv2_name = j.find("name").value();
+    int _port = -1;
+    if (j.contains("index") && j["index"].is_number_integer()) {
+        _port = j.value("index", -1);
+    } else {
+        LOGW("Port index missing or invalid");
+    }
+    std::string n = "Unknown Control";
+    if (j.contains("name") && j["name"].is_string()) {
+        n = j["name"].get<std::string>();
+    } else if (j.contains("name") && !j["name"].is_null()) {
+        n = j["name"].dump();
+    } else {
+        LOGW("Control name is missing or null");
+    }
+    name = strdup(n.c_str());
+    name_allocated = true;
+    lv2_name = n;
     port = _port ;
 
-    if (j.find("InputPort").value() == true && j.find("ControlPort").value() == true) {
-        if (j.find("toggle").value() == true)
+    if (j.value("InputPort", false) == true && j.value("ControlPort", false) == true) {
+        if (j.value("toggle", false) == true)
             type = TOGGLE;
         else
             type = FLOAT;
@@ -236,19 +249,23 @@ PluginControl::PluginControl(const LV2_Descriptor *descriptor, nlohmann::json j)
         LADSPA_Data lower_bound  ;
         LADSPA_Data upper_bound ;
 
-        if (j.find("maximum")->is_string()) {
-            _max = j.find("maximum").value();
-            upper_bound = std::stof (_max);
-        } else {
-            upper_bound = j.find("maximum").value();
+        if (j.contains("maximum") && !j["maximum"].is_null()) {
+            if (j["maximum"].is_string()) {
+                _max = j["maximum"].get<std::string>();
+                try { upper_bound = std::stof(_max); } catch(...) { upper_bound = 1.0f; }
+            } else if (j["maximum"].is_number()) {
+                upper_bound = j.value("maximum", 1.0f);
+            }
         }
 
-        if (j.find("minimum")->is_string()) {
-            _min = j.find("minimum").value();
-            LOGD("minimum: %s is string", _min.c_str());
-            lower_bound = std::stof (_min);
-        } else {
-            lower_bound = j.find("minimum").value();
+        if (j.contains("minimum") && !j["minimum"].is_null()) {
+            if (j["minimum"].is_string()) {
+                _min = j["minimum"].get<std::string>();
+                LOGD("minimum: %s is string", _min.c_str());
+                try { lower_bound = std::stof(_min); } catch(...) { lower_bound = 0.0f; }
+            } else if (j["minimum"].is_number()) {
+                lower_bound = j.value("minimum", 0.0f);
+            }
         }
 
         //~ LOGD("[control] %s", name);
@@ -264,13 +281,17 @@ PluginControl::PluginControl(const LV2_Descriptor *descriptor, nlohmann::json j)
 
         def = (float *) malloc (sizeof (long int));
         std::string _def ;
-        if (j.find("default")->is_string()) {
-            LOGD("plugin default is string ..");
-            *def = std::stof(std::string(j.find("default").value()));
+        if (j.contains("default") && !j["default"].is_null()) {
+            if (j["default"].is_string()) {
+                LOGD("plugin default is string ..");
+                try { *def = std::stof(j["default"].get<std::string>()); } catch(...) { *def = 0.0f; }
+            } else if (j["default"].is_number()) {
+                *def = j.value("default", 0.0f);
+            } else {
+                *def = 0.0f;
+            }
         } else {
-            *def = j.find("default").value();
-//            if (isLogarithmic)
-//                * def = logf (* def);
+            *def = 0.0f;
         }
 
         /* Check the default */
@@ -294,9 +315,13 @@ PluginControl::PluginControl(const LV2_Descriptor *descriptor, nlohmann::json j)
 
         //~ LOGD("[LV2 Plugin] %s: found control %s <%f - %f> default value %f",
              //~ descriptor ->URI, name, lower_bound, upper_bound, *def);
-    } else if (j.find("InputPort").value() == true && j.find("AtomPort").value() == true) {
+    } else if (j.value("InputPort", false) == true && j.value("AtomPort", false) == true) {
         type = ATOM ;
-        lv2AtomSequence = (LV2_Atom_Sequence *) malloc (j .find("minimumSize").value());
+        int minSize = 8192;
+        if (j.contains("minimumSize") && j["minimumSize"].is_number()) {
+            minSize = j.value("minimumSize", 8192);
+        }
+        lv2AtomSequence = (LV2_Atom_Sequence *) malloc (minSize);
         def = (float *) malloc (sizeof (long int)); // aye, compatibility!
         min = 0;
         max = 1;

@@ -2,7 +2,7 @@
     <!-- Large phones / small tablets (~480-599dp smallestWidth) -->
     <dimen name="signal_chain_height">100dp</dimen>
     <dimen name="param_gear_col_width">130dp</dimen>
-    <dimen name="rack_top_bar_height">36dp</dimen>
+    <dimen name="rack_top_bar_height">42dp</dimen>
     <dimen name="knob_size_large">58dp</dimen>
     <dimen name="knob_size_small">50dp</dimen>
     <dimen name="knob_label_size">8.5sp</dimen>

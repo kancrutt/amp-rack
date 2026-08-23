@@ -1,6 +1,7 @@
 #include <cassert>
 
 #include "Engine.h"
+#include "Plugin.h"
 #include "logging_macros.h"
 
 jmethodID Engine::pushAudio = nullptr;
@@ -637,12 +638,28 @@ int Engine::addPlugintoRackByName (std::string pluginName) {
     return  0 ;
 }
 
-void Engine::setPluginFilename (std::string filename, int plugin) {
+bool Engine::setPluginFilename (std::string filename, int plugin) {
     IN
+    lastLoadError.clear();
+    // Hardened: bounds check + null/lv2Descriptor check
+    if (plugin < 0 || plugin >= (int) activePlugins.size()) {
+        lastLoadError = "Invalid plugin index";
+        OUT; return false ;
+    }
+    auto * p = activePlugins.at(plugin);
+    if (p == nullptr || p->lv2Descriptor == nullptr || p->type == SharedLibrary::LADSPA) {
+        lastLoadError = "Plugin does not support file loading";
+        LOGD("setPluginFilename: plugin %d is not an LV2 file-port plugin", plugin);
+        OUT; return false ;
+    }
     mFullDuplexPass.bypass = true;
-    activePlugins.at(plugin)->setFileName(filename);
+    bool ok = p->setFileName(filename);
     mFullDuplexPass.bypass = false;
+    if (!ok && lastLoadError.empty()) {
+        lastLoadError = Plugin::lastLoadError.empty() ? "Model file could not be loaded" : Plugin::lastLoadError;
+    }
     OUT
+    return ok ;
 }
 
 bool Engine::setPluginBuffer (float * buffer, int buffer_size, int plugin) {

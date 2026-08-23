@@ -1884,22 +1884,21 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                                 writeFile(dest, s);
                                 // Native setPluginFilename dereferences lv2Descriptor
                                 // without null-check -> SIGSEGV on non-file-port plugins.
-                                boolean canLoad = false;
-                                try {
-                                    canLoad = plugin < AudioEngine.getActivePlugins()
-                                            && AudioEngine.getFilePort(plugin);
-                                } catch (Throwable t) {
-                                    Log.w(TAG, "getFilePort probe failed", t);
-                                }
-                                if (!canLoad) {
-                                    toast("This block cannot load model files");
+                                if (!canLoadNamModel(plugin)) {
+                                    toast("Only AMP/CAB blocks can load .nam models");
                                     return;
                                 }
                                 // Correct engine API: Plugin::setFileName() connects port 99
                                 // (size) / port 100 (path). Arg order: filename FIRST.
-                                AudioEngine.setPluginFilename(dest, plugin);
-                                Log.i(TAG, "[load model] SAF pick -> plugin " + plugin + " file " + dest);
-                                toast("Loaded model successfully: " + basename);
+                                String err = AudioEngine.setPluginFilename(dest, plugin);
+                                if (err != null) {
+                                    toast("Model load failed: " + err);
+                                    Log.w(TAG, "[load model] SAF pick FAILED -> plugin " + plugin + " err: " + err);
+                                } else {
+                                    Log.i(TAG, "[load model] SAF pick -> plugin " + plugin + " file " + dest);
+                                    toast("Loaded model: " + basename);
+                                    if (signalChainCanvas != null) signalChainCanvas.invalidate();
+                                }
                             } catch (Exception e) {
                                 Log.e(TAG, "model load failed", e);
                                 toast("Failed to load model: " + e.getMessage());
@@ -1910,13 +1909,16 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                                 unzipNAMModel(dir, returnUri);
                                 File zdir = new File(dir);
                                 File[] models = zdir.listFiles((d, n) -> n.toLowerCase().endsWith(".nam"));
-                                boolean canZ = plugin < AudioEngine.getActivePlugins()
-                                        && AudioEngine.getFilePort(plugin);
+                                boolean canZ = canLoadNamModel(plugin);
                                 if (models != null && models.length > 0 && canZ) {
                                     java.util.Arrays.sort(models);
                                     String picked = models[models.length - 1].getAbsolutePath();
-                                    AudioEngine.setPluginFilename(picked, plugin);
-                                    toast("Loaded model: " + models[models.length - 1].getName());
+                                    String err2 = AudioEngine.setPluginFilename(picked, plugin);
+                                    if (err2 != null) {
+                                        toast("Model load failed: " + err2);
+                                    } else {
+                                        toast("Loaded model: " + models[models.length - 1].getName());
+                                    }
                                 } else {
                                     toast("No .nam file found inside zip");
                                 }
@@ -2847,7 +2849,9 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             TextView gearInfoType = findViewById(R.id.detail_gear_info_type);
             TextView gearInfoDesc = findViewById(R.id.detail_gear_info_desc);
             if (gearInfoType != null) {
-                gearInfoType.setText(isCab ? "CAB · SPEAKER" : isAmp ? "AMP · NAM" : "EFFECT · STOMPBOX");
+                gearInfoType.setText(pluginName != null && !pluginName.isEmpty()
+                        ? pluginName : "EFFECT");
+                gearInfoType.setTextColor(CategoryHelper.getColor(pluginName));
             }
             if (gearInfoDesc != null) {
                 String fullDesc = getPluginFullDescription(pluginName);
@@ -2873,18 +2877,38 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             boolean isActive = AudioEngine.getActivePluginEnabled(position);
             com.google.android.material.switchmaterial.SwitchMaterial enabledSwitch = findViewById(R.id.detail_enabled_switch);
             TextView enabledLabelView = findViewById(R.id.detail_enabled_label);
+            View ledView = findViewById(R.id.detail_led);
+
+            final int colorActiveGreen = Color.parseColor("#00E676");
+            final int colorInactiveGrey = Color.parseColor("#8F94A0");
+            final ColorStateList thumbTintOn = ColorStateList.valueOf(colorActiveGreen);
+            final ColorStateList thumbTintOff = ColorStateList.valueOf(Color.parseColor("#6A6E78"));
+            final ColorStateList trackTintOn = ColorStateList.valueOf(Color.parseColor("#2A3D2E"));
+            final ColorStateList trackTintOff = ColorStateList.valueOf(Color.parseColor("#25272C"));
+
             if (enabledSwitch != null) {
                 enabledSwitch.setOnCheckedChangeListener(null);
                 enabledSwitch.setChecked(isActive);
+                enabledSwitch.setThumbTintList(isActive ? thumbTintOn : thumbTintOff);
+                enabledSwitch.setTrackTintList(isActive ? trackTintOn : trackTintOff);
+
                 if (enabledLabelView != null) {
                     enabledLabelView.setText(isActive ? "ON" : "OFF");
-                    enabledLabelView.setTextColor(isActive ? Color.parseColor("#00E676") : Color.parseColor("#888888"));
+                    enabledLabelView.setTextColor(isActive ? colorActiveGreen : colorInactiveGrey);
+                }
+                if (ledView != null) {
+                    ledView.setBackgroundResource(isActive ? R.drawable.led_glowing_active : R.drawable.led_glowing_bypass);
                 }
                 enabledSwitch.setOnCheckedChangeListener((btn, checked) -> {
                     AudioEngine.togglePlugin(position, checked);
+                    enabledSwitch.setThumbTintList(checked ? thumbTintOn : thumbTintOff);
+                    enabledSwitch.setTrackTintList(checked ? trackTintOn : trackTintOff);
                     if (enabledLabelView != null) {
                         enabledLabelView.setText(checked ? "ON" : "OFF");
-                        enabledLabelView.setTextColor(checked ? Color.parseColor("#00E676") : Color.parseColor("#888888"));
+                        enabledLabelView.setTextColor(checked ? colorActiveGreen : colorInactiveGrey);
+                    }
+                    if (ledView != null) {
+                        ledView.setBackgroundResource(checked ? R.drawable.led_glowing_active : R.drawable.led_glowing_bypass);
                     }
                     if (dataAdapter != null) dataAdapter.notifyItemChanged(position);
                     if (signalChainCanvas != null) signalChainCanvas.invalidate();
@@ -2957,6 +2981,11 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     knobCell.setGravity(Gravity.CENTER);
                     knobCell.setPadding(Math.round(2 * density), 0, Math.round(2 * density), 0);
 
+                    android.graphics.Typeface jakartaFont = null;
+                    try {
+                        jakartaFont = androidx.core.content.res.ResourcesCompat.getFont(this, R.font.plus_jakarta_sans);
+                    } catch (Throwable ignored) {}
+
                     TextView labelView = new TextView(this);
                     labelView.setText(cName.toUpperCase());
                     labelView.setTextColor(Color.parseColor("#8F94A0"));
@@ -2966,11 +2995,24 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     labelView.setMaxLines(2);
                     labelView.setEllipsize(android.text.TextUtils.TruncateAt.END);
                     labelView.setGravity(Gravity.CENTER);
+                    if (jakartaFont != null) {
+                        labelView.setTypeface(jakartaFont, android.graphics.Typeface.BOLD);
+                    }
+
+                    float minVal = -12f;
+                    float maxVal = 12f;
+                    try {
+                        float[] bounds = AudioEngine.getPluginControlValues(position, i);
+                        if (bounds != null && bounds.length >= 3 && bounds[2] > bounds[1]) {
+                            minVal = bounds[1];
+                            maxVal = bounds[2];
+                        }
+                    } catch (Throwable ignored) {}
 
                     RotarySeekbar rKnob = new RotarySeekbar(this);
                     rKnob.setShowKnob(true);
-                    rKnob.setMinValue(-12f);
-                    rKnob.setMaxValue(12f);
+                    rKnob.setMinValue(minVal);
+                    rKnob.setMaxValue(maxVal);
                     rKnob.setValue(val);
                     rKnob.mKnobColor = CategoryHelper.getColor(pluginName);
                     LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(knobDimPx, knobDimPx);
@@ -2983,13 +3025,35 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     valView.setTextColor(Color.parseColor("#FFFFFF"));
                     valView.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, valSizePx);
                     valView.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
+                    if (jakartaFont != null) {
+                        valView.setTypeface(jakartaFont, android.graphics.Typeface.BOLD);
+                    }
+                    valView.setPadding(Math.round(4 * density), Math.round(2 * density), Math.round(4 * density), Math.round(2 * density));
+                    valView.setClickable(true);
+                    valView.setFocusable(true);
 
                     int finalI = i;
                     String unitFinal = unit;
+                    final float fMin = minVal;
+                    final float fMax = maxVal;
+                    final String fCName = cName;
+
                     rKnob.setOnValueChangedListener((source, value) -> {
                         AudioEngine.setPluginControl(position, finalI, value);
                         valView.setText(formatParamValue(value, unitFinal));
                     });
+
+                    // Tap on value label or control name to input value manually
+                    View.OnClickListener manualInputClick = v -> {
+                        showManualValueInputDialog(fCName, rKnob.getValue(), fMin, fMax, unitFinal, newVal -> {
+                            AudioEngine.setPluginControl(position, finalI, newVal);
+                            rKnob.setValue(newVal);
+                            valView.setText(formatParamValue(newVal, unitFinal));
+                        });
+                    };
+                    valView.setOnClickListener(manualInputClick);
+                    labelView.setOnClickListener(manualInputClick);
+                    rKnob.setOnKnobClickListener(k -> manualInputClick.onClick(k));
 
                     knobCell.addView(labelView);
                     knobCell.addView(rKnob);
@@ -3008,13 +3072,17 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     levelContainer.addView(cell);
                 }
 
-                // Populate TONE container — single horizontal scrollable row,
-                // center-justified by HSV layout_gravity when content is narrow
+                // Populate TONE container — single horizontal scrollable row.
+                // Center-justified when content fits; START when it overflows so the
+                // first knob is never clipped (HSV layout_gravity="center" clips leading
+                // content and makes it unreachable by scrolling).
                 toneContainer.setOrientation(LinearLayout.HORIZONTAL);
                 toneContainer.setGravity(Gravity.CENTER_VERTICAL);
                 for (LinearLayout cell : toneCells) {
                     toneContainer.addView(cell);
                 }
+                applyScrollGravity(toneContainer);
+                applyScrollGravity(levelContainer);
 
                 // Dynamically adjust panel visibility so we don't force empty "LEVEL" boxes
                 boolean hasLevel = levelCells.size() > 0;
@@ -3027,6 +3095,28 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 if (!hasLevel && !hasTone) {
                     addEmptyPanelHint(toneContainer, "MODEL-CAPTURED / NO CONTROLS");
                 }
+            }
+        });
+    }
+
+    /**
+     * Center-justify a knob row inside its HorizontalScrollView when the content
+     * is narrower than the viewport; switch to START gravity when it overflows,
+     * so scrolling can reach the first (leftmost) knob instead of clipping it.
+     */
+    private void applyScrollGravity(final LinearLayout knobContainer) {
+        if (knobContainer == null || !(knobContainer.getParent() instanceof android.view.ViewGroup)) return;
+        final android.view.ViewGroup hsv = (android.view.ViewGroup) knobContainer.getParent();
+        hsv.post(() -> {
+            int childW = knobContainer.getWidth();
+            int parentW = hsv.getWidth();
+            if (childW <= 0 || parentW <= 0) return;
+            FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) knobContainer.getLayoutParams();
+            if (!(lp instanceof FrameLayout.LayoutParams)) return;
+            int g = (childW <= parentW) ? Gravity.CENTER : Gravity.START;
+            if (((FrameLayout.LayoutParams) lp).gravity != g) {
+                ((FrameLayout.LayoutParams) lp).gravity = g;
+                knobContainer.setLayoutParams(lp);
             }
         });
     }
@@ -3101,6 +3191,58 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 || n.contains("shape") || n.contains("style") || n.contains("select"))
             return "";
         return "dB";
+    }
+
+    public void showManualValueInputDialog(String controlName, float currentVal, float minVal, float maxVal, String unit, OnManualValueListener listener) {
+        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert);
+        
+        LinearLayout container = new LinearLayout(this);
+        container.setOrientation(LinearLayout.VERTICAL);
+        int pad = (int) (20 * getResources().getDisplayMetrics().density);
+        container.setPadding(pad, pad / 2, pad, pad / 2);
+        
+        TextView hintView = new TextView(this);
+        String rangeStr = String.format(java.util.Locale.US, "Min: %.2f   Max: %.2f %s", minVal, maxVal, unit != null ? unit : "");
+        hintView.setText(rangeStr);
+        hintView.setTextColor(Color.parseColor("#8F94A0"));
+        hintView.setTextSize(12);
+        hintView.setPadding(0, 0, 0, (int) (8 * getResources().getDisplayMetrics().density));
+        container.addView(hintView);
+        
+        android.widget.EditText input = new android.widget.EditText(this);
+        input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER 
+                | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL 
+                | android.text.InputType.TYPE_NUMBER_FLAG_SIGNED);
+        input.setText(String.format(java.util.Locale.US, "%.2f", currentVal));
+        input.setTextColor(Color.WHITE);
+        input.setTextSize(18);
+        input.setSelectAllOnFocus(true);
+        container.addView(input);
+        
+        builder.setTitle("Set " + controlName)
+               .setView(container)
+               .setPositiveButton("SET", (dialog, which) -> {
+                   String text = input.getText().toString().trim().replace(',', '.');
+                   try {
+                       float entered = Float.parseFloat(text);
+                       float clamped = Math.max(minVal, Math.min(maxVal, entered));
+                       if (listener != null) listener.onValueSet(clamped);
+                   } catch (Exception e) {
+                       toast("Invalid number format");
+                   }
+               })
+               .setNegativeButton("CANCEL", null);
+               
+        android.app.AlertDialog dialog = builder.create();
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
+        }
+        dialog.show();
+        input.requestFocus();
+    }
+
+    interface OnManualValueListener {
+        void onValueSet(float value);
     }
 
     static String formatParamValue(float val, String unit) {
@@ -3677,6 +3819,21 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     }
 
     /** Apply an already-on-disk model file to the given active block via its atom port. */
+    /** Only amp/cab-class blocks expose LV2 file-path ports (99/100) for .nam models. */
+    private boolean canLoadNamModel(int plugin) {
+        try {
+            if (plugin < 0 || plugin >= AudioEngine.getActivePlugins()) return false;
+            String n = AudioEngine.getActivePluginName(plugin);
+            if (n == null) return false;
+            String ln = n.toLowerCase();
+            CategoryHelper.Category c = CategoryHelper.getCategory(n);
+            return ln.contains("nam") || ln.contains("neural") || ln.contains("aida")
+                    || c == CategoryHelper.Category.AMP || c == CategoryHelper.Category.CABINET;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
     private void applyLocalModelToPlugin(int plugin, File srcFile) {
         try {
             String dirName = AudioEngine.getActivePluginName(plugin);
@@ -3692,15 +3849,19 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                         java.nio.file.StandardCopyOption.REPLACE_EXISTING);
             }
             // Correct engine API: file-path ports (Plugin::setFileName)
-            boolean canL = plugin < AudioEngine.getActivePlugins()
-                    && AudioEngine.getFilePort(plugin);
-            if (!canL) {
-                toast("This block cannot load model files");
+            if (!canLoadNamModel(plugin)) {
+                toast("Only AMP/CAB blocks can load .nam models");
                 return;
             }
-            AudioEngine.setPluginFilename(dest.getAbsolutePath(), plugin);
-            Log.i(TAG, "[load model] local -> plugin " + plugin + " file " + dest.getAbsolutePath());
-            toast("Model loaded: " + srcFile.getName());
+            String err3 = AudioEngine.setPluginFilename(dest.getAbsolutePath(), plugin);
+            if (err3 != null) {
+                toast("Model load failed: " + err3);
+                Log.w(TAG, "[load model] local FAILED -> plugin " + plugin + " err: " + err3);
+            } else {
+                Log.i(TAG, "[load model] local -> plugin " + plugin + " file " + dest.getAbsolutePath());
+                toast("Model loaded: " + srcFile.getName());
+                if (signalChainCanvas != null) signalChainCanvas.invalidate();
+            }
         } catch (Exception e) {
             Log.e(TAG, "applyLocalModelToPlugin failed", e);
             toast("Failed to load model: " + e.getMessage());

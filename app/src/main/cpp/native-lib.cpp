@@ -11,6 +11,7 @@ static const int kOboeApiAAudio = 0;
 static const int kOboeApiOpenSLES = 1;
 
 static Engine * engine = nullptr;
+static std::string lastLoadError;
 
 
 extern "C" JNIEXPORT jstring JNICALL
@@ -950,18 +951,17 @@ Java_com_kancrutt_gigginggear_AudioEngine_getLatency(JNIEnv *env, jclass clazz, 
     return engine->getLatency(input);
 }
 extern "C"
-JNIEXPORT void JNICALL
+JNIEXPORT jstring JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_setPluginFilename(JNIEnv *env, jclass clazz,
                                                                 jstring filename, jint plugin) {
     if (!engine)
-        return;
+        return env->NewStringUTF("Audio engine not initialized");
 
     const char *nativeString = env->GetStringUTFChars(filename, 0);
-
-    // use your string
-
-    engine->setPluginFilename(std::string (nativeString), plugin);
+    bool ok = engine->setPluginFilename(std::string (nativeString), plugin);
     env->ReleaseStringUTFChars(filename, nativeString);
+    if (ok) return nullptr;
+    return env->NewStringUTF(engine->lastLoadError.c_str());
 }
 extern "C"
 JNIEXPORT jboolean JNICALL

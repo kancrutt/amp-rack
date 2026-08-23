@@ -491,25 +491,68 @@ public class Rack extends Fragment {
 
         // ---- Top bar wiring (B5): master volume knob + preset rename / quick save ----
         LinearLayout knobContainer = view.findViewById(R.id.top_volume_knob_container);
-        if (knobContainer != null && mainActivity.skinEngine != null) {
+        TextView topVolVal = view.findViewById(R.id.top_volume_val);
+        if (knobContainer != null) {
+            knobContainer.removeAllViews();
             RotarySeekbar volKnob = new RotarySeekbar(getContext());
-            mainActivity.skinEngine.rotary(volKnob, 40, 0, 100, 80);
-            volKnob.mKnobColor = Color.parseColor("#00E5FF");
-            LinearLayout.LayoutParams vkLp = new LinearLayout.LayoutParams(dp(40), dp(40));
+            volKnob.setShowKnob(true);
+            volKnob.setBackground(null);
+            volKnob.setMaxValue(100f);
+            volKnob.setMinValue(0f);
+            volKnob.setValue(80f);
+            volKnob.mKnobRadius = 0.65f;
+            if (topVolVal != null) {
+                topVolVal.setText("80%");
+            }
+            
+            // Comfortable master volume knob size matching enlarged top bar
+            float density = getResources().getDisplayMetrics().density;
+            int knobDimPx = (int) (40 * density);
+            if (mainActivity != null && mainActivity.tabletMode) {
+                knobDimPx = (int) (52 * density);
+            }
+            LinearLayout.LayoutParams vkLp = new LinearLayout.LayoutParams(knobDimPx, knobDimPx);
             vkLp.gravity = android.view.Gravity.CENTER_VERTICAL;
             knobContainer.addView(volKnob, vkLp);
+
             volKnob.setOnValueChangedListener((bar, value) -> {
                 try {
                     AudioEngine.setOutputVolume(value / 100f);
+                    if (topVolVal != null) {
+                        topVolVal.setText((int) value + "%");
+                    }
                 } catch (Exception e) {
                     Log.w(TAG, "setOutputVolume failed", e);
                 }
             });
             volKnob.setOnTouchListener((v, event) -> {
                 float val = volKnob.getValue();
-                try { AudioEngine.setOutputVolume(val / 100f); } catch (Exception ignored) {}
+                try {
+                    AudioEngine.setOutputVolume(val / 100f);
+                    if (topVolVal != null) {
+                        topVolVal.setText((int) val + "%");
+                    }
+                } catch (Exception ignored) {}
                 return false;
             });
+
+            // Tap master volume knob or value text to input value manually (0 .. 100%)
+            View.OnClickListener manualVolClick = v -> {
+                if (mainActivity != null) {
+                    mainActivity.showManualValueInputDialog("Master Volume", volKnob.getValue(), 0f, 100f, "%", newVal -> {
+                        volKnob.setValue(newVal);
+                        if (topVolVal != null) {
+                            topVolVal.setText((int) newVal + "%");
+                        }
+                        try { AudioEngine.setOutputVolume(newVal / 100f); } catch (Exception ignored) {}
+                    });
+                }
+            };
+            volKnob.setOnKnobClickListener(k -> manualVolClick.onClick(k));
+            knobContainer.setOnClickListener(manualVolClick);
+            if (topVolVal != null) {
+                topVolVal.setOnClickListener(manualVolClick);
+            }
         }
 
         TextView topPresetDisplay = view.findViewById(R.id.top_preset_display);

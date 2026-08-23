@@ -81,8 +81,10 @@ public:
     std::string getLV2JSON_PC (std::string pluginName) ;
 #endif
 
-    void setFileName(std::string filename);
+    bool setFileName(std::string filename);
+    static std::string lastLoadError;
     std::string loadedFileName ;
+    float loadedFileNameSize = 0.0f ;
     int loadedFileType = -1 ;
 
     void lv2FeaturesInit();

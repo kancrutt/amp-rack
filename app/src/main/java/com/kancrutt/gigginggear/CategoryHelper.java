@@ -4,18 +4,18 @@ import android.graphics.Color;
 
 public class CategoryHelper {
 
-    public static final int COLOR_AMP = Color.parseColor("#FFD1DC");
-    public static final int COLOR_CAB = Color.parseColor("#E3E2E6");
-    public static final int COLOR_DIST = Color.parseColor("#FFD9C2");
-    public static final int COLOR_MOD = Color.parseColor("#CBE4F9");
-    public static final int COLOR_DELAY = Color.parseColor("#D8F3DC");
-    public static final int COLOR_REVERB = Color.parseColor("#E8D7F1");
-    public static final int COLOR_COMP = Color.parseColor("#FFE8B8");
-    public static final int COLOR_EQ = Color.parseColor("#D7F0DB");
-    public static final int COLOR_PITCH = Color.parseColor("#D8D4F7");
-    public static final int COLOR_WAH = Color.parseColor("#CFF2EE");
-    public static final int COLOR_VOL = Color.parseColor("#CCF0E4");
-    public static final int COLOR_GATE = Color.parseColor("#F5EBD8");
+    public static final int COLOR_AMP = Color.parseColor("#D96B58");
+    public static final int COLOR_CAB = Color.parseColor("#D0D0D0");
+    public static final int COLOR_DIST = Color.parseColor("#E07A5F");
+    public static final int COLOR_MOD = Color.parseColor("#5C82E6");
+    public static final int COLOR_DELAY = Color.parseColor("#52B788");
+    public static final int COLOR_REVERB = Color.parseColor("#9D65C9");
+    public static final int COLOR_COMP = Color.parseColor("#E09F3E");
+    public static final int COLOR_EQ = Color.parseColor("#8CB369");
+    public static final int COLOR_PITCH = Color.parseColor("#7B52AE");
+    public static final int COLOR_WAH = Color.parseColor("#4EA8DE");
+    public static final int COLOR_VOL = Color.parseColor("#48CAE4");
+    public static final int COLOR_GATE = Color.parseColor("#F4A261");
     public static final int COLOR_DEFAULT = Color.parseColor("#8F94A0");
 
     public enum Category {

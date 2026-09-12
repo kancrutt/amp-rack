@@ -4178,96 +4178,124 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     final boolean fIsInt = isIntegerParam;
 
                     if (isLevelControl) {
-                        // Level controls use Rotary Knobs in LEVEL panel — safe spacing, centered
-                        LinearLayout knobCell = new LinearLayout(this);
-                        knobCell.setOrientation(LinearLayout.VERTICAL);
-                        knobCell.setGravity(Gravity.CENTER);
-                        knobCell.setPadding(Math.round(10 * density), Math.round(4 * density), Math.round(10 * density), Math.round(4 * density));
-                        LinearLayout.LayoutParams knobCellLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-                        knobCellLp.setMargins(Math.round(4 * density), 0, Math.round(4 * density), 0);
-                        knobCell.setLayoutParams(knobCellLp);
+                        // Level controls use the same horizontal slider row as
+                        // tone controls (lastworks build: all controls are sliders)
+                        LinearLayout sliderRowLvl = new LinearLayout(this);
+                        sliderRowLvl.setOrientation(LinearLayout.HORIZONTAL);
+                        sliderRowLvl.setGravity(Gravity.CENTER_VERTICAL);
+                        sliderRowLvl.setPadding(Math.round(12 * density), Math.round(12 * density), Math.round(12 * density), Math.round(12 * density));
+                        sliderRowLvl.setBackgroundResource(R.drawable.glass_card_bg);
+                        LinearLayout.LayoutParams rowLpLvl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                        rowLpLvl.setMargins(0, Math.round(4 * density), 0, Math.round(4 * density));
+                        sliderRowLvl.setLayoutParams(rowLpLvl);
+                        sliderRowLvl.setMinimumHeight(Math.round(48 * density));
 
                         TextView labelView = new TextView(this);
                         labelView.setText(cName.toUpperCase());
                         if (cHint != null && !cHint.isEmpty()) {
                             labelView.setContentDescription(cName + " (" + cHint + ")");
                         }
-                        labelView.setTextColor(Color.parseColor("#A1A1AA"));
-                        labelView.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, labelSizePx);
-                        labelView.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
-                        labelView.setGravity(Gravity.CENTER);
+                        labelView.setTextColor(Color.parseColor("#E6E6E6"));
+                        labelView.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 11f * density);
                         labelView.setMaxLines(2);
+                        labelView.setMinLines(1);
                         labelView.setEllipsize(android.text.TextUtils.TruncateAt.END);
-                        labelView.setPadding(0, 0, 0, Math.round(2 * density));
                         if (jakartaFont != null) labelView.setTypeface(jakartaFont, android.graphics.Typeface.BOLD);
+                        LinearLayout.LayoutParams nameLp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 0.44f);
+                        nameLp.setMarginEnd(Math.round(12 * density));
+                        nameLp.gravity = Gravity.CENTER_VERTICAL;
+                        labelView.setLayoutParams(nameLp);
 
-                        RotarySeekbar rKnob = new RotarySeekbar(this);
-                        rKnob.setShowKnob(true);
-                        rKnob.setMinValue(minVal);
-                        rKnob.setMaxValue(maxVal);
-                        rKnob.setLogarithmic(fIsLog);
-                        if (fIsInt && maxVal > minVal) {
-                            // INT range 0..N has N intervals (0..1 => 1 step, NOT 2:
-                            // the old Math.max(2, ...) invented a phantom 0.5).
-                            int steps = Math.max(1, Math.round(maxVal - minVal));
-                            rKnob.setNumSteps(steps);
-                        } else if ("%".equals(unit) && maxVal > minVal) {
-                            // Percentage knob: exactly 100 steps (1% per step) so it steps 0%, 1%, 2% ... 100% cleanly
-                            rKnob.setNumSteps(100);
+                        final int progressMaxLvl = 10000;
+                        SeekBar seekBarLvl = new SeekBar(this);
+                        float trackRadiusPxLvl = 7 * density;
+                        android.graphics.drawable.GradientDrawable bgShapeLvl = new android.graphics.drawable.GradientDrawable();
+                        bgShapeLvl.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+                        bgShapeLvl.setCornerRadius(trackRadiusPxLvl);
+                        bgShapeLvl.setColor(Color.parseColor("#2E323B"));
+                        RoundedProgressDrawable progressFillLvl = new RoundedProgressDrawable(pluginColor, trackRadiusPxLvl);
+                        android.graphics.drawable.LayerDrawable trackDrawableLvl = new android.graphics.drawable.LayerDrawable(new android.graphics.drawable.Drawable[]{bgShapeLvl, progressFillLvl});
+                        trackDrawableLvl.setId(0, android.R.id.background);
+                        trackDrawableLvl.setId(1, android.R.id.progress);
+                        seekBarLvl.setProgressDrawable(trackDrawableLvl);
+                        seekBarLvl.setThumb(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+                        seekBarLvl.setPadding(0, 0, 0, 0);
+                        seekBarLvl.setMax(progressMaxLvl);
+                        float clampedValLvl = Math.max(minVal, Math.min(val, maxVal));
+                        float valueRangeLvl = maxVal > minVal ? maxVal - minVal : 1f;
+                        if (fIsLog) {
+                            float p01 = logValueToProgress(clampedValLvl, minVal, maxVal);
+                            seekBarLvl.setProgress(Math.round(p01 * progressMaxLvl));
                         } else {
-                            // Continuous knob: fine-grained so setValue() never
-                            // visibly snaps (RotarySeekbar snaps to 1/numSteps).
-                            rKnob.setNumSteps(1000);
+                            seekBarLvl.setProgress(Math.round((clampedValLvl - minVal) / valueRangeLvl * progressMaxLvl));
                         }
-                        rKnob.setValue(val);
-                        rKnob.mKnobColor = pluginColor;
-                        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(knobDimPx, knobDimPx);
-                        lp.gravity = Gravity.CENTER;
-                        rKnob.setLayoutParams(lp);
+                        LinearLayout.LayoutParams sliderLpLvl = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+                        sliderLpLvl.setMarginStart(Math.round(4 * density));
+                        seekBarLvl.setLayoutParams(sliderLpLvl);
 
                         TextView valView = new TextView(this);
                         valView.setText(ParameterFormatter.rawToDisplay(val, parameterMeta).text);
                         valView.setTextColor(Color.parseColor("#E6E6E6"));
                         valView.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, valSizePx);
-                        valView.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
                         if (jakartaFont != null) valView.setTypeface(jakartaFont, android.graphics.Typeface.BOLD);
                         valView.setPadding(Math.round(4 * density), Math.round(2 * density), Math.round(4 * density), Math.round(2 * density));
+                        valView.setMinWidth(Math.round(52 * density));
+                        valView.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
 
-                        int finalI = i;
-                        String unitFinal = unit;
-                        final float fMin = minVal;
-                        final float fMax = maxVal;
-                        final String fCName = cName;
-                        final String fHint = cHint;
+                        int finalILvl = i;
+                        String unitFinalLvl = unit;
+                        final float fMinLvl = minVal;
+                        final float fMaxLvl = maxVal;
+                        final String fCNameLvl = cName;
+                        final String fHintLvl = cHint;
 
-                        rKnob.setOnValueChangedListener((source, value) -> {
-                            if (fIsInt) {
-                                value = Math.round(value);
+                        seekBarLvl.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
+                            @Override public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
+                                if (!fromUser) return;
+                                float value;
+                                if (fIsLog) {
+                                    value = logProgressToValue(progress / (float) progressMaxLvl, fMinLvl, fMaxLvl);
+                                } else {
+                                    value = fMinLvl + (progress / (float) progressMaxLvl) * (fMaxLvl - fMinLvl);
+                                }
+                                if (fIsInt) {
+                                    value = Math.round(value);
+                                }
+                                value = Math.max(fMinLvl, Math.min(fMaxLvl, value));
+                                AudioEngine.setPluginControl(position, finalILvl, value);
+                                valView.setText(ParameterFormatter.rawToDisplay(value, parameterMeta).text);
                             }
-                            value = Math.max(fMin, Math.min(fMax, value));
-                            AudioEngine.setPluginControl(position, finalI, value);
-                            valView.setText(ParameterFormatter.rawToDisplay(value, parameterMeta).text);
+                            @Override public void onStartTrackingTouch(SeekBar sb) {}
+                            @Override public void onStopTrackingTouch(SeekBar sb) {}
                         });
 
-                        View.OnClickListener manualInputClick = v -> {
-                            showManualValueInputDialog(fCName, rKnob.getValue(), fMin, fMax, unitFinal, fHint, newVal -> {
-                                // Mirror the slider branch: INT params commit integers,
-                                // otherwise a typed "1" lands as 1.0-proof float drift.
+                        View.OnClickListener manualInputClickLvl = v -> {
+                            float curValLvl;
+                            if (fIsLog) {
+                                curValLvl = logProgressToValue(seekBarLvl.getProgress() / (float) progressMaxLvl, fMinLvl, fMaxLvl);
+                                curValLvl = Math.max(fMinLvl, Math.min(fMaxLvl, curValLvl));
+                            } else {
+                                curValLvl = fMinLvl + (seekBarLvl.getProgress() / (float) progressMaxLvl) * (fMaxLvl - fMinLvl);
+                            }
+                            showManualValueInputDialog(fCNameLvl, curValLvl, fMinLvl, fMaxLvl, unitFinalLvl, fHintLvl, newVal -> {
                                 if (fIsInt) newVal = Math.round(newVal);
-                                newVal = Math.max(fMin, Math.min(fMax, newVal));
-                                AudioEngine.setPluginControl(position, finalI, newVal);
-                                rKnob.setValue(newVal);
+                                newVal = Math.max(fMinLvl, Math.min(fMaxLvl, newVal));
+                                AudioEngine.setPluginControl(position, finalILvl, newVal);
+                                if (fIsLog) {
+                                    seekBarLvl.setProgress(Math.round(logValueToProgress(newVal, fMinLvl, fMaxLvl) * progressMaxLvl));
+                                } else {
+                                    seekBarLvl.setProgress(Math.round((newVal - fMinLvl) / (fMaxLvl - fMinLvl) * progressMaxLvl));
+                                }
                                 valView.setText(ParameterFormatter.rawToDisplay(newVal, parameterMeta).text);
                             });
                         };
-                        valView.setOnClickListener(manualInputClick);
-                        labelView.setOnClickListener(manualInputClick);
-                        rKnob.setOnKnobClickListener(k -> manualInputClick.onClick(k));
+                        valView.setOnClickListener(manualInputClickLvl);
+                        labelView.setOnClickListener(manualInputClickLvl);
 
-                        knobCell.addView(labelView);
-                        knobCell.addView(rKnob);
-                        knobCell.addView(valView);
-                        levelCells.add(knobCell);
+                        sliderRowLvl.addView(labelView);
+                        sliderRowLvl.addView(seekBarLvl);
+                        sliderRowLvl.addView(valView);
+                        levelCells.add(sliderRowLvl);
                     } else {
                         // Tone / FX controls: proportional layout — safe padding, no mepet/cut, aligned with slider
                         LinearLayout sliderRow = new LinearLayout(this);

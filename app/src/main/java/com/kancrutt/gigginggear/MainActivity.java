@@ -2032,6 +2032,8 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             } catch (Exception e) {
                 Log.w(TAG, "onResume: auto-start failed", e);
             }
+        // Restore chain state for tab switches and backgrounded app
+        if (running) loadActivePreset();
         }
     }
 

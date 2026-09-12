@@ -2002,7 +2002,8 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             }
         }
 
-//        loadActivePreset();
+        loadActivePreset();  // Restore signal chain from saved active preset
+
         // when savedInstanceState is not null
         // the problem with this is that when we start at first,
         // this will be empty since firestore returns data async

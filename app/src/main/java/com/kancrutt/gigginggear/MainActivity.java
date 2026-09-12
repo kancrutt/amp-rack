@@ -8422,4 +8422,9 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         return selection;
     }
 
+    public static void pushToVideo(float[] buffer, int len) {
+        // JNI callback from native audio engine for meter/visualizer data
+        // Stub implementation - no-op for now
+    }
+
 }

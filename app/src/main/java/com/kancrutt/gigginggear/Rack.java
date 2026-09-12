@@ -56,6 +56,8 @@ import com.google.android.material.progressindicator.LinearProgressIndicator;
 import com.google.android.material.slider.Slider;
 
 import android.content.SharedPreferences;
+import android.text.SpannableStringBuilder;
+import android.text.style.ForegroundColorSpan;
 import android.view.WindowInsets;
 import android.view.RoundedCorner;
 import android.widget.AdapterView;
@@ -1776,8 +1778,14 @@ public class Rack extends Fragment {
         } else {
             TextView display = getView() != null ? getView().findViewById(R.id.top_preset_display) : null;
             if (display != null) {
-                display.setText(String.format(java.util.Locale.US, "%d  %s",
-                        currentPresetNumber, label.toUpperCase(java.util.Locale.US)));
+                // Format: "1. PRESET NAME" with orange prefix
+                String num = String.valueOf(currentPresetNumber);
+                SpannableStringBuilder sb = new SpannableStringBuilder(num + ". " + label.toUpperCase(java.util.Locale.US));
+                // Color the number and dot orange
+                int orange = android.graphics.Color.parseColor("#FF8A00");
+                sb.setSpan(new ForegroundColorSpan(orange), 0, num.length() + 1, 
+                           android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+                display.setText(sb);
             }
         }
         if (persist) {

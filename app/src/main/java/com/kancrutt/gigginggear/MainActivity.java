@@ -1534,7 +1534,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             return;
         Log.d(TAG, "showMediaPlayerDialog: " + lastRecordedFileName);
 
-        AlertDialog.Builder builder = new AlertDialog.Builder(context);
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
         LayoutInflater inflater = getLayoutInflater();
 
         ConstraintLayout constraintLayout = (ConstraintLayout) inflater.inflate(R.layout.media_player_dialog, null);
@@ -1718,7 +1718,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         deleteFile.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                AlertDialog.Builder builder = new AlertDialog.Builder(context);
+                AlertDialog.Builder builder = new AlertDialog.Builder(this);
                 builder.setMessage("Are you sure you want to delete this file?")
                         .setTitle("Delete " + lastRecordedFileName)
                         .setPositiveButton("Delete", new DialogInterface.OnClickListener() {
@@ -1848,7 +1848,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             settings.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View view) {
-                    AlertDialog.Builder builder = new AlertDialog.Builder(context);
+                    AlertDialog.Builder builder = new AlertDialog.Builder(this);
                     // Get the layout inflater
                     LayoutInflater inflater = getLayoutInflater();
 
@@ -2084,7 +2084,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             mainActivity.latencyWarnLogo.setVisibility(GONE);
         } else {
             if (! isHeadphonesPlugged() && headphoneWarning) {
-                AlertDialog.Builder builder = new AlertDialog.Builder(context);
+                AlertDialog.Builder builder = new AlertDialog.Builder(this);
                 builder.setMessage("No headphones or audio interface detected: you may hear feedback if you run the app on device speakers. Do you wish to continue?")
                         .setPositiveButton("Start audio", new DialogInterface.OnClickListener() {
                             @Override
@@ -2758,7 +2758,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     }
 
     AlertDialog createPluginDialog() {
-        AlertDialog.Builder builder = new AlertDialog.Builder(context);
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
         LayoutInflater inflater = getLayoutInflater();
 
         linearLayoutPluginDialog = (ConstraintLayout) inflater.inflate(R.layout.load_plugin_dialog, null);
@@ -6376,7 +6376,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     }
 
     public static void alert(String title, String text) {
-        AlertDialog.Builder builder = new AlertDialog.Builder(context);
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setMessage(text)
                 .setTitle(title)
                 .setPositiveButton("OK", null);
@@ -7941,7 +7941,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         }
         Log.d(TAG, String.format ("[defaults] %d: %d", cin, cout));
 
-        AlertDialog.Builder builder = new AlertDialog.Builder(context);
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
         // Get the layout inflater
         LayoutInflater inflater = mainActivity.getLayoutInflater();
 

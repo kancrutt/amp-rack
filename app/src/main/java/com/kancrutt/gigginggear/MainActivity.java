@@ -8427,4 +8427,9 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         // Stub implementation - no-op for now
     }
 
+    public static void setSampleRateDisplay(int rate, int precision) {
+        // JNI callback from native audio engine for sample rate display
+        // Stub implementation - no-op for now
+    }
+
 }

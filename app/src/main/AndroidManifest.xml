@@ -85,7 +85,33 @@
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data
+                    android:scheme="gigginggear"
+                    android:host="tone3000"
+                    android:path="/callback" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data
+                    android:scheme="com.kancrutt.gigginggear"
+                    android:host="tone3000"
+                    android:path="/callback" />
+            </intent-filter>
         </activity>
+
+        <meta-data
+            android:name="com.kancrutt.gigginggear.TONE3000_CLIENT_ID"
+            android:value="t3k_pub_TmasX816SaHi4-OVqB5BtGHGL81F3_uU" />
 
         <meta-data
             android:name="preloaded_fonts"

@@ -7,6 +7,7 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.RectF;
+import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.text.TextPaint;
 import android.text.TextUtils;
@@ -21,8 +22,10 @@ import androidx.core.content.ContextCompat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class SignalChainCanvasView extends View {
 
@@ -110,6 +113,11 @@ public class SignalChainCanvasView extends View {
     private final List<Edge> edges = new ArrayList<>();
     private final Map<Integer, Node> nodeMap = new HashMap<>();
     private final Map<String, Bitmap> iconCacheWithSize = new HashMap<>();
+    // TONE3000 badges (restored from lastworks build 2026-09-11 22:50).
+    private final Map<Integer, Integer> slotToPluginId = new HashMap<>();
+    private final Set<Integer> t3kNodeIds = new HashSet<>();
+    private String lastLoadedFp = null;
+    private long lastLoadMs = 0;
     private final Paint paintNodeBody   = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint paintNodeBorder = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint paintNodeSelected = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -252,12 +260,92 @@ public class SignalChainCanvasView extends View {
     }
 
     public void loadFromActivePlugins() {
+        loadFromActivePlugins(false);
+    }
+
+    /** TONE3000 node badges (restored from lastworks build 2026-09-11 22:50). */
+    public void clearT3kBadges() {
+        t3kNodeIds.clear();
+        invalidate();
+    }
+
+    public boolean isT3kNode(int id) {
+        int pluginId;
+        if (slotToPluginId.containsKey(id)) {
+            pluginId = slotToPluginId.get(id);
+        } else {
+            pluginId = id;
+        }
+        return t3kNodeIds.contains(pluginId);
+    }
+
+    public void setT3kBadge(int id, boolean isT3k) {
+        int pluginId;
+        if (slotToPluginId.containsKey(id)) {
+            pluginId = slotToPluginId.get(id);
+        } else {
+            pluginId = id;
+        }
+        if (isT3k) {
+            t3kNodeIds.add(pluginId);
+        } else {
+            t3kNodeIds.remove(pluginId);
+        }
+        invalidate();
+    }
+
+    public void reapplyT3kBadgesFromMeta(Map<Integer, ?> metaBySlot) {
+        t3kNodeIds.clear();
+        if (metaBySlot == null) {
+            invalidate();
+            return;
+        }
+        for (Integer slot : metaBySlot.keySet()) {
+            Integer pid = slotToPluginId.get(slot);
+            if (pid != null) t3kNodeIds.add(pid);
+        }
+        invalidate();
+    }
+
+    /**
+     * Reload canvas nodes from the engine. When force is false, identical
+     * reloads within 800 ms are skipped (debounce, matches lastworks).
+     */
+    public void loadFromActivePlugins(boolean force) {
+        try {
+            StringBuilder fp = new StringBuilder();
+            int c = 0;
+            try {
+                c = AudioEngine.getActivePlugins();
+            } catch (Exception ignored) {}
+            fp.append(c);
+            for (int i = 0; i < c; i++) {
+                try {
+                    fp.append(i).append(AudioEngine.getActivePluginName(i)).append(";");
+                } catch (Exception ignored) {
+                    fp.append(i).append(":?;");
+                }
+            }
+            boolean hasPending = pendingCustomPos != null && !pendingCustomPos.isEmpty();
+            String curFp = fp.toString() + "|pending=" + hasPending;
+            long now = SystemClock.uptimeMillis();
+            if (!force && !hasPending && curFp.equals(lastLoadedFp) && now - lastLoadMs < 800) {
+                return;
+            }
+            lastLoadedFp = curFp;
+            lastLoadMs = now;
+        } catch (Exception ignored) {}
+        loadFromActivePluginsInner();
+    }
+
+    private void loadFromActivePluginsInner() {
         // Save old nodes to preserve X/Y and selection
         Map<Integer, Node> oldNodes = new HashMap<>(nodeMap);
-        
+
         nodes.clear();
         nodeMap.clear();
         iconCacheWithSize.clear();
+        slotToPluginId.clear();
 
         // Density-scale block geometry so blocks are physically the same size
         // on every DPI (previously raw pixels: tiny on xxhdpi, huge on ldpi)
@@ -343,6 +431,7 @@ public class SignalChainCanvasView extends View {
             
             nodes.add(n);
             nodeMap.put(n.id, n);
+            slotToPluginId.put(i, n.pluginId);
         }
 
         // 3) OUTPUT anchor
@@ -843,6 +932,30 @@ public class SignalChainCanvasView extends View {
         if (iconBmp != null) {
             RectF dst = new RectF(iconX, iconY, iconX + iconSize, iconY + iconSize);
             canvas.drawBitmap(iconBmp, null, dst, null);
+        }
+
+        // TONE3000 badge (restored from lastworks build 2026-09-11 22:50).
+        if (t3kNodeIds.contains(n.pluginId)) {
+            String t3k = "T3K";
+            Paint t3kBg = new Paint(Paint.ANTI_ALIAS_FLAG);
+            t3kBg.setColor(Color.parseColor("#FF8A00"));
+            t3kBg.setStyle(Paint.Style.FILL);
+            Paint t3kText = new Paint(Paint.ANTI_ALIAS_FLAG);
+            t3kText.setColor(-1);
+            t3kText.setTextSize(7.5f * d);
+            t3kText.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+            t3kText.setTextAlign(Paint.Align.CENTER);
+            float padH = d * 4.0f;
+            float tw = t3kText.measureText(t3k);
+            float bw = tw + padH * 2.0f;
+            float bh = d * 9.0f;
+            float bx = n.x + d * 4.0f;
+            float by = n.y + d * 4.0f;
+            RectF t3kR = new RectF(bx, by, bx + bw, by + bh);
+            canvas.drawRoundRect(t3kR, d * 3.0f, d * 3.0f, t3kBg);
+            Paint.FontMetrics fm = t3kText.getFontMetrics();
+            float ty = by + bh / 2f - (fm.ascent + fm.descent) / 2f;
+            canvas.drawText(t3k, bx + bw / 2f, ty, t3kText);
         }
 
         // Label (compact, crisp, inside block bottom)

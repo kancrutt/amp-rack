@@ -133,6 +133,8 @@ public:
     double getLatency(bool input);
 
     bool setPluginFilename(std::string filename, int plugin);
+    bool canLoadModelFile(int plugin);
+    std::string getPluginLoadedFileName(int plugin);
     std::string lastLoadError;
 
     void popFunction();

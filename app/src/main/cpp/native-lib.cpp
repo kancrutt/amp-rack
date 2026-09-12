@@ -965,6 +965,22 @@ Java_com_kancrutt_gigginggear_AudioEngine_setPluginFilename(JNIEnv *env, jclass 
 }
 extern "C"
 JNIEXPORT jboolean JNICALL
+Java_com_kancrutt_gigginggear_AudioEngine_canLoadModelFile(JNIEnv *env, jclass clazz, jint plugin) {
+    if (!engine)
+        return JNI_FALSE;
+    return engine->canLoadModelFile(plugin) ? JNI_TRUE : JNI_FALSE;
+}
+extern "C"
+JNIEXPORT jstring JNICALL
+Java_com_kancrutt_gigginggear_AudioEngine_getPluginLoadedFileName(JNIEnv *env, jclass clazz, jint plugin) {
+    if (!engine)
+        return nullptr;
+    std::string s = engine->getPluginLoadedFileName(plugin);
+    if (s.empty()) return nullptr;
+    return env->NewStringUTF(s.c_str());
+}
+extern "C"
+JNIEXPORT jboolean JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_getFilePort(JNIEnv *env, jclass clazz, jint plugin) {
     // TODO: implement getFilePort()
     if (engine == NULL)

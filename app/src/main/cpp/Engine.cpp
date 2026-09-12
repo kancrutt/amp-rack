@@ -662,6 +662,20 @@ bool Engine::setPluginFilename (std::string filename, int plugin) {
     return ok ;
 }
 
+bool Engine::canLoadModelFile (int plugin) {
+    if (plugin < 0 || plugin >= (int) activePlugins.size()) return false ;
+    auto * p = activePlugins.at(plugin);
+    if (p == nullptr || p->lv2Descriptor == nullptr || p->type == SharedLibrary::LADSPA) return false ;
+    return p->filePort != nullptr ;
+}
+
+std::string Engine::getPluginLoadedFileName (int plugin) {
+    if (plugin < 0 || plugin >= (int) activePlugins.size()) return "" ;
+    auto * p = activePlugins.at(plugin);
+    if (p == nullptr) return "" ;
+    return p->loadedFileName ;
+}
+
 bool Engine::setPluginBuffer (float * buffer, int buffer_size, int plugin) {
     IN
 //    LOGD("plugins in queue %d requested %d", activePlugins.size(), plugin);

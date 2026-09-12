@@ -269,4 +269,24 @@
     <color name="color_cat_wah_inactive">#5E3600</color>
     <color name="color_cat_volume_inactive">#004D54</color>
     <color name="color_cat_noisegate_inactive">#593E00</color>
+
+    <color name="gg_glass_text_primary">#E6E6E6</color>
+    <color name="gg_glass_text_secondary">#A1A1AA</color>
+    <color name="gg_glass_text_disabled">#52525B</color>
+    <color name="gg_glass_bg">#0E0F12</color>
+    <color name="gg_glass_border">#FFFFFF</color>
+    <color name="gg_glass_border_accent">#FF8A00</color>
+    <color name="gg_glass_border_dim">#FFFFFF</color>
+    <color name="gg_glass_divider">#FFFFFF</color>
+    <color name="gg_glass_glow_accent">#FF8A00</color>
+    <color name="gg_glass_glow_selected">#FFFFFF</color>
+    <color name="gg_glass_shadow">#000000</color>
+    <color name="gg_glass_surface">#17191E</color>
+    <color name="gg_glass_surface_card">#1F2228</color>
+    <color name="gg_glass_surface_overlay">#17191E</color>
+    <color name="gg_glass_surface_selected">#272B33</color>
+    <color name="gg_surface">#17191E</color>
+    <color name="gg_surface_2">#1F2228</color>
+    <color name="gg_surface_glass">#1F2228</color>
+    <color name="gg_surface_selected">#272B33</color>
 </resources>

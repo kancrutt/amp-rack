@@ -380,6 +380,12 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     String customTheme = null ;
     static SkinEngine skinEngine = null;
 
+    // TONE3000 slot metadata (restored from lastworks build 2026-09-11 22:50).
+    Map<Integer, JSONObject> t3kBlockMeta = new HashMap<>();
+    Map<Integer, String> t3kModelPath = new HashMap<>();
+    Map<Integer, String> pendingT3kLoad = new HashMap<>();
+    Map<Integer, String> pendingT3kFile = new HashMap<>();
+
     int primaryColor = com.google.android.material.R.color.design_default_color_primary;
     private static final int AUDIO_EFFECT_REQUEST = 0;
     private static final int READ_STORAGE_REQUEST = 1;
@@ -3822,13 +3828,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     /** Only amp/cab-class blocks expose LV2 file-path ports (99/100) for .nam models. */
     private boolean canLoadNamModel(int plugin) {
         try {
-            if (plugin < 0 || plugin >= AudioEngine.getActivePlugins()) return false;
-            String n = AudioEngine.getActivePluginName(plugin);
-            if (n == null) return false;
-            String ln = n.toLowerCase();
-            CategoryHelper.Category c = CategoryHelper.getCategory(n);
-            return ln.contains("nam") || ln.contains("neural") || ln.contains("aida")
-                    || c == CategoryHelper.Category.AMP || c == CategoryHelper.Category.CABINET;
+            return AudioEngine.canLoadModelFile(plugin);
         } catch (Throwable t) {
             return false;
         }
@@ -5501,6 +5501,527 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         toast("Successfully extracted Model " + basename);
     }
 
+    /**
+     * Load a TONE3000-downloaded model file into a NAM/IR-capable slot.
+     * Restored from lastworks build 2026-09-11 22:50 (method size 3637B in dex).
+     */
+    public boolean loadTone3000Model(java.io.File modelFile,
+            com.kancrutt.gigginggear.tone3000.model.ModelDto model,
+            com.kancrutt.gigginggear.tone3000.model.ToneDto tone) {
+        if (modelFile == null || !modelFile.exists()) {
+            toast("Model file missing");
+            return false;
+        }
+        String fmt;
+        if (tone.format != null) fmt = tone.format.toLowerCase();
+        else fmt = "nam";
+        boolean isNam = fmt.contains("nam") || fmt.contains("aida") || model.isNam();
+        boolean isIr = fmt.contains("ir") || fmt.contains("wav") || model.isIr();
+        boolean isA2Direct = false;
+        int targetSlot = -1;
+        try {
+            int sel = dataAdapter.getSelectedPosition();
+            int total = AudioEngine.getActivePlugins();
+            if (sel >= 0 && sel < total) {
+                boolean canUse = false;
+                if (isNam) {
+                    try {
+                        if (canLoadNamModel(sel)) canUse = true;
+                    } catch (Exception ignored) {}
+                }
+                if (isIr) {
+                    try {
+                        if (canLoadIrModel(sel)) canUse = true;
+                    } catch (Exception ignored) {}
+                }
+                if (canUse) targetSlot = sel;
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "loadTone3000Model failed", e);
+            toast("Failed to load model: " + e.getMessage());
+            return false;
+        }
+        if (targetSlot < 0) {
+            try {
+                isA2Direct = model != null && "2".equals(model.architectureVersion);
+            } catch (Exception e) {
+                Log.e(TAG, "loadTone3000Model failed", e);
+                toast("Failed to load model: " + e.getMessage());
+                return false;
+            }
+        }
+        String loaderName;
+        if (isIr) loaderName = "Simple IR Loader";
+        else if (isA2Direct) loaderName = "Neural Amp Modeler NG";
+        else loaderName = "Neural Amp Modeler";
+        if (isIr) {
+            String[] irCandidates = {"Simple IR Loader", "Impulse Loader", "Neural Amp Modeler"};
+            for (String cand : irCandidates) {
+                try {
+                    int before = AudioEngine.getActivePlugins();
+                    try {
+                        addPluginByName(cand);
+                    } catch (Exception ignored) {}
+                    try {
+                        if (AudioEngine.getActivePlugins() > before) {
+                            targetSlot = AudioEngine.getActivePlugins() - 1;
+                            break;
+                        }
+                    } catch (Exception ignored) {}
+                } catch (Exception ignored) {}
+            }
+        } else {
+            try {
+                int before = AudioEngine.getActivePlugins();
+                addPluginByName(loaderName);
+                if (AudioEngine.getActivePlugins() > before) {
+                    targetSlot = AudioEngine.getActivePlugins() - 1;
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "loadTone3000Model failed", e);
+                toast("Failed to load model: " + e.getMessage());
+                return false;
+            }
+        }
+        if (targetSlot < 0 || targetSlot >= AudioEngine.getActivePlugins()) {
+            try {
+                toast("No slot available for model");
+            } catch (Exception e) {
+                Log.e(TAG, "loadTone3000Model failed", e);
+                toast("Failed to load model: " + e.getMessage());
+                return false;
+            }
+            return false;
+        }
+        try {
+            if (isNam && !canLoadNamModel(targetSlot)) {
+                Log.w(TAG, "target slot not NAM-capable but trying anyway: " + targetSlot);
+            }
+            if (isIr && isNam) {
+                Log.d(TAG, "format ambiguous nam/ir, using nam path for " + tone.title);
+                isIr = false;
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "loadTone3000Model failed", e);
+            toast("Failed to load model: " + e.getMessage());
+            return false;
+        }
+        try {
+            if (modelFile.length() == 0) {
+                try {
+                    toast("Downloaded file is empty");
+                } catch (Exception e) {
+                    Log.e(TAG, "loadTone3000Model failed", e);
+                    toast("Failed to load model: " + e.getMessage());
+                    return false;
+                }
+                return false;
+            }
+            String destPath = modelFile.getAbsolutePath();
+            try {
+                Log.i(TAG, "TONE3000 load: tone=" + tone.title + " arch=" + model.architectureVersion
+                        + " file=" + destPath + " size=" + modelFile.length());
+            } catch (Exception ignored) {}
+            if (model.architectureVersion != null && model.architectureVersion.equals("2")) {
+                try {
+                    String head = new String(java.nio.file.Files.readAllBytes(modelFile.toPath()),
+                            java.nio.charset.StandardCharsets.UTF_8);
+                    if (head.length() > 800) head = head.substring(0, 800);
+                    Log.d(TAG, "TONE3000 A2 head: " + head.replace("\n", " "));
+                } catch (Exception ignored) {}
+            }
+            String err = AudioEngine.setPluginFilename(destPath, targetSlot);
+            if (err != null) {
+                Log.w(TAG, "TONE3000 setPluginFilename failed (first try "
+                        + AudioEngine.getActivePluginName(targetSlot) + "): " + err
+                        + " arch=" + model.architectureVersion);
+                boolean isA2 = "2".equals(model.architectureVersion);
+                if (isA2Direct && isA2) {
+                    String[] fallbackLoaders = {"Neural Amp Modeler NG", "AIDA-X", "Neural Amp Modeler"};
+                    for (String fb : fallbackLoaders) {
+                        try {
+                            String curName = AudioEngine.getActivePluginName(targetSlot);
+                            if (fb.equals(curName)) continue;
+                            Log.i(TAG, "TONE3000 A2 fallback: trying loader " + fb);
+                            int before = AudioEngine.getActivePlugins();
+                            addPluginByName(fb);
+                            if (AudioEngine.getActivePlugins() != before + 1) {
+                                Log.w(TAG, "TONE3000 A2 fallback: add failed for " + fb + ", trying next");
+                                continue;
+                            }
+                            int trial = AudioEngine.getActivePlugins() - 1;
+                            if (!canLoadNamModel(trial)) {
+                                safeDeletePlugin(trial);
+                                continue;
+                            }
+                            String err2 = AudioEngine.setPluginFilename(destPath, trial);
+                            if (err2 == null) {
+                                if (!safeDeletePlugin(targetSlot)) {
+                                    safeDeletePlugin(trial);
+                                    continue;
+                                }
+                                int last = AudioEngine.getActivePlugins() - 1;
+                                try {
+                                    AudioEngine.movePlugin(last, targetSlot);
+                                } catch (Throwable t) {
+                                    Log.w(TAG, "movePlugin failed after fallback add", t);
+                                }
+                                Log.i(TAG, "TONE3000 A2 fallback succeeded with " + fb + " at slot " + targetSlot);
+                                err = null;
+                                break;
+                            }
+                            Log.w(TAG, "TONE3000 fallback " + fb + " failed: " + err2);
+                            safeDeletePlugin(trial);
+                        } catch (Exception fe) {
+                            Log.w(TAG, "fallback " + fb + " exception", fe);
+                        }
+                    }
+                }
+            }
+            if (err != null) {
+                if (err.toLowerCase().contains("unsupported") || err.toLowerCase().contains("format")
+                        || err.toLowerCase().contains("nam")) {
+                    if ("2".equals(model.architectureVersion)) {
+                        toast("NAM A2 not supported by this loader \u2014 try updating the app or use A1 model");
+                    } else {
+                        toast("Unsupported format: " + fmt);
+                    }
+                } else {
+                    toast("Model load failed: " + err);
+                    return false;
+                }
+                try {
+                    AudioEngine.deletePlugin(targetSlot);
+                    shiftT3kMetaOnDelete(targetSlot);
+                } catch (Exception ignored) {}
+                try {
+                    if (signalChainCanvas != null) {
+                        signalChainCanvas.clearT3kBadges();
+                        signalChainCanvas.post(() -> {
+                            signalChainCanvas.loadFromActivePlugins(true);
+                            signalChainCanvas.postDelayed(() ->
+                                    signalChainCanvas.reapplyT3kBadgesFromMeta(t3kBlockMeta), 120);
+                        });
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "loadTone3000Model failed", e);
+                    toast("Failed to load model: " + e.getMessage());
+                    return false;
+                }
+                return false;
+            }
+            java.io.File metaFile = new java.io.File(modelFile.getParentFile(),
+                    modelFile.getName() + ".t3k.json");
+            JSONObject meta = new JSONObject();
+            meta.put("tone3000ToneId", String.valueOf(tone.id));
+            meta.put("tone3000ModelId", String.valueOf(model.id));
+            meta.put("tone3000Creator", tone.userUsername != null ? tone.userUsername : "");
+            meta.put("tone3000ToneTitle", tone.title);
+            meta.put("tone3000Format", tone.format);
+            meta.put("tone3000GearType", tone.gear);
+            meta.put("tone3000SourceUrl", model.modelUrl);
+            try (java.io.FileOutputStream fos = new java.io.FileOutputStream(metaFile)) {
+                fos.write(meta.toString(2).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            } catch (Exception e) {
+                Log.w(TAG, "failed to persist t3k meta", e);
+            }
+            t3kBlockMeta.put(targetSlot, meta);
+            t3kModelPath.put(targetSlot, destPath);
+            int badgeSlot = targetSlot;
+            if (signalChainCanvas != null) {
+                signalChainCanvas.post(() -> {
+                    signalChainCanvas.loadFromActivePlugins();
+                    signalChainCanvas.postDelayed(() -> {
+                        try {
+                            signalChainCanvas.setT3kBadge(badgeSlot, true);
+                        } catch (Exception ignored) {}
+                        signalChainCanvas.invalidate();
+                    }, 120);
+                });
+            }
+            if (dataAdapter != null) dataAdapter.notifyDataSetChanged();
+            String loaded = AudioEngine.getPluginLoadedFileName(targetSlot);
+            boolean engineConfirmed = loaded != null && !loaded.isEmpty()
+                    && (loaded.equals(destPath) || loaded.endsWith(modelFile.getName()));
+            boolean active = AudioEngine.getActivePluginEnabled(targetSlot);
+            try {
+                if (engineConfirmed) {
+                    Log.i(TAG, "TONE3000 ENGINE VERIFIED: slot=" + targetSlot + " file=" + loaded
+                            + " active=" + active + " arch=" + model.architectureVersion + " format=" + fmt);
+                    toast("Loaded TONE3000: " + tone.title + " \u2192 " + model.name
+                            + (active ? "" : " (bypassed)"));
+                } else {
+                    Log.e(TAG, "TONE3000 ENGINE VERIFY FAILED: expected=" + destPath + " got=" + loaded);
+                    toast("Model attached but engine read-back failed \u2014 check log");
+                }
+            } catch (Throwable ve) {
+                Log.w(TAG, "engine verification unavailable, assuming loaded", ve);
+                toast("Loaded TONE3000: " + tone.title + " \u2192 " + model.name);
+            }
+            return true;
+        } catch (Exception e) {
+            Log.e(TAG, "loadTone3000Model failed", e);
+            toast("Failed to load model: " + e.getMessage());
+            return false;
+        }
+    }
+
+    // ---- TONE3000 integration (restored from lastworks build 2026-09-11 22:50) ----
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleTone3000Callback(intent);
+    }
+
+    private void handleTone3000Callback(Intent intent) {
+        if (intent == null || intent.getData() == null) return;
+        android.net.Uri data = intent.getData();
+        if (data == null) return;
+        String scheme = data.getScheme();
+        String host = data.getHost();
+        boolean isT3k = data.toString().contains("tone3000/callback")
+                || ("gigginggear".equals(scheme) && "tone3000".equals(host))
+                || ("com.kancrutt.gigginggear".equals(scheme) && "tone3000".equals(host));
+        if (!isT3k) return;
+        Log.i("Amp Rack MainActivity", "TONE3000 callback: " + data);
+        try {
+            com.kancrutt.gigginggear.tone3000.Tone3000AuthManager auth =
+                    com.kancrutt.gigginggear.tone3000.Tone3000AuthManager.get(this);
+            com.kancrutt.gigginggear.tone3000.Tone3000AuthManager.CallbackResult cb = auth.handleCallback(data);
+            if (cb.canceled) {
+                if (cb.code != null) {
+                    exchangeTone3000Code(cb.code, null);
+                } else {
+                    toast("TONE3000 selection canceled");
+                }
+                return;
+            }
+            if (cb.error != null) {
+                toast("TONE3000 error: " + cb.error);
+                return;
+            }
+            exchangeTone3000Code(cb.code, cb.toneId);
+        } catch (com.kancrutt.gigginggear.tone3000.model.ApiException e) {
+            Log.e("Amp Rack MainActivity", "TONE3000 callback failed", e);
+            if ("state_mismatch".equals(e.errorCode)) {
+                toast("TONE3000 security check failed \u2014 please try again");
+            } else if ("missing_code".equals(e.errorCode)) {
+                toast("TONE3000 callback missing code");
+            } else {
+                toast("TONE3000 error: " + e.getMessage());
+            }
+        } catch (Exception e) {
+            Log.e("Amp Rack MainActivity", "TONE3000 callback exception", e);
+            toast("TONE3000 callback failed: " + e.getMessage());
+        }
+    }
+
+    private void exchangeTone3000Code(String code, String toneId) {
+        ProgressDialog pd = new ProgressDialog(this);
+        pd.setMessage("Connecting to TONE3000\u2026");
+        pd.setIndeterminate(true);
+        pd.setCancelable(false);
+        pd.show();
+        new Thread(() -> {
+            try {
+                com.kancrutt.gigginggear.tone3000.Tone3000AuthManager.get(this).exchangeCode(this, code);
+                runOnUiThread(() -> {
+                    try {
+                        pd.dismiss();
+                    } catch (Exception ignored) {}
+                    if (toneId != null && !toneId.isEmpty()) {
+                        com.kancrutt.gigginggear.tone3000.ui.Tone3000ToneDetailSheet sheet =
+                                com.kancrutt.gigginggear.tone3000.ui.Tone3000ToneDetailSheet.newInstance(toneId);
+                        sheet.show(getSupportFragmentManager(), "t3k_detail");
+                    } else {
+                        toast("TONE3000 connected \u2014 tap + to browse tones");
+                    }
+                });
+            } catch (com.kancrutt.gigginggear.tone3000.model.ApiException e) {
+                runOnUiThread(() -> {
+                    try {
+                        pd.dismiss();
+                    } catch (Exception ignored) {}
+                    Log.e("Amp Rack MainActivity", "TONE3000 token exchange failed", e);
+                    if (e.httpCode == 400) {
+                        toast("TONE3000 auth expired \u2014 please try again");
+                    } else {
+                        toast("TONE3000 auth failed: " + e.getMessage());
+                    }
+                });
+            } catch (Exception e) {
+                runOnUiThread(() -> {
+                    try {
+                        pd.dismiss();
+                    } catch (Exception ignored) {}
+                    toast("TONE3000 auth failed: " + e.getMessage());
+                });
+            }
+        }).start();
+    }
+
+    public JSONObject getTone3000MetaForSlot(int slot) {
+        JSONObject v = t3kBlockMeta.get(slot);
+        if (v != null) return v;
+        String p = t3kModelPath.get(slot);
+        if (p != null) {
+            try {
+                java.io.File meta = new java.io.File(new java.io.File(p).getParentFile(),
+                        new java.io.File(p).getName() + ".t3k.json");
+                if (meta.exists()) {
+                    String s = new String(java.nio.file.Files.readAllBytes(meta.toPath()),
+                            java.nio.charset.StandardCharsets.UTF_8);
+                    return new JSONObject(s);
+                }
+            } catch (Exception ignored) {}
+        }
+        return null;
+    }
+
+    public String getTone3000ModelPathForSlot(int slot) {
+        return t3kModelPath.get(slot);
+    }
+
+    public java.util.Set<Integer> getTone3000SlotIds() {
+        return new java.util.HashSet<>(t3kBlockMeta.keySet());
+    }
+
+    public boolean isTone3000Slot(int slot) {
+        return getTone3000MetaForSlot(slot) != null;
+    }
+
+    public void handleMissingTone3000Model(LocalPresetManager.PluginItem item, int slot) {
+        String toneId = item.tone3000ToneId;
+        String title = item.tone3000ToneTitle != null ? item.tone3000ToneTitle
+                : (item.name != null ? item.name : "TONE3000 model");
+        new AlertDialog.Builder(this)
+                .setTitle("TONE3000 model missing")
+                .setMessage("TONE3000 model is not downloaded on this device.\n\n" + title
+                        + (item.tone3000Creator != null ? " \u2014 @" + item.tone3000Creator : "")
+                        + "\n\nDownload again or choose a replacement.")
+                .setPositiveButton("Download again", (d, w) -> {
+                    if (toneId != null && !toneId.isEmpty()) {
+                        com.kancrutt.gigginggear.tone3000.ui.Tone3000ToneDetailSheet sheet =
+                                com.kancrutt.gigginggear.tone3000.ui.Tone3000ToneDetailSheet.newInstance(toneId);
+                        sheet.show(getSupportFragmentManager(), "t3k_detail_rereload");
+                    } else {
+                        com.kancrutt.gigginggear.tone3000.ui.Tone3000EntrySheet.newInstance()
+                                .show(getSupportFragmentManager(), "t3k_entry");
+                    }
+                })
+                .setNeutralButton("Choose replacement", (d, w) -> {
+                    com.kancrutt.gigginggear.tone3000.ui.Tone3000EntrySheet.newInstance()
+                            .show(getSupportFragmentManager(), "t3k_entry");
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    public void deletePluginAndSyncTone3000(int slot) {
+        int total = AudioEngine.getActivePlugins();
+        if (slot < 0 || slot >= total) {
+            Log.w("Amp Rack MainActivity", "deletePluginAndSyncTone3000: stale slot " + slot
+                    + " of " + total + ", skipping");
+            return;
+        }
+        try {
+            AudioEngine.deletePlugin(slot);
+        } catch (Exception e) {
+            Log.e("Amp Rack MainActivity", "deletePlugin failed", e);
+            return;
+        }
+        shiftT3kMetaOnDelete(slot);
+        if (signalChainCanvas != null) {
+            signalChainCanvas.clearT3kBadges();
+            signalChainCanvas.post(() -> {
+                signalChainCanvas.loadFromActivePlugins(true);
+                signalChainCanvas.postDelayed(() ->
+                        signalChainCanvas.reapplyT3kBadgesFromMeta(t3kBlockMeta), 120);
+            });
+        }
+    }
+
+    private void shiftT3kMetaOnDelete(int deletedSlot) {
+        Map<Integer, JSONObject> newMeta = new HashMap<>();
+        Map<Integer, String> newPath = new HashMap<>();
+        for (Map.Entry<Integer, JSONObject> e : t3kBlockMeta.entrySet()) {
+            int k = e.getKey();
+            if (k == deletedSlot) continue;
+            int nk = k > deletedSlot ? k - 1 : k;
+            newMeta.put(nk, e.getValue());
+        }
+        for (Map.Entry<Integer, String> e : t3kModelPath.entrySet()) {
+            int k = e.getKey();
+            if (k == deletedSlot) continue;
+            int nk = k > deletedSlot ? k - 1 : k;
+            newPath.put(nk, e.getValue());
+        }
+        t3kBlockMeta.clear();
+        t3kBlockMeta.putAll(newMeta);
+        t3kModelPath.clear();
+        t3kModelPath.putAll(newPath);
+    }
+
+    private void shiftT3kMetaOnMove(int from, int to) {
+        if (from == to || from < 0 || to < 0) return;
+        int lo = Math.min(from, to);
+        int hi = Math.max(from, to);
+        Map<Integer, JSONObject> newMeta = new HashMap<>();
+        Map<Integer, String> newPath = new HashMap<>();
+        for (Map.Entry<Integer, JSONObject> e : t3kBlockMeta.entrySet()) {
+            int k = e.getKey();
+            if (k == from) newMeta.put(to, e.getValue());
+            else if (k >= lo && k <= hi) newMeta.put(k + (to > from ? -1 : 1), e.getValue());
+            else newMeta.put(k, e.getValue());
+        }
+        for (Map.Entry<Integer, String> e : t3kModelPath.entrySet()) {
+            int k = e.getKey();
+            if (k == from) newPath.put(to, e.getValue());
+            else if (k >= lo && k <= hi) newPath.put(k + (to > from ? -1 : 1), e.getValue());
+            else newPath.put(k, e.getValue());
+        }
+        t3kBlockMeta.clear();
+        t3kBlockMeta.putAll(newMeta);
+        t3kModelPath.clear();
+        t3kModelPath.putAll(newPath);
+    }
+
+    private boolean canLoadIrModel(int plugin) {
+        boolean ok = false;
+        if (plugin >= 0) {
+            try {
+                if (plugin >= AudioEngine.getActivePlugins()) return ok;
+                String n = AudioEngine.getActivePluginName(plugin);
+                if (n == null) return ok;
+                String ln = n.toLowerCase();
+                CategoryHelper.Category c = CategoryHelper.getCategory(n);
+                if (ln.contains("ir") || ln.contains("convolution") || ln.contains("reverb")
+                        || c == CategoryHelper.Category.CABINET) ok = true;
+                return ok;
+            } catch (Throwable t) {
+                return ok;
+            }
+        }
+        return ok;
+    }
+
+    private boolean safeDeletePlugin(int slot) {
+        try {
+            int total = AudioEngine.getActivePlugins();
+            if (slot >= 0 && slot < total) {
+                AudioEngine.deletePlugin(slot);
+                return true;
+            }
+            Log.w("Amp Rack MainActivity", "safeDeletePlugin: stale slot " + slot + " of " + total + ", skipping");
+            return false;
+        } catch (Exception e) {
+            Log.e("Amp Rack MainActivity", "safeDeletePlugin failed", e);
+            return false;
+        }
+    }
+
     public void manageNAMModels (Spinner spinner, String dir) {
         DocumentFile root = DocumentFile.fromFile(new File(dir));
         DocumentFile [] files = root.listFiles() ;
@@ -6446,6 +6967,16 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
         builder.show();
     }
+
+    // ========== State persistence (recovered from APK smali) ==========
+    private final java.util.Map<String, float[]> savedNodePositions = new java.util.HashMap<>();
+
+    public void storeNodePositions(java.util.Map<String, float[]> positions) {
+        savedNodePositions.clear();
+        if (positions != null) savedNodePositions.putAll(positions);
+    }
+
+    public java.util.Map<String, float[]> getSavedNodePositions() {
+        return new java.util.HashMap<>(savedNodePositions);
+    }
 }
-
-

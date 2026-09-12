@@ -413,11 +413,8 @@ public class Rack extends Fragment {
             signalChainCanvas.setOnDeleteNodeListener(node -> {
                 if (node != null && node.id >= 0) {
                     try {
-                        AudioEngine.deletePlugin(node.id);
-                        signalChainCanvas.postDelayed(() -> {
-                            signalChainCanvas.loadFromActivePlugins();
-                            if (mainActivity.dataAdapter != null) mainActivity.dataAdapter.notifyDataSetChanged();
-                        }, 80);
+                        mainActivity.deletePluginAndSyncTone3000(node.id);
+                        if (mainActivity.dataAdapter != null) mainActivity.dataAdapter.notifyDataSetChanged();
                     } catch (Exception e) {
                         Log.e(TAG, "deletePlugin failed for index " + node.id, e);
                     }

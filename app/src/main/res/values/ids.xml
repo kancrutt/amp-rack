@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item name="top_logo" type="id"/>
+    <item name="top_left_zone" type="id"/>
+    <item name="top_right_zone" type="id"/>
+    <item name="top_sr_text" type="id"/>
+</resources>

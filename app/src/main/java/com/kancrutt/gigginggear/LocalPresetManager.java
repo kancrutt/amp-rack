@@ -173,6 +173,13 @@ public class LocalPresetManager {
                 pObj.put("library", item.library);
                 pObj.put("unique_id", item.uniqueId);
                 pObj.put("enabled", item.enabled);
+                if (item.tone3000ToneId != null) pObj.put("tone3000ToneId", item.tone3000ToneId);
+                if (item.tone3000ToneTitle != null) pObj.put("tone3000ToneTitle", item.tone3000ToneTitle);
+                if (item.tone3000Creator != null) pObj.put("tone3000Creator", item.tone3000Creator);
+                if (item.tone3000ModelId != null) pObj.put("tone3000ModelId", item.tone3000ModelId);
+                if (item.tone3000Format != null) pObj.put("tone3000Format", item.tone3000Format);
+                if (item.tone3000GearType != null) pObj.put("tone3000GearType", item.tone3000GearType);
+                if (item.tone3000SourceUrl != null) pObj.put("tone3000SourceUrl", item.tone3000SourceUrl);
 
                 JSONArray controlsArr = new JSONArray();
                 if (item.controls != null) {
@@ -262,6 +269,13 @@ public class LocalPresetManager {
                 item.library = pObj.optString("library", "");
                 item.uniqueId = pObj.optInt("unique_id", 0);
                 item.enabled = pObj.optBoolean("enabled", true);
+                item.tone3000ToneId = pObj.isNull("tone3000ToneId") ? null : pObj.optString("tone3000ToneId", null);
+                item.tone3000ToneTitle = pObj.isNull("tone3000ToneTitle") ? null : pObj.optString("tone3000ToneTitle", null);
+                item.tone3000Creator = pObj.isNull("tone3000Creator") ? null : pObj.optString("tone3000Creator", null);
+                item.tone3000ModelId = pObj.isNull("tone3000ModelId") ? null : pObj.optString("tone3000ModelId", null);
+                item.tone3000Format = pObj.isNull("tone3000Format") ? null : pObj.optString("tone3000Format", null);
+                item.tone3000GearType = pObj.isNull("tone3000GearType") ? null : pObj.optString("tone3000GearType", null);
+                item.tone3000SourceUrl = pObj.isNull("tone3000SourceUrl") ? null : pObj.optString("tone3000SourceUrl", null);
 
                 JSONArray controlsArr = pObj.optJSONArray("controls");
                 if (controlsArr != null) {
@@ -407,6 +421,14 @@ public class LocalPresetManager {
         public boolean enabled = true;
         public List<ControlItem> controls = new ArrayList<>();
         public List<FilePortItem> filePorts = new ArrayList<>();
+        // TONE3000 provenance (restored from lastworks build 2026-09-11 22:50).
+        public String tone3000ToneId;
+        public String tone3000ToneTitle;
+        public String tone3000Creator;
+        public String tone3000ModelId;
+        public String tone3000Format;
+        public String tone3000GearType;
+        public String tone3000SourceUrl;
     }
 
     public static class ControlItem {

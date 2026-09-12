@@ -1534,7 +1534,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             return;
         Log.d(TAG, "showMediaPlayerDialog: " + lastRecordedFileName);
 
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        AlertDialog.Builder builder = new AlertDialog.Builder(mainActivity);
         LayoutInflater inflater = getLayoutInflater();
 
         ConstraintLayout constraintLayout = (ConstraintLayout) inflater.inflate(R.layout.media_player_dialog, null);
@@ -1718,7 +1718,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         deleteFile.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                AlertDialog.Builder builder = new AlertDialog.Builder(mainActivity);
                 builder.setMessage("Are you sure you want to delete this file?")
                         .setTitle("Delete " + lastRecordedFileName)
                         .setPositiveButton("Delete", new DialogInterface.OnClickListener() {
@@ -1848,7 +1848,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             settings.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View view) {
-                    AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                    AlertDialog.Builder builder = new AlertDialog.Builder(mainActivity);
                     // Get the layout inflater
                     LayoutInflater inflater = getLayoutInflater();
 
@@ -2084,7 +2084,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             mainActivity.latencyWarnLogo.setVisibility(GONE);
         } else {
             if (! isHeadphonesPlugged() && headphoneWarning) {
-                AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                AlertDialog.Builder builder = new AlertDialog.Builder(mainActivity);
                 builder.setMessage("No headphones or audio interface detected: you may hear feedback if you run the app on device speakers. Do you wish to continue?")
                         .setPositiveButton("Start audio", new DialogInterface.OnClickListener() {
                             @Override
@@ -2758,7 +2758,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     }
 
     AlertDialog createPluginDialog() {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        AlertDialog.Builder builder = new AlertDialog.Builder(mainActivity);
         LayoutInflater inflater = getLayoutInflater();
 
         linearLayoutPluginDialog = (ConstraintLayout) inflater.inflate(R.layout.load_plugin_dialog, null);
@@ -6376,7 +6376,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     }
 
     public static void alert(String title, String text) {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        AlertDialog.Builder builder = new AlertDialog.Builder(mainActivity);
         builder.setMessage(text)
                 .setTitle(title)
                 .setPositiveButton("OK", null);
@@ -7195,7 +7195,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
     public void saveCollection () {
         ArrayList selectedItems = new ArrayList();  // Where we track the selected items
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        AlertDialog.Builder builder = new AlertDialog.Builder(mainActivity);
         List<CharSequence> strings = new ArrayList<>();
         if (presets.fragmentStateAdapter.myPresets.myPresetsAdapter == null) {
             alert("Load presets first", "To save preset collection to file, switch to the Presets tab from the bottom navigation menu");
@@ -7320,7 +7320,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         aRecord = new AudioRecord(MediaRecorder.AudioSource.MIC, 48000,
                 AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_FLOAT, 1024*4);
 
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        AlertDialog.Builder builder = new AlertDialog.Builder(mainActivity);
         builder.setMessage("Audio Record Test");
         builder.setPositiveButton("Close", null);
 
@@ -7545,7 +7545,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         channelEdit = midiLayout.findViewById(R.id.channel) ;
         controlEdit = midiLayout.findViewById(R.id.control) ;
 
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        AlertDialog.Builder builder = new AlertDialog.Builder(mainActivity);
         builder.setView(midiLayout);
         if (scope == MIDIControl.Scope.PLUGIN)
             builder.setTitle("Set MIDI Control for " + AudioEngine.getActivePluginName(plugin) + " " + AudioEngine.getControlName(plugin, control));
@@ -7753,7 +7753,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
     void scanBLE () {
         if (Build.VERSION.SDK_INT < 33) {
-            AlertDialog.Builder builder = new AlertDialog.Builder(this);
+            AlertDialog.Builder builder = new AlertDialog.Builder(mainActivity);
             builder.setTitle("Bluetooth MIDI only supported on Android 13 and above.");
             builder.setMessage("To use a Bluetooth MIDI Controller with Amp Rack, install MIDI BLE Connect from the Play store, connect to your BLE MIDI Controller and then restart Amp Rack");
             builder.setPositiveButton("Install MIDI BLE Connect", new DialogInterface.OnClickListener() {
@@ -7941,7 +7941,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         }
         Log.d(TAG, String.format ("[defaults] %d: %d", cin, cout));
 
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        AlertDialog.Builder builder = new AlertDialog.Builder(mainActivity);
         // Get the layout inflater
         LayoutInflater inflater = mainActivity.getLayoutInflater();
 
@@ -8171,7 +8171,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
 
     void selectMidiDevice () {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        AlertDialog.Builder builder = new AlertDialog.Builder(mainActivity);
         LinearLayout linearLayout = (LinearLayout) getLayoutInflater().inflate(R.layout.midi_select, null);
         builder.setView(linearLayout);
 
@@ -8314,7 +8314,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
     void detachBLE () {
         Log.i(TAG, "detachBLE: ");
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        AlertDialog.Builder builder = new AlertDialog.Builder(mainActivity);
         builder.setTitle("Disconnect and forget Bluetooth device?");
         builder.setPositiveButton("Disconnect and forget", new DialogInterface.OnClickListener() {
             @Override
@@ -8361,7 +8361,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             }
         }
 
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        AlertDialog.Builder builder = new AlertDialog.Builder(mainActivity);
         // Set the dialog title.
         builder.setTitle("MIDI Mappings")
                 // Specify the list array, the items to be selected by default (null for

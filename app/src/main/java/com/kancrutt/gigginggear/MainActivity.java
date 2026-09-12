@@ -1975,7 +1975,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 //        recreate();
         Log.d(TAG, "lifecycle: resumed");
         // Restore chain state when resuming (tab switch / app backgrounding)
-        loadActivePreset();
 //        AudioEngine.create(); // originally was here
 //        loadPlugins();
 
@@ -2003,8 +2002,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 Log.w(TAG, "UNable to create directory: " + e.getMessage());
             }
         }
-
-        loadActivePreset();  // Restore signal chain from saved active preset
 
         // when savedInstanceState is not null
         // the problem with this is that when we start at first,
@@ -2129,6 +2126,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         }
 
         running = AudioEngine.setEffectOn(true);
+        loadActivePreset();  // Restore chain after engine starts
     }
 
     private void stopEffect() {

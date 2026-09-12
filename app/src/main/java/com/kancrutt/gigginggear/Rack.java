@@ -33,6 +33,7 @@ import android.widget.CheckBox;
 import android.widget.CompoundButton;
 import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.PopupMenu;
@@ -77,7 +78,9 @@ import java.io.PrintWriter;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -480,58 +483,62 @@ public class Rack extends Fragment {
             bpmChip.setOnClickListener(v -> mainActivity.showBpmDialog());
         }
 
-        // ---- Top bar wiring (B5): master volume knob + preset rename / quick save ----
+        // ---- Top bar wiring (B5): master volume pill slider + preset nav / quick save ----
         LinearLayout knobContainer = view.findViewById(R.id.top_volume_knob_container);
         TextView topVolVal = view.findViewById(R.id.top_volume_val);
         if (knobContainer != null) {
             knobContainer.removeAllViews();
-            RotarySeekbar volKnob = new RotarySeekbar(getContext());
-            volKnob.setShowKnob(true);
-            volKnob.setBackground(null);
-            volKnob.setMaxValue(100f);
-            volKnob.setMinValue(0f);
-            volKnob.setValue(80f);
-            volKnob.mKnobRadius = 0.65f;
+            float density = getResources().getDisplayMetrics().density;
+            // Pill SeekBar (matches lastworks build): rounded track #2E323B,
+            // white RoundedProgressDrawable progress, transparent thumb.
+            android.widget.SeekBar volSeek = new android.widget.SeekBar(getContext());
+            android.graphics.drawable.GradientDrawable track = new android.graphics.drawable.GradientDrawable();
+            track.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+            float cornerPx = 7f * density;
+            track.setCornerRadius(cornerPx);
+            track.setColor(android.graphics.Color.parseColor("#2E323B"));
+            MainActivity.RoundedProgressDrawable progress = new MainActivity.RoundedProgressDrawable(
+                    android.graphics.Color.WHITE, cornerPx);
+            android.graphics.drawable.LayerDrawable layer = new android.graphics.drawable.LayerDrawable(
+                    new android.graphics.drawable.Drawable[]{track, progress});
+            layer.setId(0, android.R.id.background);
+            layer.setId(1, android.R.id.progress);
+            volSeek.setProgressDrawable(layer);
+            volSeek.setThumb(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+            volSeek.setPadding(0, 0, 0, 0);
+            volSeek.setMax(10000);
+            volSeek.setProgress(7936);
+            LinearLayout.LayoutParams vsLp = new LinearLayout.LayoutParams(
+                    (int) (80 * density), (int) (22 * density));
+            vsLp.gravity = android.view.Gravity.CENTER_VERTICAL;
+            knobContainer.addView(volSeek, vsLp);
             if (topVolVal != null) {
                 topVolVal.setText("80%");
             }
-            
-            // Comfortable master volume knob size matching enlarged top bar
-            float density = getResources().getDisplayMetrics().density;
-            int knobDimPx = (int) (40 * density);
-            if (mainActivity != null && mainActivity.tabletMode) {
-                knobDimPx = (int) (52 * density);
-            }
-            LinearLayout.LayoutParams vkLp = new LinearLayout.LayoutParams(knobDimPx, knobDimPx);
-            vkLp.gravity = android.view.Gravity.CENTER_VERTICAL;
-            knobContainer.addView(volKnob, vkLp);
-
-            volKnob.setOnValueChangedListener((bar, value) -> {
-                try {
-                    AudioEngine.setOutputVolume(value / 100f);
-                    if (topVolVal != null) {
-                        topVolVal.setText((int) value + "%");
+            volSeek.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
+                @Override public void onProgressChanged(android.widget.SeekBar sb, int progress, boolean fromUser) {
+                    if (!fromUser) return;
+                    try {
+                        float percent = progress * 100f / 10000f;
+                        AudioEngine.setOutputVolume(percent / 100f);
+                        Log.d(TAG, "MASTER_VOLUME slider=" + (int) percent + "% gain=" + (percent / 100f));
+                        if (topVolVal != null) {
+                            topVolVal.setText((int) percent + "%");
+                        }
+                    } catch (Exception e) {
+                        Log.w(TAG, "setOutputVolume failed", e);
                     }
-                } catch (Exception e) {
-                    Log.w(TAG, "setOutputVolume failed", e);
                 }
-            });
-            volKnob.setOnTouchListener((v, event) -> {
-                float val = volKnob.getValue();
-                try {
-                    AudioEngine.setOutputVolume(val / 100f);
-                    if (topVolVal != null) {
-                        topVolVal.setText((int) val + "%");
-                    }
-                } catch (Exception ignored) {}
-                return false;
+                @Override public void onStartTrackingTouch(android.widget.SeekBar sb) {}
+                @Override public void onStopTrackingTouch(android.widget.SeekBar sb) {}
             });
 
-            // Tap master volume knob or value text to input value manually (0 .. 100%)
+            // Tap slider or value text to input value manually (0 .. 100%)
             View.OnClickListener manualVolClick = v -> {
                 if (mainActivity != null) {
-                    mainActivity.showManualValueInputDialog("Master Volume", volKnob.getValue(), 0f, 100f, "%", newVal -> {
-                        volKnob.setValue(newVal);
+                    mainActivity.showManualValueInputDialog("Master Volume",
+                            volSeek.getProgress() * 100f / 10000f, 0f, 100f, "%", newVal -> {
+                        volSeek.setProgress(Math.round(newVal * 100f));
                         if (topVolVal != null) {
                             topVolVal.setText((int) newVal + "%");
                         }
@@ -539,7 +546,6 @@ public class Rack extends Fragment {
                     });
                 }
             };
-            volKnob.setOnKnobClickListener(k -> manualVolClick.onClick(k));
             knobContainer.setOnClickListener(manualVolClick);
             if (topVolVal != null) {
                 topVolVal.setOnClickListener(manualVolClick);
@@ -548,8 +554,20 @@ public class Rack extends Fragment {
 
         TextView topPresetDisplay = view.findViewById(R.id.top_preset_display);
         updateTopBarPresetDisplay(1, "CLEAN");
+        ImageButton presetPrevBtn = view.findViewById(R.id.preset_prev);
+        ImageButton presetNextBtn = view.findViewById(R.id.preset_next);
+        if (presetPrevBtn != null) {
+            presetPrevBtn.setOnClickListener(v -> onPresetNavPrev());
+        }
+        if (presetNextBtn != null) {
+            presetNextBtn.setOnClickListener(v -> onPresetNavNext());
+        }
         if (topPresetDisplay != null) {
-            topPresetDisplay.setOnClickListener(v -> showRenamePresetDialog());
+            topPresetDisplay.setOnClickListener(v -> showPresetPicker());
+            topPresetDisplay.setOnLongClickListener(v -> {
+                showRenamePresetDialog();
+                return true;
+            });
         }
 
         // Responsive top bar: measure REAL laid-out widths, collapse in defined
@@ -1740,32 +1758,177 @@ public class Rack extends Fragment {
     }
 
     private void updateTopBarPresetDisplay(int presetNumber, String presetName) {
-        currentPresetNumber = presetNumber;
-        TextView display = getView() != null ? getView().findViewById(R.id.top_preset_display) : null;
-        if (display != null) {
-            android.text.SpannableStringBuilder sb = new android.text.SpannableStringBuilder();
-            if (presetNumber > 0) {
-                String num = String.valueOf(presetNumber) + "  ";
-                int start = sb.length();
-                sb.append(num);
-                sb.setSpan(new android.text.style.StyleSpan(android.graphics.Typeface.BOLD),
-                        start, start + num.length(), android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-                sb.setSpan(new android.text.style.ForegroundColorSpan(android.graphics.Color.parseColor("#FFAA00")),
-                        start, start + num.length(), android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-            }
-            if (presetName != null && !presetName.isEmpty()) {
-                String cleanName = presetName;
-                if (cleanName.matches("^\\d+\\s+.*")) {
-                    cleanName = cleanName.replaceFirst("^\\d+\\s+", "");
-                }
-                sb.append(cleanName);
-            }
-            display.setText(sb);
+        updateTopBarPresetDisplay(presetNumber, presetName, true);
+    }
+
+    private void updateTopBarPresetDisplay(int presetNumber, String presetName, boolean persist) {
+        if (presetNumber > 0) currentPresetNumber = presetNumber;
+        String label = presetName != null ? presetName : "";
+        if (label.matches("^\\d+\\s+.*")) {
+            label = label.replaceFirst("^\\d+\\s+", "");
         }
-        // Also push into patchName so syncTopBarPresetInfo() stays consistent
         if (mainActivity != null && mainActivity.patchName != null && presetName != null) {
             mainActivity.patchName.setText(presetName);
         }
+        if (mainActivity != null) {
+            mainActivity.syncTopBarPresetInfo(currentPresetNumber);
+        } else {
+            TextView display = getView() != null ? getView().findViewById(R.id.top_preset_display) : null;
+            if (display != null) {
+                display.setText(String.format(java.util.Locale.US, "%d  %s",
+                        currentPresetNumber, label.toUpperCase(java.util.Locale.US)));
+            }
+        }
+        if (persist) {
+            try {
+                android.content.SharedPreferences.Editor ed = mainActivity.getPreferences(0).edit();
+                ed.putString("topPresetName", label);
+                ed.putInt("topPresetNumber", currentPresetNumber);
+                ed.apply();
+            } catch (Exception e) {
+                Log.w(TAG, "persist top preset label failed", e);
+            }
+        }
+    }
+
+    private int getPresetCount() {
+        MainActivity ma = mainActivity;
+        if (ma == null || ma.quickPatch == null || ma.quickPatch.myPresetsAdapter == null) return 128;
+        return ma.quickPatch.myPresetsAdapter.allPresets.size();
+    }
+
+    @SuppressWarnings("unchecked")
+    private void selectPresetByIndex(int index) {
+        MainActivity ma = mainActivity;
+        if (ma == null || ma.quickPatch == null || ma.quickPatch.myPresetsAdapter == null) return;
+        ArrayList<Map> all = ma.quickPatch.myPresetsAdapter.allPresets;
+        if (index < 0 || index >= all.size()) return;
+        Object o = all.get(index);
+        if (!(o instanceof Map)) {
+            Log.w(TAG, "selectPresetByIndex: non-Map preset at " + index + ", skipping");
+            MainActivity.toast("Cannot load preset: bad format");
+            return;
+        }
+        Map preset = (Map) o;
+        String name = String.valueOf(preset.getOrDefault("name", "PRESET"));
+        updateTopBarPresetDisplay(currentPresetNumber, name);
+        try {
+            ma.loadPreset(preset);
+        } catch (Exception e) {
+            Log.w(TAG, "selectPresetByIndex load failed", e);
+        }
+    }
+
+    /** Prev/next preset navigation (lastworks behavior). Number is 1-based; index = number-1. */
+    private void onPresetNavPrev() {
+        int target = currentPresetNumber - 2;
+        int count = getPresetCount();
+        Log.d(TAG, "PRESET_NAV prev requested: current=" + currentPresetNumber + " target=" + target + " count=" + count);
+        if (target < 0) {
+            MainActivity.toast("Already at first preset");
+            return;
+        }
+        currentPresetNumber = target + 1;
+        selectPresetByIndex(target);
+    }
+
+    private void onPresetNavNext() {
+        int target = currentPresetNumber;
+        int count = getPresetCount();
+        Log.d(TAG, "PRESET_NAV next requested: current=" + currentPresetNumber + " target=" + target + " count=" + count);
+        if (target >= count) {
+            MainActivity.toast("Already at last preset");
+            return;
+        }
+        currentPresetNumber = target + 1;
+        selectPresetByIndex(target);
+    }
+
+    /** Floating preset picker (lastworks behavior): tap preset display to open. */
+    private void showPresetPicker() {
+        MainActivity ma = mainActivity;
+        if (ma == null || ma.quickPatch == null || ma.quickPatch.myPresetsAdapter == null) return;
+        java.util.List<Map> all = ma.quickPatch.myPresetsAdapter.allPresets;
+        if (all == null || all.isEmpty()) {
+            MainActivity.toast("No presets loaded");
+            return;
+        }
+        android.graphics.drawable.GradientDrawable containerBg = new android.graphics.drawable.GradientDrawable();
+        containerBg.setColor(android.graphics.Color.parseColor("#272B33"));
+        containerBg.setStroke(dp(1), android.graphics.Color.parseColor("#FFAA00"));
+        containerBg.setCornerRadius(dp(10));
+        android.graphics.drawable.GradientDrawable rowBg = new android.graphics.drawable.GradientDrawable();
+        rowBg.setColor(android.graphics.Color.parseColor("#14FFFFFF"));
+        rowBg.setStroke(dp(1), android.graphics.Color.parseColor("#FFAA00"));
+        rowBg.setCornerRadius(dp(10));
+        final androidx.appcompat.app.AlertDialog[] dialogRef = new androidx.appcompat.app.AlertDialog[1];
+        LinearLayout container = new LinearLayout(getContext());
+        container.setOrientation(LinearLayout.VERTICAL);
+        int pad = dp(12);
+        container.setPadding(pad, pad, pad, pad);
+        int current = Math.max(1, currentPresetNumber);
+        for (int i = 0; i < all.size(); i++) {
+            Map preset = all.get(i);
+            if (!(preset instanceof Map)) {
+                Log.w(TAG, "showPresetPicker: skipping non-Map preset at " + i);
+                continue;
+            }
+            String name = preset.get("name") != null ? preset.get("name").toString() : "Unnamed";
+            String origin = preset.get("origin") != null ? preset.get("origin").toString() : "";
+            LinearLayout row = new LinearLayout(getContext());
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            int rp = dp(10);
+            row.setPadding(rp, rp, rp, rp);
+            LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(
+                    android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+            rowLp.setMargins(0, 0, 0, dp(6));
+            row.setLayoutParams(rowLp);
+            boolean selected = (i + 1) == current;
+            row.setBackground(selected ? rowBg : containerBg);
+            TextView num = new TextView(getContext());
+            num.setText(String.format(java.util.Locale.US, "%d.", i + 1));
+            num.setTextColor(android.graphics.Color.parseColor("#FFAA00"));
+            num.setTypeface(android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.BOLD));
+            num.setTextSize(13f);
+            row.addView(num);
+            TextView label = new TextView(getContext());
+            label.setText(name);
+            label.setTextColor(android.graphics.Color.WHITE);
+            label.setTextSize(13f);
+            label.setSingleLine(true);
+            label.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            LinearLayout.LayoutParams labelLp = new LinearLayout.LayoutParams(0,
+                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+            labelLp.setMargins(dp(10), 0, dp(6), 0);
+            label.setLayoutParams(labelLp);
+            row.addView(label);
+            if (!origin.isEmpty()) {
+                TextView tag = new TextView(getContext());
+                tag.setText("FACTORY".equals(origin.toUpperCase(java.util.Locale.US)) ? "FACTORY" : "MY");
+                tag.setTextColor("FACTORY".equals(origin.toUpperCase(java.util.Locale.US))
+                        ? android.graphics.Color.parseColor("#52B788")
+                        : android.graphics.Color.parseColor("#8F94A0"));
+                tag.setTextSize(10f);
+                row.addView(tag);
+            }
+            final int index = i;
+            row.setOnClickListener(v -> {
+                currentPresetNumber = index + 1;
+                selectPresetByIndex(index);
+                if (dialogRef[0] != null) dialogRef[0].dismiss();
+            });
+            container.addView(row);
+        }
+        android.widget.ScrollView scroll = new android.widget.ScrollView(getContext());
+        scroll.addView(container);
+        androidx.appcompat.app.AlertDialog.Builder builder = MainActivity.dialogBuilder(getContext());
+        builder.setTitle("Select Preset");
+        builder.setView(scroll);
+        builder.setNegativeButton("Cancel", null);
+        dialogRef[0] = builder.create();
+        dialogRef[0].show();
     }
 
     private int dp(float value) {
@@ -1903,12 +2066,39 @@ public class Rack extends Fragment {
                 MainActivity.toast("Name of preset is required.");
                 return;
             }
+            String desc = descInput.getText().toString().trim();
             LocalPresetManager lpm = new LocalPresetManager(getContext());
-            LocalPresetManager.Preset p = buildPresetFromChain(name, descInput.getText().toString().trim());
+            LocalPresetManager.Preset p = buildPresetFromChain(name, desc);
+            // Dedup by name (lastworks behavior): keep the first id + earliest
+            // createdAt, delete any other presets with the same name.
+            String firstId = null;
+            long firstAt = 0;
+            try {
+                for (LocalPresetManager.Preset existing : lpm.loadAllPresets()) {
+                    if (existing.name == null || !existing.name.equals(name)) continue;
+                    if (firstId == null) {
+                        firstId = existing.id;
+                        firstAt = existing.createdAt;
+                    } else if (existing.id != null && !existing.id.equals(firstId)) {
+                        lpm.deletePreset(existing.id);
+                    }
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "save preset dedup failed", e);
+            }
+            if (firstId != null) {
+                p.id = firstId;
+                if (firstAt != 0) p.createdAt = firstAt;
+            }
             boolean ok = lpm.savePreset(p);
             if (ok) {
-                if (mainActivity.patchName != null) mainActivity.patchName.setText(name);
-            updateTopBarPresetDisplay(currentPresetNumber, name);
+                if (mainActivity != null) {
+                    mainActivity.refreshPresetLists();
+                    int idx = mainActivity.findQuickPresetIndexById(p.id);
+                    if (idx >= 0) currentPresetNumber = idx + 1;
+                    if (mainActivity.patchName != null) mainActivity.patchName.setText(name);
+                }
+                updateTopBarPresetDisplay(currentPresetNumber, name);
                 // Space saver: also snapshot the current chain into the selected scene slot
                 saveCurrentChainToScene();
                 MainActivity.toast("Preset saved.");

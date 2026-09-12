@@ -10,19 +10,19 @@
         android:layout_width="0dp"
         android:layout_height="1.5dp"
         android:layout_weight="1"
-        android:background="#4F535B" />
+        android:background="@color/gg_glass_border" />
 
     <TextView
         android:id="@+id/cable_routing_label"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="►"
-        android:textColor="#8F94A0"
+        android:textColor="@color/gg_glass_text_secondary"
         android:textSize="12sp" />
 
     <View
         android:layout_width="0dp"
         android:layout_height="1.5dp"
         android:layout_weight="1"
-        android:background="#4F535B" />
+        android:background="@color/gg_glass_border" />
 </LinearLayout>

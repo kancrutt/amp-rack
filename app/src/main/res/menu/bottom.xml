@@ -23,7 +23,7 @@
         android:id="@+id/page_drums"
         android:enabled="true"
         android:icon="@drawable/ic_nav_drum"
-        android:title="Loops &amp; Drum"/>
+        android:title="Loops"/>
     <item
         android:visible="true"
         android:id="@+id/page_settings"

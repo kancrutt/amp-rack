@@ -1,6 +1,6 @@
 package com.kancrutt.gigginggear;
 
-import android.app.AlertDialog;
+import androidx.appcompat.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -80,7 +80,11 @@ public class Presets extends Fragment {
             loginNotice.setVisibility(View.GONE);
         }
         if (tabLayout != null) {
-            tabLayout.setVisibility(View.VISIBLE);
+            if (mainActivity.tabletMode) {
+                tabLayout.setVisibility(View.GONE);
+            } else {
+                tabLayout.setVisibility(View.VISIBLE);
+            }
         }
 
         viewPager.setSaveEnabled(false);
@@ -88,7 +92,11 @@ public class Presets extends Fragment {
         if (! mainActivity.tabletMode)
             fragmentStateAdapter.createFragment(1);
         else {
-            fragmentStateAdapter.libraryPresets = new MyPresets(true);
+            // Tablet split view: LEFT = Factory/Library presets (read-only reference),
+            // RIGHT (viewPager pos 0) = My Presets (local). Using factory=true stops the
+            // left panel from re-loading the same local list (the "double list" bug) and
+            // keeps save/delete/organize operating on a single source of truth.
+            fragmentStateAdapter.libraryPresets = new MyPresets(true, false, true);
             fragmentStateAdapter.libraryPresets.mainActivity = mainActivity ;
             fragmentStateAdapter.libraryPresets.progressBar = progressPreset;
 
@@ -110,6 +118,9 @@ public class Presets extends Fragment {
             ViewGroup.LayoutParams lp = new ViewGroup.LayoutParams(mainActivity.deviceWidth/2, ViewGroup.LayoutParams.WRAP_CONTENT);
 
             LinearLayout libLayout = view.findViewById(R.id.presets_library_layout);
+            // onViewCreated can run again (rotation, tab revisit): clear first so the
+            // factory panel is never appended a second time (double-list recurrence).
+            libLayout.removeAllViews();
             libLayout.addView(ll);
         }
 
@@ -142,7 +153,7 @@ public class Presets extends Fragment {
                 Map preset ;
                 preset = mainActivity.presetToMap();
 
-                AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
+                AlertDialog.Builder builder = MainActivity.dialogBuilder(getActivity());
                 LayoutInflater inflater = requireActivity().getLayoutInflater();
                 LinearLayout linearLayout = (LinearLayout) inflater.inflate(R.layout.save_preset_dialog, null);
                 builder.setView(linearLayout).setCancelable(false);
@@ -164,17 +175,36 @@ public class Presets extends Fragment {
                         }
 
                         progressBar.setVisibility(View.VISIBLE);
-                        LocalPresetManager.Preset p = new LocalPresetManager.Preset();
-                        p.name = name.getText().toString();
-                        p.description = desc.getText().toString();
+                        // Snapshot the LIVE rig (engine + canvas), not an empty shell.
+                        LocalPresetManager.Preset p = mainActivity.buildPresetFromChain(
+                                name.getText().toString(), desc.getText().toString());
+                        // Overwrite-by-name so re-saving keeps one file per name.
+                        try {
+                            String keepId = null;
+                            long keepCreated = 0;
+                            for (LocalPresetManager.Preset existing : localPresetManager.loadAllPresets()) {
+                                if (existing.name != null && existing.name.equals(p.name)) {
+                                    if (keepId == null) {
+                                        keepId = existing.id;
+                                        keepCreated = existing.createdAt;
+                                    } else if (existing.id != null && !existing.id.equals(keepId)) {
+                                        try { localPresetManager.deletePreset(existing.id); } catch (Exception ignore) {}
+                                    }
+                                }
+                            }
+                            if (keepId != null) {
+                                p.id = keepId;
+                                if (keepCreated != 0) p.createdAt = keepCreated;
+                            }
+                        } catch (Exception e) {
+                            Log.d(TAG, "save preset dedup failed", e);
+                        }
                         localPresetManager.savePreset(p);
 
                         mainActivity.patchName.setText(name.getText());
                         mainActivity.patchDesc.setText(desc.getText());
                         dialog.dismiss();
-                        if (fragmentStateAdapter.getMyPresets() != null) {
-                            fragmentStateAdapter.getMyPresets().load();
-                        }
+                        mainActivity.refreshPresetLists();
                     }
                 });
 
@@ -192,7 +222,6 @@ public class Presets extends Fragment {
         });
 
         if (mainActivity.useTheme) {
-            mainActivity.skinEngine.fab(presetFab, SkinEngine.Resize.Width,1);
         }
     }
 
@@ -200,6 +229,7 @@ public class Presets extends Fragment {
         public ArrayList<Fragment> arrayList = new ArrayList<>();
         public MyPresets libraryPresets ;
         public MyPresets myPresets;
+        private Presets presetsFragment;
 
         public MyPresets getMyPresets() {
             return myPresets;
@@ -207,6 +237,7 @@ public class Presets extends Fragment {
 
         public PresetAdapter(@NonNull Presets fragmentActivity) {
             super(fragmentActivity);
+            this.presetsFragment = fragmentActivity;
         }
 
         @NonNull
@@ -229,6 +260,9 @@ public class Presets extends Fragment {
 
         @Override
         public int getItemCount() {
+            if (presetsFragment != null && presetsFragment.mainActivity != null && presetsFragment.mainActivity.tabletMode) {
+                return 1;
+            }
             return 2;
         }
 

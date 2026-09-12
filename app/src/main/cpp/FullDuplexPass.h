@@ -20,6 +20,7 @@
 #include <dlfcn.h>
 #include <vector>
 #include <algorithm>
+#include <mutex>
 #include "ladspa.h"
 #include "FullDuplexStream.h"
 #include "FileWriter.h"
@@ -52,6 +53,10 @@ public:
 
     void * handle [MAX_PLUGINS] ;
     LADSPA_Data run_adding_gain [MAX_PLUGINS] ;
+    // Guards every chain-state mutation (handles, ports, DAG plan/scratch).
+    // UI thread: lock()/unlock (may wait a burst). Audio thread: try_lock
+    // only (never blocks; passes dry on contention).
+    std::mutex chainMutex ;
     const LADSPA_Descriptor * descriptor [MAX_PLUGINS] ;
     int inputPorts [MAX_PLUGINS] ;
     int inputPorts2 [MAX_PLUGINS] ;
@@ -119,7 +124,7 @@ public:
                     if (outputPorts2 [i] != -1)
                         connect_port [i] (handle [i], outputPorts2 [i], (LADSPA_Data *) b);
                     if (run [i] == NULL)
-                        LOGF ("run %d is null", i);
+                        LOGE ("run %d is null, skipping node", i);
                     else
                         run [i] (handle [i], samplesToProcess);
                     break;
@@ -147,53 +152,68 @@ public:
         const float *inputFloats = static_cast<const float *>(inputData);
         float *outputFloats = static_cast<float *>(outputData);
 
-        // It also assumes the channel count for each stream is the same.
-        int32_t samplesPerFrame = outputStream->getChannelCount();
-        int32_t numInputSamples = numInputFrames * samplesPerFrame;
-        int32_t numOutputSamples = numOutputFrames * samplesPerFrame;
+        // Input and output channel counts may differ (mono guitar in, stereo
+        // monitoring out). The DSP core always runs mono so every plugin
+        // sounds exactly as in the mono build; the result is fanned out to
+        // all output channels afterwards.
+        int32_t inCh = inputStream->getChannelCount();
+        int32_t outCh = outputStream->getChannelCount();
+        if (inCh <= 0) inCh = 1;
+        if (outCh <= 0) outCh = 1;
+        int32_t numInputSamples = numInputFrames * inCh;
+        int32_t numOutputSamples = numOutputFrames * outCh;
+        (void) numInputSamples;
 
-        // It is possible that there may be fewer input than output samples.
-        int32_t samplesToProcess = std::min(numInputSamples, numOutputSamples);
-
-//        float inSamples [samplesToProcess];
-        for (int i = 0 ; i < samplesToProcess ; i ++) {
-            raw [i] = inSamples [i] = inputFloats [i] * inputVolume ;
+//        float inSamples [monoFrames];
+        // It is possible that there may be fewer input than output frames.
+        int32_t monoFrames = std::min(numInputFrames, numOutputFrames);
+        for (int32_t f = 0 ; f < monoFrames ; f ++) {
+            float s = 0.0f;
+            for (int32_t c = 0 ; c < inCh ; c++) s += inputFloats [f * inCh + c];
+            raw [f] = inSamples [f] = (s / (float) inCh) * inputVolume ;
         }
 
 if (meterEnabled) {
-            Meter::process (samplesToProcess, inSamples, true);
+            Meter::process (monoFrames, inSamples, true);
         }
         // this
         // am I devloper yet?
-//        memcpy(outputData, inputData, samplesToProcess);
-        if (! bypass)
-            process(inSamples, numInputSamples);
+//        memcpy(outputData, inputData, monoFrames);
+        // The UI thread rebuilds the chain (handles, DAG plan) on preset nav
+        // while this callback runs. try_lock keeps the audio thread
+        // wait-free: if a rebuild is in flight we pass dry for this burst
+        // instead of reading torn state (SIGSEGV inside plugin run()).
+        if (!bypass && chainMutex.try_lock()) {
+            process(inSamples, monoFrames);
+            chainMutex.unlock();
+        }
 
         /* this is not supposed to be called directly.
          * hence the entire vringbuffer stuff
          */
 
         if (pushToLockFreeBeforeOutputVolume && ! pause)
-            lockFreeQueueManager->process(raw, inSamples, samplesToProcess) ;
+            lockFreeQueueManager->process(raw, inSamples, monoFrames) ;
 
-        for (int32_t i = 0; i < samplesToProcess; i++) {
-            inSamples [i] = inSamples [i]  * outputVolume; // do some arbitrary processing
-            *outputFloats++ = inSamples [i];
+        for (int32_t f = 0; f < monoFrames; f++) {
+            float v = inSamples [f] * outputVolume; // do some arbitrary processing
+            inSamples [f] = v;
+            for (int32_t c = 0; c < outCh; c++) *outputFloats++ = v;
         }
 
 if (meterEnabled) {
-            Meter::process (samplesToProcess, inSamples, false);
+            Meter::process (monoFrames, inSamples, false);
         }
 
         if (! pushToLockFreeBeforeOutputVolume && ! pause)
-            lockFreeQueueManager->process(raw, inSamples, samplesToProcess) ;
+            lockFreeQueueManager->process(raw, inSamples, monoFrames) ;
 
-        //        for (int32_t i = 0; i < samplesToProcess; i++) {
-//            *outputFloats++ = *inputFloats++  * outputVolume; // do some arbitrary processing
-//        }
+        //        for (int32_t i = 0; i < monoFrames; i++) {
+        //            *outputFloats++ = *inputFloats++  * outputVolume; // do some arbitrary processing
+        //        }
 
-        // If there are fewer input samples then clear the rest of the buffer.
-        int32_t samplesLeft = numOutputSamples - numInputSamples;
+        // If there are fewer input frames then clear the rest of the buffer.
+        int32_t samplesLeft = numOutputSamples - monoFrames * outCh;
         for (int32_t i = 0; i < samplesLeft; i++) {
             *outputFloats++ = 0.0; // silence
         }

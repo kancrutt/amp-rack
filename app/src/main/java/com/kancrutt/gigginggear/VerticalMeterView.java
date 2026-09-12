@@ -72,14 +72,17 @@ public class VerticalMeterView extends View {
         float segH = (h - segGap * (SEGMENTS - 1)) / SEGMENTS;
         RectF seg = new RectF(barLeft, 0, barRight, 0);
 
+        // idx 0 = top row, idx SEGMENTS-1 = bottom row. Meters rise from the
+        // bottom: the `lit` lowest rows light up, red at the top.
         int lit = (int) Math.ceil(level * SEGMENTS);
         for (int i = 0; i < SEGMENTS; i++) {
             int idx = SEGMENTS - 1 - i;
             float top = idx * (segH + segGap);
             seg.top = top;
             seg.bottom = top + segH;
-            if (idx < lit) {
-                fillPaint.setColor(segmentColor(idx));
+            int height = SEGMENTS - 1 - idx; // 0 = bottom row
+            if (height < lit) {
+                fillPaint.setColor(segmentColor(height));
                 canvas.drawRect(seg, fillPaint);
             } else {
                 canvas.drawRect(seg, trackPaint);
@@ -87,9 +90,9 @@ public class VerticalMeterView extends View {
         }
     }
 
-    private int segmentColor(int idx) {
-        if (idx >= 11) return Color.parseColor("#FF5252");
-        if (idx >= 9) return Color.parseColor("#FFAA00");
+    private int segmentColor(int heightFromBottom) {
+        if (heightFromBottom >= 11) return Color.parseColor("#FF5252");
+        if (heightFromBottom >= 9) return Color.parseColor("#FFAA00");
         return Color.parseColor("#00E676");
     }
 }

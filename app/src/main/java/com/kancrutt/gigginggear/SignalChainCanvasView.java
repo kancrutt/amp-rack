@@ -7,7 +7,6 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.RectF;
-import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.text.TextPaint;
 import android.text.TextUtils;
@@ -22,14 +21,12 @@ import androidx.core.content.ContextCompat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 public class SignalChainCanvasView extends View {
 
-    public enum NodeType { PLUGIN, INPUT, OUTPUT, MERGE }
+    public enum NodeType { PLUGIN, INPUT, OUTPUT, SPLIT, MERGE }
 
     public static class Node {
         public int id;
@@ -42,8 +39,11 @@ public class SignalChainCanvasView extends View {
         public boolean selected;
         public int categoryColor;
         public int categoryIconRes;
+        public String categoryCode;
         public NodeType nodeType = NodeType.PLUGIN;
         public boolean bypassed;
+        /** 0 = main trunk, 1 = upper parallel branch, 2 = lower parallel branch. */
+        public int branch = 0;
 
         public Node(int id, int pluginId, String name, float x, float y) {
             this.id = id;
@@ -54,7 +54,13 @@ public class SignalChainCanvasView extends View {
         }
 
         public boolean isAnchor() {
-            return nodeType == NodeType.INPUT || nodeType == NodeType.OUTPUT || nodeType == NodeType.MERGE;
+            // Only INPUT/OUTPUT are invisible, non-interactive engine anchors.
+            // SPLIT/MERGE are real routing plugin blocks: visible, selectable, deletable.
+            return nodeType == NodeType.INPUT || nodeType == NodeType.OUTPUT;
+        }
+
+        public boolean isRouting() {
+            return nodeType == NodeType.SPLIT || nodeType == NodeType.MERGE;
         }
 
         public boolean contains(float tx, float ty) {
@@ -113,11 +119,6 @@ public class SignalChainCanvasView extends View {
     private final List<Edge> edges = new ArrayList<>();
     private final Map<Integer, Node> nodeMap = new HashMap<>();
     private final Map<String, Bitmap> iconCacheWithSize = new HashMap<>();
-    // TONE3000 badges (restored from lastworks build 2026-09-11 22:50).
-    private final Map<Integer, Integer> slotToPluginId = new HashMap<>();
-    private final Set<Integer> t3kNodeIds = new HashSet<>();
-    private String lastLoadedFp = null;
-    private long lastLoadMs = 0;
     private final Paint paintNodeBody   = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint paintNodeBorder = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint paintNodeSelected = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -144,6 +145,9 @@ public class SignalChainCanvasView extends View {
     private int lastTapNodeId = -1;
     private Map<String, float[]> pendingCustomPos = null;
     private static final float DRAG_THRESHOLD = 8f;
+    // Single-flight guard: coalesce redundant rebuilds within 800ms
+    private long lastLoadMs = 0;
+    private String lastLoadedFp = "";
 
     private boolean draggingPort = false;
     private boolean draggingOutput = false;
@@ -151,20 +155,55 @@ public class SignalChainCanvasView extends View {
     private float dragCurrentX, dragCurrentY;
 
     private Node outputAnchor = null;
+    private Node inputAnchor = null;
 
-    private static final int NODE_BG     = Color.parseColor("#1E1E22");
-    private static final int NODE_BORDER = Color.parseColor("#3A3D45");
-    private static final int NODE_SEL    = Color.parseColor("#FFAA00");
-    private static final int HEADER_BG  = Color.parseColor("#2A2D34");
-    private static final int TEXT_COLOR  = Color.parseColor("#E0E0E0");
-    private static final int WIRE_COLOR  = Color.parseColor("#4A4D55");
-    private static final int DOT_COLOR   = Color.parseColor("#FFAA00");
+    // TONE3000 compact T3K mark — per spec §16/25: compact T3K in signal-chain block
+    // Badge set is keyed by stable pluginId (AudioEngine.getActivePluginID), not by
+    // volatile node id (slot index). This survives slot shifts from delete/move.
+    private final java.util.Set<Integer> t3kNodeIds = new java.util.HashSet<>();
+    // Current slot -> pluginId mapping (rebuilt on each loadFromActivePlugins).
+    private final java.util.Map<Integer, Integer> slotToPluginId = new java.util.HashMap<>();
+    public void setT3kBadge(int id, boolean isT3k) {
+        // Resolve id to stable pluginId if it's a current slot index.
+        int pluginId = slotToPluginId.containsKey(id) ? slotToPluginId.get(id) : id;
+        if (isT3k) t3kNodeIds.add(pluginId); else t3kNodeIds.remove(pluginId);
+        invalidate();
+    }
+    public void clearT3kBadges() { t3kNodeIds.clear(); invalidate(); }
+    public boolean isT3kNode(int id) {
+        int pluginId = slotToPluginId.containsKey(id) ? slotToPluginId.get(id) : id;
+        return t3kNodeIds.contains(pluginId);
+    }
+
+    /** Re-apply T3K badges from a slot-keyed metadata map (e.g. t3kBlockMeta).
+     *  Clears current badges first, then badges every slot present in the map by
+     *  resolving slot -> pluginId via the current slotToPluginId map. Call only
+     *  AFTER slotToPluginId has been rebuilt (e.g. right after loadFromActivePlugins). */
+    public void reapplyT3kBadgesFromMeta(java.util.Map<Integer, ?> metaBySlot) {
+        t3kNodeIds.clear();
+        if (metaBySlot == null) { invalidate(); return; }
+        for (Integer slot : metaBySlot.keySet()) {
+            Integer pid = slotToPluginId.get(slot);
+            if (pid != null) t3kNodeIds.add(pid);
+        }
+        invalidate();
+    }
+
+    private static final int NODE_BG     = Color.parseColor("#1F2228");
+    private static final int NODE_BORDER = Color.parseColor("#2E323B");
+    private static final int NODE_SEL    = Color.parseColor("#FF8A00");
+    private static final int HEADER_BG  = Color.parseColor("#17191E");
+    private static final int TEXT_COLOR  = Color.parseColor("#E6E6E6");
+    private static final int WIRE_COLOR  = Color.parseColor("#52525B");
+    private static final int DOT_COLOR   = Color.parseColor("#FF8A00");
     private static final int PORT_RADIUS = 40;
 
     // Anchor colors
-    private static final int COLOR_INPUT  = Color.parseColor("#00E676");
-    private static final int COLOR_OUTPUT = Color.parseColor("#FF5252");
-    private static final int COLOR_MERGE  = Color.parseColor("#FFAA00");
+    private static final int COLOR_INPUT  = Color.parseColor("#22C55E");
+    private static final int COLOR_OUTPUT = Color.parseColor("#EF4444");
+    private static final int COLOR_MERGE  = Color.parseColor("#FF8A00");
+    private static final int COLOR_ROUTING = Color.parseColor("#A1A1AA");
+    private static final int COLOR_SPLIT  = COLOR_ROUTING;
 
     public SignalChainCanvasView(Context ctx) { super(ctx); init(); }
     public SignalChainCanvasView(Context ctx, AttributeSet attrs) { super(ctx, attrs); init(); }
@@ -217,6 +256,13 @@ public class SignalChainCanvasView extends View {
         return CategoryHelper.getCode(pluginName);
     }
 
+    public void selectNode(int id) {
+        for (Node n : nodes) {
+            n.selected = (n.id == id);
+        }
+        invalidate();
+    }
+
     public void setOnNodeSelectedListener(OnNodeSelectedListener l) { this.listener = l; }
     public void setOnChainChangedListener(OnChainChangedListener l) { this.chainChangedListener = l; }
     public void setOnDeleteNodeListener(OnDeleteNodeListener l) { this.deleteNodeListener = l; }
@@ -233,10 +279,14 @@ public class SignalChainCanvasView extends View {
 
     private Bitmap getCategoryIcon(String pluginName) {
         int resId = getCategoryIconRes(pluginName);
+        return getCategoryIconFromRes(resId, getCategoryColor(pluginName), pluginName);
+    }
+
+    private Bitmap getCategoryIconFromRes(int resId, int tint, String cacheName) {
         // Rasterize at the EXACT on-screen pixel size (density-scaled). The old
         // fixed 44x44px bitmap was upscaled ~2.5-3x on modern phones -> blur.
         int iconPx = Math.round(36f * getResources().getDisplayMetrics().density);
-        String cacheKey = resId + "@" + iconPx;
+        String cacheKey = cacheName + "@" + resId + "@" + iconPx + "@" + tint;
         Bitmap bmp = iconCacheWithSize.get(cacheKey);
         if (bmp == null) {
             try {
@@ -245,7 +295,6 @@ public class SignalChainCanvasView extends View {
                     bmp = Bitmap.createBitmap(iconPx, iconPx, Bitmap.Config.ARGB_8888);
                     Canvas c = new Canvas(bmp);
                     d.setBounds(0, 0, iconPx, iconPx);
-                    int tint = getCategoryColor(pluginName);
                     if (tint != 0) {
                         d.mutate().setColorFilter(tint, android.graphics.PorterDuff.Mode.SRC_IN);
                     }
@@ -253,7 +302,7 @@ public class SignalChainCanvasView extends View {
                     iconCacheWithSize.put(cacheKey, bmp);
                 }
             } catch (Exception e) {
-                Log.w("SignalChainCanvas", "icon render fail for " + pluginName, e);
+                Log.w("SignalChainCanvas", "icon render fail for " + cacheName, e);
             }
         }
         return bmp;
@@ -262,86 +311,34 @@ public class SignalChainCanvasView extends View {
     public void loadFromActivePlugins() {
         loadFromActivePlugins(false);
     }
-
-    /** TONE3000 node badges (restored from lastworks build 2026-09-11 22:50). */
-    public void clearT3kBadges() {
-        t3kNodeIds.clear();
-        invalidate();
-    }
-
-    public boolean isT3kNode(int id) {
-        int pluginId;
-        if (slotToPluginId.containsKey(id)) {
-            pluginId = slotToPluginId.get(id);
-        } else {
-            pluginId = id;
-        }
-        return t3kNodeIds.contains(pluginId);
-    }
-
-    public void setT3kBadge(int id, boolean isT3k) {
-        int pluginId;
-        if (slotToPluginId.containsKey(id)) {
-            pluginId = slotToPluginId.get(id);
-        } else {
-            pluginId = id;
-        }
-        if (isT3k) {
-            t3kNodeIds.add(pluginId);
-        } else {
-            t3kNodeIds.remove(pluginId);
-        }
-        invalidate();
-    }
-
-    public void reapplyT3kBadgesFromMeta(Map<Integer, ?> metaBySlot) {
-        t3kNodeIds.clear();
-        if (metaBySlot == null) {
-            invalidate();
-            return;
-        }
-        for (Integer slot : metaBySlot.keySet()) {
-            Integer pid = slotToPluginId.get(slot);
-            if (pid != null) t3kNodeIds.add(pid);
-        }
-        invalidate();
-    }
-
-    /**
-     * Reload canvas nodes from the engine. When force is false, identical
-     * reloads within 800 ms are skipped (debounce, matches lastworks).
-     */
     public void loadFromActivePlugins(boolean force) {
+        StringBuilder sbBefore = new StringBuilder();
+        for (Node n : nodes) {
+            sbBefore.append(n.id).append("/").append(n.name).append("/").append(n.x).append("/").append(n.y).append(";");
+        }
+        // Single-flight: skip duplicate rebuild for identical engine state within 800ms
         try {
             StringBuilder fp = new StringBuilder();
             int c = 0;
-            try {
-                c = AudioEngine.getActivePlugins();
-            } catch (Exception ignored) {}
-            fp.append(c);
+            try { c = AudioEngine.getActivePlugins(); } catch (Exception ignored) {}
+            fp.append(c).append("|");
             for (int i = 0; i < c; i++) {
-                try {
-                    fp.append(i).append(AudioEngine.getActivePluginName(i)).append(";");
-                } catch (Exception ignored) {
-                    fp.append(i).append(":?;");
-                }
+                try { fp.append(AudioEngine.getActivePluginID(i)).append(":").append(AudioEngine.getActivePluginName(i)).append(";"); }
+                catch (Exception ignored) { fp.append(i).append(":?;"); }
             }
+            // Pending restore must not be skipped — it carries new position state
             boolean hasPending = pendingCustomPos != null && !pendingCustomPos.isEmpty();
             String curFp = fp.toString() + "|pending=" + hasPending;
-            long now = SystemClock.uptimeMillis();
-            if (!force && !hasPending && curFp.equals(lastLoadedFp) && now - lastLoadMs < 800) {
+            long now = android.os.SystemClock.uptimeMillis();
+            if (!force && !hasPending && curFp.equals(lastLoadedFp) && (now - lastLoadMs) < 800) {
                 return;
             }
             lastLoadedFp = curFp;
             lastLoadMs = now;
         } catch (Exception ignored) {}
-        loadFromActivePluginsInner();
-    }
-
-    private void loadFromActivePluginsInner() {
         // Save old nodes to preserve X/Y and selection
         Map<Integer, Node> oldNodes = new HashMap<>(nodeMap);
-
+        
         nodes.clear();
         nodeMap.clear();
         iconCacheWithSize.clear();
@@ -356,6 +353,13 @@ public class SignalChainCanvasView extends View {
             count = AudioEngine.getActivePlugins();
         } catch (Exception e) {
             Log.e("SignalChainCanvas", "AudioEngine not ready", e);
+        }
+        StringBuilder sbPlugins = new StringBuilder();
+        for (int i = 0; i < count; i++) {
+            try {
+                String name = AudioEngine.getActivePluginName(i);
+                sbPlugins.append(i).append("/").append(name).append(";");
+            } catch (Exception ignored) {}
         }
 
         int totalBlocks = 2 + count; // INPUT + count plugins + OUTPUT
@@ -387,74 +391,110 @@ public class SignalChainCanvasView extends View {
         float xCursor = 8 * density;
         float yCenter = getHeight() > 0 ? getHeight() / 2f : 48f * density;
 
-        // 1) INPUT anchor (always first, non-deletable)
-        float inputX = xCursor;
-        float inputY = yCenter - nodeH / 2f;
-        Node inputNode = new Node(-100, -1, "INPUT", inputX, inputY);
+        // 1) INPUT anchor: smaller visual marker, fixed to far left
+        float anchorDim = 24 * density;
+        Node inputNode = new Node(-100, -1, "IN", 4 * density, yCenter - anchorDim / 2f);
         inputNode.nodeType = NodeType.INPUT;
         inputNode.categoryColor = COLOR_INPUT;
-        inputNode.width = nodeW;
-        inputNode.height = nodeH;
-        // Preserve INPUT anchor position if it existed before
-        if (oldNodes.containsKey(inputNode.id)) {
-            inputNode.x = oldNodes.get(inputNode.id).x;
-            inputNode.y = oldNodes.get(inputNode.id).y;
-        }
+        inputNode.width = anchorDim;
+        inputNode.height = anchorDim;
+        inputAnchor = inputNode;
         nodes.add(inputNode);
         nodeMap.put(inputNode.id, inputNode);
         xCursor = inputNode.x + inputNode.width + spacing;
 
         // 2) Plugin blocks from AudioEngine
 
+        // Find rightmost position among existing blocks to place new blocks cleanly next to the last one
+        float rightmostX = inputNode.x + inputNode.width;
+        float lastBlockY = yCenter - nodeH / 2f;
+        for (Map.Entry<Integer, Node> entry : oldNodes.entrySet()) {
+            if (entry.getKey() >= 0) { // skip input/output anchors
+                Node old = entry.getValue();
+                float right = old.x + old.width;
+                if (right > rightmostX) {
+                    rightmostX = right;
+                    lastBlockY = old.y;
+                }
+            }
+        }
+
         for (int i = 0; i < count; i++) {
             String name = null;
             try { name = AudioEngine.getActivePluginName(i); } catch (Exception e) { Log.w("SignalChainCanvas", "name fail i=" + i, e); }
             if (name == null) name = "Plugin " + i;
+            String displayName = PluginNaming.displayName(name);
 
             float cx = xCursor;
             float cy = yCenter - nodeH / 2f;
             xCursor += nodeW + spacing;
 
-            Node n = new Node(i, AudioEngine.getActivePluginID(i), name, cx, cy);
+            Node n = new Node(i, AudioEngine.getActivePluginID(i), displayName, cx, cy);
+            slotToPluginId.put(i, n.pluginId);
             n.categoryColor = getCategoryColor(name);
             n.categoryIconRes = getCategoryIconRes(name);
+            n.categoryCode = getCategoryCode(name);
             n.width = nodeW;
             n.height = nodeH;
+
+            // SPLIT / MERGE are structured routing blocks (listed in the Add-Block menu).
+            String nlow = name.toLowerCase();
+            if (nlow.contains("split")) {
+                n.nodeType = NodeType.SPLIT;
+                n.categoryColor = COLOR_SPLIT;
+                n.categoryIconRes = R.drawable.ic_routing_split;
+            } else if (nlow.contains("merge")) {
+                n.nodeType = NodeType.MERGE;
+                n.categoryColor = COLOR_MERGE;
+                n.categoryIconRes = R.drawable.ic_routing_merge;
+            }
             
-            // Preserve selection AND position from previous layout
+            // Preserve selection AND position from previous layout, or place new block right after the last block.
+            // Bypass LEDs always re-read the engine: preset restores toggle
+            // natively, so a stale preserved flag would draw the wrong state.
             if (oldNodes.containsKey(i)) {
                 n.selected = oldNodes.get(i).selected;
                 n.x = oldNodes.get(i).x;
                 n.y = oldNodes.get(i).y;
                 n.bypassed = oldNodes.get(i).bypassed;
+            } else if (!oldNodes.isEmpty()) {
+                // Auto-place new effect block in empty canvas space immediately to the right of the last block
+                n.x = rightmostX + spacing;
+                n.y = lastBlockY;
+                rightmostX = n.x + n.width;
             }
-            
+            // Bypass LEDs always re-read the engine: preset restores toggle
+            // natively, so a stale preserved/default flag would draw the
+            // wrong state (e.g. bypassed block shown lit after cold start).
+            try { n.bypassed = !AudioEngine.getActivePluginEnabled(i); } catch (Exception ignore) {}
+
             nodes.add(n);
             nodeMap.put(n.id, n);
-            slotToPluginId.put(i, n.pluginId);
         }
 
-        // 3) OUTPUT anchor
-        float outX = xCursor;
-        float outY = yCenter - nodeH / 2f;
-        Node outputNode = new Node(-200, -1, "OUTPUT", outX, outY);
+        // 3) OUTPUT anchor: preserve custom position like plugin blocks,
+        // otherwise every reload resets OUT 1744 -> 1630 (see log 19:57:05)
+        float outX = viewW - anchorDim - 48 * density;
+        float outY = yCenter - anchorDim / 2f;
+        if (oldNodes.containsKey(-200)) {
+            outX = oldNodes.get(-200).x;
+            outY = oldNodes.get(-200).y;
+        }
+        Node outputNode = new Node(-200, -1, "OUT", outX, outY);
         outputNode.nodeType = NodeType.OUTPUT;
         outputNode.categoryColor = COLOR_OUTPUT;
-        outputNode.width = nodeW;
-        outputNode.height = nodeH;
-        // Preserve OUTPUT anchor position if it existed before
-        if (oldNodes.containsKey(outputNode.id)) {
-            outputNode.x = oldNodes.get(outputNode.id).x;
-            outputNode.y = oldNodes.get(outputNode.id).y;
-        }
+        outputNode.width = anchorDim;
+        outputNode.height = anchorDim;
         nodes.add(outputNode);
         nodeMap.put(outputNode.id, outputNode);
         outputAnchor = outputNode;
 
         // Safety clamp: all nodes inside canvas bounds (fixes dangling off-canvas lines)
+        float strictFabR = 105 * density; // Generous margin so it never overlaps the FAB
         if (getWidth() > 0 && getHeight() > 0) {
             for (Node n : nodes) {
-                n.x = Math.max(0, Math.min(n.x, getWidth() - n.width - fabReserved));
+                if (n.nodeType == NodeType.INPUT) continue; // Keep INPUT exactly at left edge
+                n.x = Math.max(inputNode.x + inputNode.width + spacing, Math.min(n.x, getWidth() - n.width - strictFabR));
                 n.y = Math.max(0, Math.min(n.y, getHeight() - n.height));
             }
         }
@@ -469,15 +509,26 @@ public class SignalChainCanvasView extends View {
         edges.clear();
         edges.addAll(validEdges);
 
-        // If NO edges exist, auto-wire them in series
+        // ALWAYS re-attach IN/OUT anchor edges after edge cleanup — deleting a
+        // block can leave surviving blocks disconnected from the chain (e.g.
+        // the tail block loses its →OUT edge after a neighbor is removed).
+        // attachAnchorEdges is idempotent (checks hasIncoming/hasOutgoing first),
+        // so calling it even when edges exist only patches missing connections,
+        // never duplicates lines. (Previously anchors were only patched when
+        // edges.isEmpty(), leaving broken chains after partial delete.)
+        attachAnchorEdges();
+
+        // If NO edges exist at all (clean slate / no preset wiring), auto-wire.
         if (edges.isEmpty()) {
-            int lastPluginNodeId = inputNode.id;
-            for (int i = 0; i < count; i++) {
-                edges.add(new Edge(lastPluginNodeId, i));
-                lastPluginNodeId = i;
-            }
-            edges.add(new Edge(lastPluginNodeId, outputNode.id));
+            autoWireRespectingRouting(inputNode, outputNode, count);
         }
+
+        // Branch labels are always recomputed from block order so the two-row
+        // layout stays correct even when edges were restored from a preset.
+        assignBranchLabels(count);
+
+        // Lay out parallel branches as two rows between each SPLIT and its MERGE.
+        layoutBranchRows(nodeH, spacing, yCenter);
 
         syncGraphToAudioEngine();
 
@@ -490,14 +541,159 @@ public class SignalChainCanvasView extends View {
             setCustomNodePositions(pendingCustomPos);
             pendingCustomPos = null;
         }
+        StringBuilder sbAfter = new StringBuilder();
+        for (Node n : nodes) {
+            sbAfter.append(n.id).append("/").append(n.name).append("/").append(n.x).append("/").append(n.y).append(";sel=").append(n.selected).append(";");
+        }
+        // Log selected plugin
+        Node selected = null;
+        for (Node n : nodes) if (n.selected) { selected = n; break; }
+        if (selected != null) {
+        } else {
+        }
+    }
+
+    /**
+     * Walk blocks in chain order and tag each with its branch row:
+     * 0 = trunk, 1 = upper parallel branch, 2 = lower parallel branch.
+     * Derived purely from SPLIT/MERGE positions, so it is stable across
+     * rebuilds and preset restores.
+     */
+    private void assignBranchLabels(int count) {
+        boolean inSplit = false;
+        boolean nextUpper = true;
+        for (int i = 0; i < count; i++) {
+            Node n = nodeMap.get(i);
+            if (n == null) continue;
+            if (n.nodeType == NodeType.SPLIT) {
+                n.branch = 0;
+                inSplit = true;
+                nextUpper = true;
+            } else if (n.nodeType == NodeType.MERGE) {
+                n.branch = 0;
+                inSplit = false;
+            } else if (inSplit) {
+                n.branch = nextUpper ? 1 : 2;
+                nextUpper = !nextUpper;
+            } else {
+                n.branch = 0;
+            }
+        }
+    }
+
+    /**
+     * Declarative series/parallel auto-wiring driven by inserted SPLIT/MERGE blocks
+     * (primary interaction model — no port-dot dragging required).
+     *
+     * Rules, walking the chain left to right:
+     *   - Normal blocks chain straight through (plain series line).
+     *   - A SPLIT forks the signal: every block after it alternates into the upper
+     *     branch then the lower branch, so each branch is populated independently.
+     *   - A MERGE recombines: both branch tails feed into it, and the chain
+     *     continues as a single row afterwards.
+     */
+    private void autoWireRespectingRouting(Node inputNode, Node outputNode, int count) {
+        int trunkTail = inputNode.id;   // last node on the single (non-split) path
+        int upperTail = -1;             // last node on upper branch (-1 = none yet)
+        int lowerTail = -1;             // last node on lower branch
+        boolean inSplit = false;
+        boolean nextGoesUpper = true;
+
+        for (int i = 0; i < count; i++) {
+            Node n = nodeMap.get(i);
+            if (n == null) continue;
+
+            if (n.nodeType == NodeType.SPLIT) {
+                // SPLIT consumes the current trunk and opens two branches.
+                edges.add(new Edge(trunkTail, i));
+                inSplit = true;
+                upperTail = i;
+                lowerTail = i;
+                nextGoesUpper = true;
+                n.branch = 0;
+                continue;
+            }
+
+            if (n.nodeType == NodeType.MERGE) {
+                // MERGE recombines both branch tails (2 inputs) into one trunk.
+                if (inSplit) {
+                    edges.add(new Edge(upperTail, i));
+                    if (lowerTail != upperTail) edges.add(new Edge(lowerTail, i));
+                } else {
+                    edges.add(new Edge(trunkTail, i));
+                }
+                inSplit = false;
+                trunkTail = i;
+                upperTail = -1;
+                lowerTail = -1;
+                n.branch = 0;
+                continue;
+            }
+
+            if (inSplit) {
+                // Alternate effect blocks between the two branches so both populate.
+                if (nextGoesUpper) {
+                    edges.add(new Edge(upperTail, i));
+                    upperTail = i;
+                    n.branch = 1;
+                } else {
+                    edges.add(new Edge(lowerTail, i));
+                    lowerTail = i;
+                    n.branch = 2;
+                }
+                nextGoesUpper = !nextGoesUpper;
+            } else {
+                edges.add(new Edge(trunkTail, i));
+                trunkTail = i;
+                n.branch = 0;
+            }
+        }
+
+        // Terminate: any dangling branch tails also reach OUTPUT (implicit sum).
+        if (inSplit) {
+            edges.add(new Edge(upperTail, outputNode.id));
+            if (lowerTail != upperTail) edges.add(new Edge(lowerTail, outputNode.id));
+        } else {
+            edges.add(new Edge(trunkTail, outputNode.id));
+        }
+    }
+
+    /**
+     * Visually branch the canvas into an upper and lower row between a SPLIT and
+     * its MERGE. Only applies to blocks whose branch != 0 (set by auto-wiring),
+     * so manually repositioned blocks in the trunk keep their coordinates.
+     */
+    private void layoutBranchRows(float nodeH, float spacing, float yCenter) {
+        float offset = (nodeH * 0.62f) + (spacing * 0.35f);
+        for (Node n : nodes) {
+            if (n.isAnchor()) continue;
+            if (n.branch == 1) {
+                n.y = yCenter - nodeH / 2f - offset;
+            } else if (n.branch == 2) {
+                n.y = yCenter - nodeH / 2f + offset;
+            }
+            if (getHeight() > 0) {
+                n.y = Math.max(0, Math.min(n.y, getHeight() - n.height));
+            }
+        }
     }
 
     private void syncGraphToAudioEngine() {
-        int[] from = new int[edges.size()];
-        int[] to = new int[edges.size()];
-        for (int i = 0; i < edges.size(); i++) {
-            from[i] = edges.get(i).fromNodeId;
-            to[i] = edges.get(i).toNodeId;
+        // Strip out INPUT (-100) and OUTPUT (-200) anchors.
+        // The native GraphSolver only accepts valid plugin indices (0..N-1).
+        // Passing negative IDs causes the explicit graph to be rejected and falls back to linear series!
+        java.util.List<Edge> activeEdges = new java.util.ArrayList<>();
+        for (Edge e : edges) {
+            if (e.fromNodeId >= 0 && e.toNodeId >= 0) {
+                activeEdges.add(e);
+            }
+        }
+        
+        int[] from = new int[activeEdges.size()];
+        int[] to = new int[activeEdges.size()];
+        for (int i = 0; i < activeEdges.size(); i++) {
+            from[i] = activeEdges.get(i).fromNodeId;
+            to[i] = activeEdges.get(i).toNodeId;
         }
         try {
             AudioEngine.setGraph(from, to);
@@ -513,7 +709,32 @@ public class SignalChainCanvasView extends View {
                 edges.add(new Edge(from[i], to[i]));
             }
         }
+        // Engine graphs never carry INPUT (-100) / OUTPUT (-200) anchors (the
+        // native solver rejects negative ids), so explicit preset edges only
+        // cover plugin-to-plugin wiring. Re-attach anchors here so IN/OUT lines
+        // survive save -> load instead of leaving blocks floating.
+        attachAnchorEdges();
         invalidate();
+    }
+
+    /** Feed every head node from INPUT and drain every tail node to OUTPUT —
+     *  the same invariant autoWireRespectingRouting() uses, applied to
+     *  explicitly restored edges. Idempotent (checks existing endpoints). */
+    private void attachAnchorEdges() {
+        java.util.Set<Integer> hasIncoming = new java.util.HashSet<>();
+        java.util.Set<Integer> hasOutgoing = new java.util.HashSet<>();
+        for (Edge e : edges) {
+            hasIncoming.add(e.toNodeId);
+            hasOutgoing.add(e.fromNodeId);
+        }
+        boolean hasPluginNode = false;
+        for (Node n : nodes) {
+            if (n == null || n.id < 0) continue;
+            hasPluginNode = true;
+            if (!hasIncoming.contains(n.id)) edges.add(new Edge(-100, n.id));
+            if (!hasOutgoing.contains(n.id)) edges.add(new Edge(n.id, -200));
+        }
+        if (!hasPluginNode && edges.isEmpty()) edges.add(new Edge(-100, -200));
     }
 
     private float portRadiusPx() {
@@ -551,7 +772,7 @@ public class SignalChainCanvasView extends View {
     private Node hitTest(float tx, float ty) {
         for (int i = nodes.size() - 1; i >= 0; i--) {
             Node n = nodes.get(i);
-            if (n.isAnchor()) continue; // anchors invisible & non-interactive
+            // Anchors (INPUT/OUTPUT) and routing blocks (SPLIT/MERGE) are all selectable
             if (n.contains(tx, ty)) return n;
         }
         return null;
@@ -600,10 +821,10 @@ public class SignalChainCanvasView extends View {
                 }
                 // Cek BLOCK dulu — drag block prioritas utama
                 Node hit = hitTest(tx, ty);
-                if (hit != null && hit.nodeType != NodeType.OUTPUT) {
+                if (hit != null) {
                     // Tap di dalam block = SELECT + siap drag (bukan port)
                     long now = SystemClock.elapsedRealtime();
-                    if (lastTapNodeId == hit.id && now - lastTapTime < 320L) {
+                    if (lastTapNodeId == hit.id && now - lastTapTime < 320L && !hit.isAnchor()) {
                         // Double tap = bypass on/off
                         try {
                             boolean en = AudioEngine.getActivePluginEnabled(hit.id);
@@ -678,9 +899,10 @@ public class SignalChainCanvasView extends View {
                         float dy = ty - lastY;
                         float nx = dragNode.x + dx;
                         float ny = dragNode.y + dy;
-                        // Clamp: left=0, right=canvas-fabReserved (don't overlap "+" button)
-                        float fabR = 85f * getResources().getDisplayMetrics().density;
-                        nx = Math.max(0, Math.min(nx, getWidth() - dragNode.width - fabR));
+                        // Clamp: don't cross input node, don't overlap "+" button
+                        float fabR = 105f * getResources().getDisplayMetrics().density;
+                        float minX = (inputAnchor != null) ? (inputAnchor.x + inputAnchor.width + 12f * getResources().getDisplayMetrics().density) : 0;
+                        nx = Math.max(minX, Math.min(nx, getWidth() - dragNode.width - fabR));
                         ny = Math.max(0, Math.min(ny, getHeight() - dragNode.height));
                         dragNode.x = nx;
                         dragNode.y = ny;
@@ -770,6 +992,14 @@ public class SignalChainCanvasView extends View {
         this.pendingCustomPos = p;
     }
 
+    public Map<String, float[]> captureNodePositions() {
+        Map<String, float[]> map = new HashMap<>();
+        for (Node n : nodes) {
+            map.put(String.valueOf(n.id), new float[]{n.x, n.y});
+        }
+        return map;
+    }
+
     private void toastBypass(Node n, boolean enabled) {
         try {
             android.widget.Toast.makeText(getContext(),
@@ -799,11 +1029,42 @@ public class SignalChainCanvasView extends View {
         setMeasuredDimension(w, h);
     }
 
+    @Override
+    protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+        super.onSizeChanged(w, h, oldw, oldh);
+        if (w > 0 && h > 0) {
+            float density = getResources().getDisplayMetrics().density;
+            float anchorDim = 24 * density;
+            float yCenter = h / 2f - anchorDim / 2f;
+            float fabReserved = 48 * density;
+
+            if (inputAnchor != null) {
+                inputAnchor.x = 4 * density;
+                inputAnchor.y = yCenter;
+            }
+            if (outputAnchor != null) {
+                outputAnchor.x = w - anchorDim - fabReserved;
+                outputAnchor.y = yCenter;
+            }
+            invalidate();
+        }
+    }
+
     @Override protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
 
-        if (outputAnchor != null) {
-            outputAnchor.y = getHeight() / 2f - outputAnchor.height / 2f;
+        float density = getResources().getDisplayMetrics().density;
+        float anchorDim = 24 * density;
+        float yCenter = getHeight() / 2f - anchorDim / 2f;
+        float fabReserved = 48 * density;
+
+        if (inputAnchor != null) {
+            inputAnchor.x = 4 * density;
+            inputAnchor.y = yCenter;
+        }
+        if (outputAnchor != null && getWidth() > 0) {
+            outputAnchor.x = getWidth() - anchorDim - fabReserved;
+            outputAnchor.y = yCenter;
         }
 
         for (Edge e : edges) {
@@ -822,74 +1083,33 @@ public class SignalChainCanvasView extends View {
                     dragCurrentX, dragCurrentY, wireColor);
         }
 
-        // INPUT/OUTPUT anchors are kept internally for engine semantics but are
-        // NOT drawn and NOT hit-testable — first/last plugin blocks are the
-        // visible connection endpoints, freeing canvas space for blocks.
+        // Draw nodes and anchors
         for (Node n : nodes) {
-            if (!n.isAnchor()) {
+            if (n.isAnchor()) {
+                drawAnchorNode(canvas, n);
+            } else {
                 drawNode(canvas, n);
             }
         }
     }
 
     private void drawAnchorNode(Canvas canvas, Node n) {
-        RectF r = new RectF(n.x, n.y, n.x + n.width, n.y + n.height);
-
-        // Body
-        paintNodeBody.setColor(NODE_BG);
-        canvas.drawRoundRect(r, 12, 12, paintNodeBody);
-
-        // Border — color per type
-        Paint border = new Paint(Paint.ANTI_ALIAS_FLAG);
-        border.setStyle(Paint.Style.STROKE);
-        border.setStrokeWidth(3f);
-        border.setColor(n.categoryColor);
-        canvas.drawRoundRect(r, 12, 12, border);
-
-        // Glyph in center
-        Paint glyphPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        glyphPaint.setColor(n.categoryColor);
-        glyphPaint.setStyle(Paint.Style.FILL);
-
         float cx = n.x + n.width / 2f;
         float cy = n.y + n.height / 2f;
+        float radius = n.width / 2f;
+        float d = getResources().getDisplayMetrics().density;
 
-        if (n.nodeType == NodeType.INPUT) {
-            // Right-pointing triangle (guitar input)
-            Path tri = new Path();
-            tri.moveTo(cx - 10, cy - 12);
-            tri.lineTo(cx + 10, cy);
-            tri.lineTo(cx - 10, cy + 12);
-            tri.close();
-            canvas.drawPath(tri, glyphPaint);
-        } else if (n.nodeType == NodeType.OUTPUT) {
-            // Speaker cone shape
-            canvas.drawCircle(cx, cy, 10, glyphPaint);
-            Paint dotCenter = new Paint(Paint.ANTI_ALIAS_FLAG);
-            dotCenter.setColor(NODE_BG);
-            canvas.drawCircle(cx, cy, 4, dotCenter);
-        } else if (n.nodeType == NodeType.MERGE) {
-            // Two arrows merging downward
-            Path merge = new Path();
-            merge.moveTo(cx - 12, cy - 8);
-            merge.lineTo(cx, cy + 4);
-            merge.lineTo(cx + 12, cy - 8);
-            merge.close();
-            canvas.drawPath(merge, glyphPaint);
-            canvas.drawCircle(cx, cy + 10, 3, glyphPaint);
-        }
-
-        // Label (anchor nodes: INPUT, OUTPUT)
-        paintText.setColor(n.categoryColor);
-        paintText.setTextSize(11f * getResources().getDisplayMetrics().density);
-        canvas.drawText(n.name, cx, n.y + n.height - 8, paintText);
-
-        // Port dots — radius density-scaled (3.5 raw px was ~1dp on 3x screens: invisible)
-        float pr = 4.5f * getResources().getDisplayMetrics().density;
-        paintInputDot.setColor(n.categoryColor);
-        paintOutputDot.setColor(n.categoryColor);
-        canvas.drawCircle(n.getInputX(), n.getInputY(), pr, paintInputDot);
-        canvas.drawCircle(n.getOutputX(), n.getOutputY(), pr, paintOutputDot);
+        Paint markerPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+         // IN/OUT are connection labels, not effect blocks: text only, no
+         // background circle or border.
+         Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+         textPaint.setColor(Color.WHITE);
+         textPaint.setTextAlign(Paint.Align.CENTER);
+         textPaint.setTextSize(10f * d);
+        textPaint.setTypeface(android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL));
+        Paint.FontMetrics fm = textPaint.getFontMetrics();
+        float textY = cy - (fm.ascent + fm.descent) / 2f;
+        canvas.drawText(n.name.toUpperCase(), cx, textY, textPaint);
     }
 
     private int dimColor(int color, float factor) {
@@ -903,27 +1123,32 @@ public class SignalChainCanvasView extends View {
     private void drawNode(Canvas canvas, Node n) {
         RectF r = new RectF(n.x, n.y, n.x + n.width, n.y + n.height);
 
-        paintNodeBody.setColor(Color.parseColor("#1E1E22"));
+        paintNodeBody.setColor(Color.parseColor("#1F2228"));
         canvas.drawRoundRect(r, 12, 12, paintNodeBody);
 
         // Bypassed nodes use dimmed/desaturated category color
         int drawColor = n.bypassed ? dimColor(n.categoryColor, 0.35f) : n.categoryColor;
 
         if (n.selected) {
+            Paint glowBg = new Paint(Paint.ANTI_ALIAS_FLAG);
+            glowBg.setStyle(Paint.Style.FILL);
+            glowBg.setColor(Color.argb(40, Color.red(drawColor), Color.green(drawColor), Color.blue(drawColor)));
+            canvas.drawRoundRect(r, 12, 12, glowBg);
+
             Paint selGlow = new Paint(Paint.ANTI_ALIAS_FLAG);
             selGlow.setStyle(Paint.Style.STROKE);
-            selGlow.setStrokeWidth(5f);
+            selGlow.setStrokeWidth(4f);
             selGlow.setColor(drawColor);
             canvas.drawRoundRect(r, 12, 12, selGlow);
         } else {
             Paint normBorder = new Paint(Paint.ANTI_ALIAS_FLAG);
             normBorder.setStyle(Paint.Style.STROKE);
-            normBorder.setStrokeWidth(2.5f);
-            normBorder.setColor(drawColor);
+            normBorder.setStrokeWidth(1.5f);
+            normBorder.setColor(Color.argb(35, 255, 255, 255));
             canvas.drawRoundRect(r, 12, 12, normBorder);
         }
 
-        Bitmap iconBmp = getCategoryIcon(n.name);
+        Bitmap iconBmp = getCategoryIconFromRes(n.categoryIconRes, n.categoryColor, n.name);
         float d = getResources().getDisplayMetrics().density;
         float iconSize = Math.min(26f * d, n.height * 0.40f);
         float iconX = n.x + (n.width - iconSize) / 2f;
@@ -934,34 +1159,32 @@ public class SignalChainCanvasView extends View {
             canvas.drawBitmap(iconBmp, null, dst, null);
         }
 
-        // TONE3000 badge (restored from lastworks build 2026-09-11 22:50).
+        // TONE3000 compact T3K mark — top interior, small chip (spec §16 compact mark)
         if (t3kNodeIds.contains(n.pluginId)) {
             String t3k = "T3K";
             Paint t3kBg = new Paint(Paint.ANTI_ALIAS_FLAG);
             t3kBg.setColor(Color.parseColor("#FF8A00"));
             t3kBg.setStyle(Paint.Style.FILL);
             Paint t3kText = new Paint(Paint.ANTI_ALIAS_FLAG);
-            t3kText.setColor(-1);
+            t3kText.setColor(Color.WHITE);
             t3kText.setTextSize(7.5f * d);
-            t3kText.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+            t3kText.setTypeface(android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.BOLD));
             t3kText.setTextAlign(Paint.Align.CENTER);
-            float padH = d * 4.0f;
+            float padH = 4f * d, padV = 2f * d;
             float tw = t3kText.measureText(t3k);
-            float bw = tw + padH * 2.0f;
-            float bh = d * 9.0f;
-            float bx = n.x + d * 4.0f;
-            float by = n.y + d * 4.0f;
-            RectF t3kR = new RectF(bx, by, bx + bw, by + bh);
-            canvas.drawRoundRect(t3kR, d * 3.0f, d * 3.0f, t3kBg);
+            float bw = tw + padH * 2, bh = 9f * d;
+            float bx = n.x + 4f * d, by = n.y + 4f * d;
+            android.graphics.RectF t3kR = new android.graphics.RectF(bx, by, bx + bw, by + bh);
+            canvas.drawRoundRect(t3kR, 3f * d, 3f * d, t3kBg);
             Paint.FontMetrics fm = t3kText.getFontMetrics();
-            float ty = by + bh / 2f - (fm.ascent + fm.descent) / 2f;
-            canvas.drawText(t3k, bx + bw / 2f, ty, t3kText);
+            float ty = by + bh/2f - (fm.ascent + fm.descent)/2f;
+            canvas.drawText(t3k, bx + bw/2f, ty, t3kText);
         }
 
         // Label (compact, crisp, inside block bottom)
-        String code = getCategoryCode(n.name);
+        String code = n.categoryCode != null ? n.categoryCode : getCategoryCode(n.name);
         paintText.setColor(n.bypassed ? Color.parseColor("#80FFFFFF") : Color.parseColor("#ECEFF1"));
-        paintText.setTextSize(12f * d);
+         paintText.setTextSize(10f * d);
         canvas.drawText(code, n.x + n.width / 2f, n.y + n.height - 8f * d, paintText);
 
         // Port dots — density-scaled to match anchor nodes
@@ -970,6 +1193,19 @@ public class SignalChainCanvasView extends View {
         paintOutputDot.setColor(drawColor);
         canvas.drawCircle(n.getInputX(), n.getInputY(), pr, paintInputDot);
         canvas.drawCircle(n.getOutputX(), n.getOutputY(), pr, paintOutputDot);
+
+        // Routing blocks expose their extra port visually: SPLIT has two outputs,
+        // MERGE has two inputs. This makes the fixed 1-in/2-out and 2-in/1-out
+        // port topology readable at a glance without any dragging.
+        if (n.nodeType == NodeType.SPLIT) {
+            float sep = n.height * 0.26f;
+            canvas.drawCircle(n.getOutputX(), n.getOutputY() - sep, pr * 0.85f, paintOutputDot);
+            canvas.drawCircle(n.getOutputX(), n.getOutputY() + sep, pr * 0.85f, paintOutputDot);
+        } else if (n.nodeType == NodeType.MERGE) {
+            float sep = n.height * 0.26f;
+            canvas.drawCircle(n.getInputX(), n.getInputY() - sep, pr * 0.85f, paintInputDot);
+            canvas.drawCircle(n.getInputX(), n.getInputY() + sep, pr * 0.85f, paintInputDot);
+        }
 
         if (n.selected) {
             float bx = n.x + n.width - 8 * d;

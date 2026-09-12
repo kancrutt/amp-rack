@@ -15,7 +15,7 @@
         android:ellipsize="end"
         android:maxLines="1"
         android:text="GAIN"
-        android:textColor="#8E8E93"
+        android:textColor="@color/gg_glass_text_secondary"
         android:textSize="10sp"
         android:textStyle="bold" />
 
@@ -33,7 +33,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="0.50"
-        android:textColor="#FFAA00"
+        android:textColor="@color/gg_accent"
         android:textSize="11sp"
         android:textStyle="bold" />
 

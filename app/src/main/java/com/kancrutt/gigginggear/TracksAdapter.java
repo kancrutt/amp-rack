@@ -1,6 +1,6 @@
 package com.kancrutt.gigginggear;
 
-import android.app.AlertDialog;
+import androidx.appcompat.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.graphics.BitmapFactory;
@@ -86,7 +86,7 @@ public class TracksAdapter extends RecyclerView.Adapter<TracksAdapter.ViewHolder
             holder.deleteButton.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View view) {
-                    AlertDialog.Builder builder = new AlertDialog.Builder(view.getContext());
+                    AlertDialog.Builder builder = MainActivity.dialogBuilder(view.getContext());
                     builder.setMessage("Are you sure you want to delete this file? This action cannot be undone.")
                             .setPositiveButton("Delete file", new DialogInterface.OnClickListener() {
                                 public void onClick(DialogInterface dialog, int id) {
@@ -108,9 +108,6 @@ public class TracksAdapter extends RecyclerView.Adapter<TracksAdapter.ViewHolder
                 }
             });
         }
-
-        // Skeuomorphic SkinEngine disabled for this screen (design system: dark
-        // flat/vector). Rows keep their gg_card_bg from track_file.xml.
     }
 
     @Override

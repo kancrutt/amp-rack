@@ -43,7 +43,7 @@ import com.google.android.exoplayer2.analytics.AnalyticsListener;
 import com.google.android.exoplayer2.audio.AuxEffectInfo;
 import com.google.android.exoplayer2.video.VideoSize;
 import com.google.android.material.navigation.NavigationBarItemView;
-import com.google.android.material.slider.Slider;
+
 
 import java.io.File;
 
@@ -198,39 +198,57 @@ public class Tracks extends Fragment {
             }
         });
 
-        Slider slider = view.findViewById(R.id.tracks_volume);
-        slider.setValue(player.getVolume());
-        slider.addOnChangeListener(new Slider.OnChangeListener() {
-            @Override
-            public void onValueChange(@NonNull Slider slider, float value, boolean fromUser) {
+        android.widget.SeekBar slider = view.findViewById(R.id.tracks_volume);
+        android.widget.TextView volumeVal = view.findViewById(R.id.tracks_volume_value);
+        slider.setMax(100);
+        // ExoPlayer volume is 0..1 float: scale to 0..100 for the slider.
+        // (Old code cast the float directly -> always 0, and pushed 0..100
+        // into setVolume() which expects 0..1.)
+        int initVol = Math.round(player.getVolume() * 100f);
+        if (initVol < 0) initVol = 0;
+        if (initVol > 100) initVol = 100;
+        slider.setProgress(initVol);
+        volumeVal.setText(String.valueOf(initVol));
+        stylePillSeekBar(slider);
+        slider.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(android.widget.SeekBar seekBar, int progress, boolean fromUser) {
                 if (fromUser) {
-                    player.setVolume(value);
+                    player.setVolume(progress / 100f);
                 }
+                volumeVal.setText(String.valueOf(progress));
             }
+            @Override public void onStartTrackingTouch(android.widget.SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(android.widget.SeekBar seekBar) {}
         });
 
-        Slider bpm = view.findViewById(R.id.tracks_bpm);
-        bpm.setValueFrom(40f);
-        bpm.setValueTo(240f);
-        bpm.setStepSize(1f);
-        bpm.setValue(120f);
-        bpm.setLabelFormatter(value -> String.valueOf((int) value));
-        bpm.addOnChangeListener(new Slider.OnChangeListener() {
-            @Override
-            public void onValueChange(@NonNull Slider slider, float value, boolean fromUser) {
-                Log.d(TAG, "onValueChange BPM: " + (int) value);
-                // Map 40-240 BPM relative to 120 baseline for playback speed (0.33x to 2.0x)
-                float speed = value / 120f;
+        android.widget.SeekBar bpm = view.findViewById(R.id.tracks_bpm);
+        android.widget.TextView bpmVal = view.findViewById(R.id.tracks_bpm_value);
+        bpm.setMax(200); // 40-240 range => 200 steps
+        int initBpm = 80; // 120 BPM
+        bpm.setProgress(initBpm);
+        int initBpmValue = 40 + initBpm;
+        bpmVal.setText(String.valueOf(initBpmValue));
+        stylePillSeekBar(bpm);
+        bpm.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(android.widget.SeekBar seekBar, int progress, boolean fromUser) {
+                int currentBpm = 40 + progress;
+                bpmVal.setText(String.valueOf(currentBpm));
+                // Always apply (not only fromUser) so the reset button — which
+                // calls setProgress() programmatically — actually takes effect.
+                if (fromUser) Log.d(TAG, "onValueChange BPM: " + currentBpm);
+                float speed = currentBpm / 120f;
                 PlaybackParameters param = new PlaybackParameters(speed);
                 player.setPlaybackParameters(param);
             }
+            @Override public void onStartTrackingTouch(android.widget.SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(android.widget.SeekBar seekBar) {}
         });
 
         android.widget.ImageButton resetBPM = view.findViewById(R.id.tracks_reset_bpm);
         resetBPM.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                bpm.setValue(120f);
+                bpm.setProgress(80);
             }
         });
 
@@ -521,5 +539,21 @@ public class Tracks extends Fragment {
 
     public void load (Uri filename) {
         tracksAdapter.add(filename.toString());
+    }
+
+    private void stylePillSeekBar(android.widget.SeekBar seekBar) {
+        float density = getResources().getDisplayMetrics().density;
+        float trackRadiusPx = 7 * density;
+        android.graphics.drawable.GradientDrawable bgShape = new android.graphics.drawable.GradientDrawable();
+        bgShape.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+        bgShape.setCornerRadius(trackRadiusPx);
+        bgShape.setColor(android.graphics.Color.parseColor("#2E323B"));
+        MainActivity.RoundedProgressDrawable progressFill = new MainActivity.RoundedProgressDrawable(android.graphics.Color.WHITE, trackRadiusPx);
+        android.graphics.drawable.LayerDrawable trackDrawable = new android.graphics.drawable.LayerDrawable(new android.graphics.drawable.Drawable[]{bgShape, progressFill});
+        trackDrawable.setId(0, android.R.id.background);
+        trackDrawable.setId(1, android.R.id.progress);
+        seekBar.setProgressDrawable(trackDrawable);
+        seekBar.setThumb(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+        seekBar.setPadding(0,0,0,0);
     }
 }

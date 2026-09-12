@@ -92,17 +92,13 @@ public class MyPresets extends Fragment {
             ArrayList<Map> mapList = new ArrayList<>();
             if (factory) {
                 loadFactoryPresets(mapList);
-            } else if (localPresetManager != null) {
-                java.util.List<LocalPresetManager.Preset> list = localPresetManager.loadAllPresets();
-                for (LocalPresetManager.Preset p : list) {
-                    try {
-                        org.json.JSONObject jo = LocalPresetManager.presetToJson(p);
-                        HashMap<String, Object> map = new Gson().fromJson(jo.toString(), HashMap.class);
-                        mapList.add(map);
-                    } catch (Exception e) {
-                        Log.e(TAG, "Error converting preset for adapter", e);
-                    }
-                }
+            } else if (quick) {
+                // Combined library: FACTORY first, then USER — the top-bar
+                // nav/picker must cover the whole library, not just local saves.
+                loadFactoryPresets(mapList);
+                loadUserPresets(mapList);
+            } else {
+                loadUserPresets(mapList);
             }
             myPresetsAdapter.presets = mapList;
             myPresetsAdapter.allPresets = new ArrayList<>(mapList);
@@ -111,6 +107,31 @@ public class MyPresets extends Fragment {
         updateEmptyState();
         if (myPresetsAdapter != null) {
             myPresetsAdapter.quick = quick;
+        }
+    }
+
+    /** Local user presets (LocalPresetManager) as adapter maps. A user preset
+     *  with the same name as an already-loaded entry is skipped so the nav
+     *  list never shows two rows with the same number-name pair. */
+    private void loadUserPresets (ArrayList<Map> mapList) {
+        if (localPresetManager == null) return;
+        java.util.List<LocalPresetManager.Preset> list = localPresetManager.loadAllPresets();
+        for (LocalPresetManager.Preset p : list) {
+            try {
+                org.json.JSONObject jo = LocalPresetManager.presetToJson(p);
+                HashMap<String, Object> map = new Gson().fromJson(jo.toString(), HashMap.class);
+                map.put("origin", "user");
+                String name = map.get("name") != null ? map.get("name").toString() : "";
+                boolean dup = false;
+                for (Map existing : mapList) {
+                    String en = existing.get("name") != null ? existing.get("name").toString() : "";
+                    if (name.equals(en)) { dup = true; break; }
+                }
+                if (dup) continue;
+                mapList.add(map);
+            } catch (Exception e) {
+                Log.e(TAG, "Error converting preset for adapter", e);
+            }
         }
     }
 
@@ -150,6 +171,7 @@ public class MyPresets extends Fragment {
                         continue;
                     }
                     HashMap<String, Object> map = new Gson().fromJson(jo.toString(), HashMap.class);
+                    map.put("origin", "factory");
                     mapList.add(map);
                     loaded++;
                 } catch (Exception e) {
@@ -180,7 +202,14 @@ public class MyPresets extends Fragment {
             mainActivity = (MainActivity) getActivity();
         localPresetManager = new LocalPresetManager(mainActivity);
 
-        recyclerView = (RecyclerView) ((LinearLayout) view).getChildAt(2);
+        // Tablet split view needs a visible column header (phone keeps TabLayout titles).
+        TextView panelTitleView = view.findViewById(R.id.presets_panel_title);
+        if (panelTitleView != null && mainActivity != null && mainActivity.tabletMode) {
+            panelTitleView.setVisibility(View.VISIBLE);
+            panelTitleView.setText(factory ? "FACTORY PRESETS" : "MY PRESETS");
+        }
+
+        recyclerView = view.findViewById(R.id.my_presets_recycler);
         Button loadMore = view.findViewById(R.id.load_more);
         ProgressBar loadProgress = view.findViewById(R.id.load_progress);
         loadMore.setOnClickListener(new View.OnClickListener() {
@@ -208,9 +237,13 @@ public class MyPresets extends Fragment {
                 }
             }
         });
-                quickHeader = (LinearLayout) ((LinearLayout) view).getChildAt(0);
+                quickHeader = view.findViewById(R.id.collections_header);
         myPresetsAdapter = new MyPresetsAdapter();
         myPresetsAdapter.setMainActivity(mainActivity);
+        // Factory assets are read-only: never offer delete there. Delete on the
+        // factory panel only removed the row until next reload (looked "broken")
+        // and could even match a local file by name.
+        myPresetsAdapter.allowDelete = !factory;
         myPresetsAdapter.loadProgress = loadProgress;
         recyclerView.setAdapter(myPresetsAdapter);
         myPresetsAdapter.onListChanged = this::updateEmptyState;
@@ -220,11 +253,16 @@ public class MyPresets extends Fragment {
         load();
 
         LinearLayout layout = (LinearLayout) view ;
-        LinearLayout lx = (LinearLayout) ((LinearLayout) view).getChildAt(1);
-        if (!shared && !factory) {
+        LinearLayout lx = view.findViewById(R.id.search_row);
+        boolean isTablet = mainActivity != null && mainActivity.tabletMode;
+        // Search row: phone keeps legacy behavior (hidden on My tab); on tablet
+        // both columns show it so each list keeps its own working filter.
+        if (lx != null && !shared && !factory && !isTablet) {
             lx.setVisibility(View.GONE);
-        } else {
-            EditText editText = (EditText) lx.getChildAt(0);
+        } else if (lx != null) {
+            lx.setVisibility(View.VISIBLE);
+            EditText editText = lx.findViewById(R.id.search_presets);
+            if (editText != null) {
             editText.addTextChangedListener(new TextWatcher() {
                 @Override
                 public void beforeTextChanged(CharSequence charSequence, int i, int i1, int i2) {
@@ -242,10 +280,14 @@ public class MyPresets extends Fragment {
                     myPresetsAdapter.updateList(editable.toString());
                 }
             });
+            }
         }
 
-        if (shared && !factory) {
-            ToggleButton toggleButton = (ToggleButton) lx.getChildAt(1);
+        if (shared && !factory && lx != null) {
+            ToggleButton toggleButton = lx.findViewById(R.id.toggle_show_favorites);
+            if (toggleButton == null) {
+                Log.w(TAG, "onViewCreated: favorites toggle missing, skipping");
+            } else {
             favToggle = toggleButton;
             toggleButton.setButtonDrawable(R.drawable.ic_baseline_favorite_border_24);
             toggleButton.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
@@ -259,20 +301,38 @@ public class MyPresets extends Fragment {
                 }
             });
 
+            myPresetsAdapter.removeAll();
             File f = new File(mainActivity.favPresetsDir);
             File[] list = f.listFiles();
-            for (File file: list) {
-                JSONObject jsonObject = ConnectGuitar.loadJSONFromFile(mainActivity, Uri.fromFile(file));
-                if (jsonObject == null) {
-                    Log.e(TAG, "onViewCreated: " + file.getAbsolutePath() + " is null");
-                    continue;
-                }
+            if (list != null) {
+                for (File file: list) {
+                    JSONObject jsonObject = ConnectGuitar.loadJSONFromFile(mainActivity, Uri.fromFile(file));
+                    if (jsonObject == null) {
+                        Log.e(TAG, "onViewCreated: " + file.getAbsolutePath() + " is null");
+                        continue;
+                    }
 
-                myPresetsAdapter.addPreset(MainActivity.JSONtoMap(jsonObject));
+                    myPresetsAdapter.addPreset(MainActivity.JSONtoMap(jsonObject));
+                }
             }
+            } // end else (toggle present)
         }
 
-        Button sortByButton = (Button) lx.getChildAt(2);
+        if (lx == null) {
+            Log.w(TAG, "onViewCreated: search_row missing, skipping sort setup");
+            if (progressBar != null)
+                myPresetsAdapter.setProgressBar(progressBar);
+            load();
+            return;
+        }
+        Button sortByButton = lx.findViewById(R.id.sort_button);
+        if (sortByButton == null) {
+            Log.w(TAG, "onViewCreated: sort_button missing, skipping sort setup");
+            if (progressBar != null)
+                myPresetsAdapter.setProgressBar(progressBar);
+            load();
+            return;
+        }
         sortMenu = new PopupMenu(mainActivity, sortByButton);
         sortMenu.getMenuInflater().inflate(R.menu.sort_by, sortMenu.getMenu());
 
@@ -292,7 +352,10 @@ public class MyPresets extends Fragment {
         sortMenu.setOnMenuItemClickListener(new PopupMenu.OnMenuItemClickListener() {
             @Override
             public boolean onMenuItemClick(MenuItem menuItem) {
-                SharedPreferences sharedPreferences = ((MainActivity) getActivity()).defaultSharedPreferences;
+                // NOTE: this fragment can be hosted manually on tablet (getActivity()==null),
+                // so always use the mainActivity field captured in onViewCreated.
+                if (mainActivity == null || mainActivity.defaultSharedPreferences == null) return false;
+                SharedPreferences sharedPreferences = mainActivity.defaultSharedPreferences;
                 menuItem.setChecked(true);
                 switch (menuItem.getItemId()) {
                     default:
@@ -315,8 +378,13 @@ public class MyPresets extends Fragment {
         if (quick) {
             List<String> labels = new ArrayList<String>();
             SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(mainActivity);
-            quickHeader.setVisibility(View.VISIBLE);
-            quickSpinner = (Spinner) quickHeader.getChildAt(1);
+            if (quickHeader != null) quickHeader.setVisibility(View.VISIBLE);
+            quickSpinner = quickHeader != null
+                    ? (Spinner) quickHeader.findViewById(R.id.collections_spinner)
+                    : null;
+            if (quickSpinner == null) {
+                Log.w(TAG, "onViewCreated: collections spinner missing, skipping quick collections");
+            } else {
             labels.add("Factory Presets");
             Set<String> vals = sharedPreferences.getStringSet("collections", null) ;
             Log.d(TAG, "onViewCreated: vals: " + vals);
@@ -453,16 +521,19 @@ public class MyPresets extends Fragment {
 
                 horiz.addView(ll);
             }
+            } // end else (collections spinner present)
         }
 
-        if (!shared && !factory) {
+        // Phone keeps legacy behavior (no sort on the My tab); tablet shows sort
+        // on both columns.
+        if (!shared && !factory && !isTablet) {
             sortByButton.setVisibility(View.GONE);
         }
 
         sortByButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                sortMenu.show();
+                if (sortMenu != null) sortMenu.show();
             }
         });
 

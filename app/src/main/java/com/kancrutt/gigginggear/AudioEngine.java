@@ -22,6 +22,7 @@ public class AudioEngine {
     public static native float getActivePluginValue (int plugin, int control);
     public static native float getActivePluginValueByIndex (int plugin, int control);
     public static native int getActivePluginID (int plugin);
+    public static native String getActivePluginUri (int plugin);
     public static native int getPluginControls (int plugin) ;
     public static native boolean getFilePort (int plugin);
     public static native void setFilePortValue (int plugin, String filename);
@@ -32,6 +33,12 @@ public class AudioEngine {
     public static native boolean getControlIsLogarithmic (int plugin, int control);
     public static native String getControlName (int plugin, int control) ;
     public static native int getControlType (int plugin, int control);
+    public static native String getControlUnit (int plugin, int control);
+    public static native String [] getControlEnumLabels (int plugin, int control);
+    public static native float [] getControlEnumValues (int plugin, int control);
+    public static native float getControlDefault (int plugin, int control);
+    public static native int getControlPortIndex (int plugin, int control);
+    public static native void setParameterMetadata (String json);
     public static native String getActivePluginName (int plugin);
 
     public static native String getRecordingFileName ();
@@ -44,6 +51,8 @@ public class AudioEngine {
     public static native int addPluginLazyLV2(String library, int plugin);
     public static native int addPluginByName (String name);
     public static native boolean deletePlugin (int plugin) ;
+    public static native int addRoutingBlock (boolean isSplit);
+    public static native int insertRoutingBlock (int index, boolean isSplit);
     public static native void clearActiveQueue ();
     public static native void toggleRecording (boolean state) ;
 
@@ -82,6 +91,8 @@ public class AudioEngine {
     public static native void setLibraryPath (String path);
     public static native void setInputVolume (float volume);
     public static native void setOutputVolume (float volume);
+    public static native float getInputVolume();
+    public static native float getOutputVolume();
     public static native void toggleMixer (boolean toggle);
     public static native void printActiveChain ();
 
@@ -93,7 +104,9 @@ public class AudioEngine {
     public static native void setGraph (int[] from, int[] to);
     public static native int[] getGraphEdges ();
     public static native String setPluginFilename (String filename, int plugin);
+    /** Engine truth: can a model file actually attach to this slot? Use for all UI gating (labels, badges, targeting). */
     public static native boolean canLoadModelFile (int plugin);
+    /** Engine-level read-back: returns the model file actually connected to the plugin, or null if none. */
     public static native String getPluginLoadedFileName (int plugin);
     public static native String tuneLatency ();
 

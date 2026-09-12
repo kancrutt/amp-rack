@@ -1,5 +1,6 @@
 #include <jni.h>
 #include <string>
+#include <exception>
 #include "logging_macros.h"
 #include "ladspa.h"
 
@@ -12,6 +13,27 @@ static const int kOboeApiOpenSLES = 1;
 
 static Engine * engine = nullptr;
 static std::string lastLoadError;
+
+// ---- Zero-Trust JNI bounds guards (audit 2026-09) ----
+// Every one of these used to be a bare vector .at() that threw
+// std::out_of_range on a stale/negative Java index -> uncaught -> SIGABRT
+// ("terminating due to uncaught exception of type std::out_of_range: vector").
+// Java routinely passes stale slot numbers (chain edits shift indices;
+// preset restore races the engine), so ALL JNI entries validate first.
+static bool validPlugin(int plugin) {
+    return engine != nullptr && plugin >= 0 && plugin < (int) engine->activePlugins.size();
+}
+static bool validControl(int plugin, int control) {
+    return validPlugin(plugin) && control >= 0
+        && control < (int) engine->activePlugins.at(plugin)->pluginControls.size();
+}
+static bool validLibrary(int library) {
+    return engine != nullptr && library >= 0 && library < (int) engine->libraries.size();
+}
+static bool validLibraryPlugin(int library, int plugin) {
+    return validLibrary(library) && plugin >= 0
+        && plugin < (int) engine->libraries.at(library)->descriptors.size();
+}
 
 
 extern "C" JNIEXPORT jstring JNICALL
@@ -158,14 +180,14 @@ Java_com_kancrutt_gigginggear_AudioEngine_native_1setDefaultStreamValues(JNIEnv 
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_setMode(JNIEnv *env, jclass clazz, jint mode) {
-    // TODO: implement setMode()
     if (engine == nullptr) return ;
+    // Mode maps to routing mode (0 = Series, 1 = Parallel) in the engine
+    engine->setRoutingMode(mode);
     LOGD("setting mode to %d", mode) ;
 }
 extern "C"
 JNIEXPORT jint JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_getSharedLibraries(JNIEnv *env, jclass clazz) {
-    // TODO: implement getSharedLibraries()
     if (engine == NULL) {
         LOGF ("engine is NULL");
         return 0;
@@ -175,9 +197,12 @@ Java_com_kancrutt_gigginggear_AudioEngine_getSharedLibraries(JNIEnv *env, jclass
 extern "C"
 JNIEXPORT jint JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_getPlugins(JNIEnv *env, jclass clazz, jint library) {
-    // TODO: implement getPlugins()
     if (engine == NULL) {
         LOGF ("engine is NULL");
+        return 0;
+    }
+    if (!validLibrary(library)) {
+        LOGE("getPlugins: invalid library %d (have %d)", library, (int) engine->libraries.size());
         return 0;
     }
     return engine->libraries.at(library)->total_plugins ;
@@ -186,14 +211,13 @@ extern "C"
 JNIEXPORT jint JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_getPluginControls(JNIEnv *env, jclass clazz,
                                                                 jint plugin) {
-    // TODO: implement getPluginControls()
     if (engine == NULL) {
         LOGF ("engine is NULL");
         return 0;
     }
 
-    if (plugin > engine ->activePlugins.size()) {
-        HERE LOGE("%d plugin controls requested but only %d plugins in active queue!", plugin, engine->activePlugins.size());
+    if (!validPlugin(plugin)) {
+        HERE LOGE("%d plugin controls requested but only %d plugins in active queue!", plugin, (int) engine->activePlugins.size());
         return 0 ;
     }
 
@@ -203,24 +227,97 @@ extern "C"
 JNIEXPORT jfloatArray JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_getPluginControlValues(JNIEnv *env, jclass clazz,
                                                                      jint plugin, jint control) {
-    // TODO: implement getPluginControlValues()
     if (engine == NULL) {
         LOGF ("engine is NULL");
         return 0;
     }
-    // [default, min, max, type]
+    if (!validControl(plugin, control)) {
+        LOGE("getPluginControlValues: invalid plugin %d control %d", plugin, control);
+        return 0;
+    }
+    // [currentRawValue, pluginMin, pluginMax, type, isLogarithmic,
+    //  isEnumeration, isInteger]. Values are never normalized here.
     PluginControl *p = engine ->activePlugins.at(plugin)->pluginControls.at(control) ;
-    jfloatArray r = env ->NewFloatArray(4);
-    float res [] = {p->getValue(), p->getMin(), p->getMax(), static_cast<float>(p->type)};
-//    float res [] = {p->getDefault(), p->getMin(), p->getMax(), static_cast<float>(p->type)};
-    env->SetFloatArrayRegion(r, 0, 4, res);
+    jfloatArray r = env ->NewFloatArray(7);
+    float res [] = {p->getValue(), p->getMin(), p->getMax(), static_cast<float>(p->type),
+                    p->isLogarithmic ? 1.0f : 0.0f, p->isEnumeration ? 1.0f : 0.0f, p->isInteger ? 1.0f : 0.0f};
+    env->SetFloatArrayRegion(r, 0, 7, res);
     return r ;
+}
+extern "C"
+JNIEXPORT jstring JNICALL
+Java_com_kancrutt_gigginggear_AudioEngine_getControlUnit(JNIEnv *env, jclass clazz,
+                                                                     jint plugin, jint control) {
+    if (engine == NULL) { LOGF("engine is NULL"); return env->NewStringUTF(""); }
+    if (plugin < 0 || plugin >= (int)engine->activePlugins.size()) return env->NewStringUTF("");
+    auto *p = engine->activePlugins.at(plugin);
+    if (control < 0 || control >= (int)p->pluginControls.size()) return env->NewStringUTF("");
+    PluginControl *c = p->pluginControls.at(control);
+    return env->NewStringUTF(c->unit.c_str());
+}
+extern "C"
+JNIEXPORT jobjectArray JNICALL
+Java_com_kancrutt_gigginggear_AudioEngine_getControlEnumLabels(JNIEnv *env, jclass clazz,
+                                                                           jint plugin, jint control) {
+    if (!validControl(plugin, control)) return env->NewObjectArray(0, env->FindClass("java/lang/String"), nullptr);
+    auto *p = engine->activePlugins.at(plugin);
+    PluginControl *c = p->pluginControls.at(control);
+    if (c->enumLabels.empty()) return env->NewObjectArray(0, env->FindClass("java/lang/String"), nullptr);
+    jclass stringClass = env->FindClass("java/lang/String");
+    jobjectArray arr = env->NewObjectArray((jsize) c->enumLabels.size(), stringClass, nullptr);
+    for (size_t i = 0; i < c->enumLabels.size(); i++) {
+        env->SetObjectArrayElement(arr, (jsize) i, env->NewStringUTF(c->enumLabels.at(i).c_str()));
+    }
+    return arr;
+}
+extern "C"
+JNIEXPORT jfloatArray JNICALL
+Java_com_kancrutt_gigginggear_AudioEngine_getControlEnumValues(JNIEnv *env, jclass clazz,
+                                                                 jint plugin, jint control) {
+    if (!validControl(plugin, control)) return nullptr;
+    auto *p = engine->activePlugins.at(plugin);
+    PluginControl *c = p->pluginControls.at(control);
+    if (c->enumValues.empty()) return env->NewFloatArray(0);
+    jfloatArray arr = env->NewFloatArray((jsize) c->enumValues.size());
+    env->SetFloatArrayRegion(arr, 0, (jsize) c->enumValues.size(), c->enumValues.data());
+    return arr;
+}
+extern "C"
+JNIEXPORT jfloat JNICALL
+Java_com_kancrutt_gigginggear_AudioEngine_getControlDefault(JNIEnv *env, jclass clazz,
+                                                             jint plugin, jint control) {
+    if (!validControl(plugin, control)) return 0.0f;
+    auto *p = engine->activePlugins.at(plugin);
+    PluginControl *c = p->pluginControls.at(control);
+    return c->getDefault();
+}
+extern "C"
+JNIEXPORT jint JNICALL
+Java_com_kancrutt_gigginggear_AudioEngine_getControlPortIndex(JNIEnv *env, jclass clazz,
+                                                               jint plugin, jint control) {
+    if (!validControl(plugin, control)) return -1;
+    auto *p = engine->activePlugins.at(plugin);
+    return (jint) p->pluginControls.at(control)->port;
+}
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_kancrutt_gigginggear_AudioEngine_setParameterMetadata(JNIEnv *env, jclass clazz,
+                                                                jstring jsonStr) {
+    if (engine == NULL) { LOGF("engine is NULL"); return; }
+    const char *cstr = env->GetStringUTFChars(jsonStr, nullptr);
+    if (!cstr) return;
+    try {
+        auto metadata = nlohmann::json::parse(cstr);
+        Plugin::setParameterMetadata(metadata);
+    } catch (const nlohmann::json::exception& e) {
+        LOGE("parameter metadata parse failed: %s", e.what());
+    }
+    env->ReleaseStringUTFChars(jsonStr, cstr);
 }
 extern "C"
 JNIEXPORT jint JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_addPlugin(JNIEnv *env, jclass clazz, jint library,
                                                         jint plugin) {
-    // TODO: implement addPlugin()
     if (engine == NULL) {
         LOGF ("engine is NULL");
         return 0;
@@ -232,14 +329,47 @@ Java_com_kancrutt_gigginggear_AudioEngine_addPlugin(JNIEnv *env, jclass clazz, j
 extern "C"
 JNIEXPORT jboolean JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_deletePlugin(JNIEnv *env, jclass clazz, jint plugin) {
-    // TODO: implement deletePlugin()
     IN
+    if (engine == nullptr || !validPlugin(plugin)) {
+        LOGE("deletePlugin: engine null or invalid plugin %d", plugin);
+        OUT return false;
+    }
     LOGD("Deleting plugin at position %d", plugin);
-    engine -> mFullDuplexPass.bypass = true ;
-    bool res = engine->deletePluginFromRack(plugin);
-    engine -> mFullDuplexPass.bypass = false ;
+    // A C++ throw across JNI is a process SIGABRT — convert to a logged error instead.
+    try {
+        engine -> mFullDuplexPass.bypass = true ;
+        bool res = engine->deletePluginFromRack(plugin);
+        engine -> mFullDuplexPass.bypass = false ;
+        OUT
+        return res ;
+    } catch (const std::exception &e) {
+        LOGE("deletePlugin threw: %s", e.what());
+    } catch (...) {
+        LOGE("deletePlugin threw unknown exception");
+    }
+    if (engine) engine -> mFullDuplexPass.bypass = false ;
     OUT
-    return res ;
+    return false ;
+}
+
+extern "C"
+JNIEXPORT jint JNICALL
+Java_com_kancrutt_gigginggear_AudioEngine_addRoutingBlock(JNIEnv *env, jclass clazz, jboolean isSplit) {
+    if (engine == NULL) { LOGF ("engine is NULL"); return 0; }
+    engine->mFullDuplexPass.bypass = true;
+    int n = engine->addRoutingBlock(isSplit != 0);
+    engine->mFullDuplexPass.bypass = false;
+    return n;
+}
+
+extern "C"
+JNIEXPORT jint JNICALL
+Java_com_kancrutt_gigginggear_AudioEngine_insertRoutingBlock(JNIEnv *env, jclass clazz, jint index, jboolean isSplit) {
+    if (engine == NULL) { LOGF ("engine is NULL"); return 0; }
+    engine->mFullDuplexPass.bypass = true;
+    engine->insertRoutingBlock(index, isSplit != 0);
+    engine->mFullDuplexPass.bypass = false;
+    return engine->activePlugins.size();
 }
 
 extern "C"
@@ -247,7 +377,6 @@ JNIEXPORT void JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_setPluginControl(JNIEnv *env, jclass clazz,
                                                                jint plugin, jint control,
                                                                jfloat value) {
-    // TODO: implement setPluginControl()
     if (engine == NULL) {
         LOGF ("engine is NULL");
         return ;
@@ -258,34 +387,50 @@ Java_com_kancrutt_gigginggear_AudioEngine_setPluginControl(JNIEnv *env, jclass c
         return ;
     }
 
-    if (plugin >= engine->activePlugins.size()) {
-        HERE LOGE("[%d] plugin requested but only %d plugins are active", plugin, engine->activePlugins.size());
+    if (!validPlugin(plugin)) {
+        HERE LOGE("[%d] plugin requested but only %d plugins are active", plugin, (int) engine->activePlugins.size());
         return;
     }
 
-    if (control >= engine->activePlugins.at(plugin)->pluginControls.size()) {
+    if (control < 0 || control >= (int) engine->activePlugins.at(plugin)->pluginControls.size()) {
         HERE LOGE ("[%d] control requested but plugin [%s] has only [%d] controls", control, engine->activePlugins.at(plugin)->descriptor->Name, engine->activePlugins.at(plugin)->pluginControls.size());
         return ;
     }
 
     LOGD("[%d] setting control %s to %f", control, engine->activePlugins.at(plugin)->pluginControls.at(control)->name, value);
-    engine->activePlugins.at(plugin)->pluginControls.at(control)->setValue(value);
+    auto* controlPtr = engine->activePlugins.at(plugin)->pluginControls.at(control);
+    LOGI("PARAM_TRACE native_set plugin=%d control=%d raw=%f before=%f min=%f max=%f unit=%s",
+         plugin, control, value, controlPtr->getValue(), controlPtr->getMin(),
+         controlPtr->getMax(), controlPtr->unit.c_str());
+    controlPtr->setValue(value);
+    LOGI("PARAM_TRACE native_written plugin=%d control=%d raw=%f",
+         plugin, control, controlPtr->getValue());
 }
 extern "C"
 JNIEXPORT jint JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_movePlugin(JNIEnv *env, jclass clazz, jint plugin,
-                                                         jint position) {
+                                                          jint position) {
     if (engine == nullptr) return -1 ;
-    return engine->moveActivePlugin(plugin, position);
+    try {
+        return engine->moveActivePlugin(plugin, position);
+    } catch (const std::exception &e) {
+        LOGE("movePlugin threw: %s", e.what());
+    } catch (...) {
+        LOGE("movePlugin threw unknown exception");
+    }
+    return -1 ;
 }
 
 extern "C"
 JNIEXPORT jboolean JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_togglePlugin(JNIEnv *env, jclass clazz, jint plugin,
                                                            jboolean state) {
-    // TODO: implement togglePlugin()
     if (engine == NULL) {
         LOGF ("engine is NULL");
+        return false;
+    }
+    if (!validPlugin(plugin)) {
+        LOGE("togglePlugin: invalid plugin %d", plugin);
         return false;
     }
     engine->activePlugins.at(plugin)->active = state ;
@@ -297,9 +442,12 @@ extern "C"
 JNIEXPORT jstring JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_getLibraryName(JNIEnv *env, jclass clazz,
                                                              jint library) {
-    // TODO: implement getLibraryName()
     if (engine == NULL) {
         LOGF ("engine is NULL");
+        return NULL;
+    }
+    if (!validLibrary(library)) {
+        LOGE("getLibraryName: invalid library %d", library);
         return NULL;
     }
     return env->NewStringUTF(engine->libraries.at(library)->so_file.c_str()) ;
@@ -308,9 +456,12 @@ extern "C"
 JNIEXPORT jstring JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_getPluginName(JNIEnv *env, jclass clazz, jint library,
                                                             jint plugin) {
-    // TODO: implement getPluginName()
     if (engine == NULL) {
         LOGF ("engine is NULL");
+        return NULL;
+    }
+    if (!validLibraryPlugin(library, plugin)) {
+        LOGE("getPluginName: invalid library %d plugin %d", library, plugin);
         return NULL;
     }
     return env->NewStringUTF(engine->libraries.at(library)->descriptors.at(plugin)->Name);
@@ -319,14 +470,13 @@ extern "C"
 JNIEXPORT jstring JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_getActivePluginName(JNIEnv *env, jclass clazz,
                                                                   jint plugin) {
-    // TODO: implement getActivePluginName()
     if (engine == NULL) {
         LOGF ("engine is NULL");
         return NULL;
     }
 
-    if (engine->activePlugins.size() <= plugin) {
-        HERE LOGE("[%d] plugin requested but only [%d] plugins in queue.", plugin, engine->activePlugins.size());
+    if (!validPlugin(plugin)) {
+        HERE LOGE("[%d] plugin requested but only [%d] plugins in queue.", plugin, (int) engine->activePlugins.size());
         return NULL;
     }
 
@@ -337,29 +487,46 @@ Java_com_kancrutt_gigginggear_AudioEngine_getActivePluginName(JNIEnv *env, jclas
 }
 extern "C"
 JNIEXPORT jstring JNICALL
+Java_com_kancrutt_gigginggear_AudioEngine_getActivePluginUri(JNIEnv *env, jclass clazz,
+                                                              jint plugin) {
+    if (!validPlugin(plugin)) return env->NewStringUTF("");
+    auto *active = engine->activePlugins.at(plugin);
+    if (active->type != SharedLibrary::LV2 || active->lv2Descriptor == nullptr
+            || active->lv2Descriptor->URI == nullptr) return env->NewStringUTF("");
+    return env->NewStringUTF(active->lv2Descriptor->URI);
+}
+extern "C"
+JNIEXPORT jstring JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_getControlName(JNIEnv *env, jclass clazz, jint plugin,
                                                              jint control) {
-    // TODO: implement getControlName()
     if (engine == NULL) {
         LOGF ("engine is NULL");
         return NULL;
     }
 
-    if (engine->activePlugins.size() == 0) {
-        LOGD ("%d plugin info requested but no plugins in queue", plugin);
+    if (!validPlugin(plugin)) {
+        LOGD ("%d plugin info requested but invalid plugin index", plugin);
         return NULL;
     }
 
-    if (engine->activePlugins.at(plugin)->type == SharedLibrary::LADSPA)
-        return env ->NewStringUTF(engine->activePlugins.at(plugin)->descriptor->PortNames [control]);
-    else if (engine->activePlugins.at(plugin)->type == SharedLibrary::LV2) {
-        return env ->NewStringUTF(engine->activePlugins.at(plugin)->pluginControls [control]->lv2_name.c_str());
+    if (!validControl(plugin, control)) {
+        HERE LOGE("[%d] control requested but plugin has fewer controls", control);
+        return NULL;
     }
+
+    if (engine->activePlugins.at(plugin)->type == SharedLibrary::LADSPA) {
+        auto *p = engine->activePlugins.at(plugin);
+        return env ->NewStringUTF(p->descriptor->PortNames [control]);
+    }
+    else if (engine->activePlugins.at(plugin)->type == SharedLibrary::LV2) {
+        auto *p = engine->activePlugins.at(plugin);
+        return env ->NewStringUTF(p->pluginControls [control]->lv2_name.c_str());
+    }
+    return env->NewStringUTF(""); // unknown plugin type fallback (fixes UB on implicit return)
 }
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_loadLibrary(JNIEnv *env, jclass clazz, jstring filename) {
-    // TODO: implement loadLibrary()
     if (engine == NULL) {
         LOGF ("engine is NULL");
         return ;
@@ -375,7 +542,6 @@ Java_com_kancrutt_gigginggear_AudioEngine_loadLibrary(JNIEnv *env, jclass clazz,
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_loadPlugins(JNIEnv *env, jclass clazz) {
-    // TODO: implement loadPlugins()
     IN
     if (engine == NULL) {
         LOGF ("engine is NULL");
@@ -393,7 +559,6 @@ Java_com_kancrutt_gigginggear_AudioEngine_loadPlugins(JNIEnv *env, jclass clazz)
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_debugInfo(JNIEnv *env, jclass clazz) {
-    // TODO: implement debugInfo()
     if (engine == NULL) {
         LOGF ("engine is NULL");
         return ;
@@ -411,7 +576,7 @@ extern "C"
 JNIEXPORT jint JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_movePluginDown(JNIEnv *env, jclass clazz,
                                                              jint plugin) {
-    // TODO: implement movePluginDown()
+    if (!validPlugin(plugin)) return -1;
     engine -> mFullDuplexPass.bypass = true ;
     int res = engine ->moveActivePluginDown(plugin);
     engine -> mFullDuplexPass.bypass = false ;
@@ -421,7 +586,7 @@ Java_com_kancrutt_gigginggear_AudioEngine_movePluginDown(JNIEnv *env, jclass cla
 extern "C"
 JNIEXPORT jint JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_movePluginUp(JNIEnv *env, jclass clazz, jint plugin) {
-    // TODO: implement movePluginUp()
+    if (!validPlugin(plugin)) return -1;
     engine -> mFullDuplexPass.bypass = true ;
     int res = engine ->moveActivePluginUp(plugin);
     engine -> mFullDuplexPass.bypass = false ;
@@ -431,7 +596,6 @@ extern "C"
 JNIEXPORT void JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_setExternalStoragePath(JNIEnv *env, jclass clazz,
                                                                      jstring path) {
-    // TODO: implement setExternalStoragePath()
     IN ;
     if (engine == NULL) {
         HERE LOGF ("engine is NULL"); OUT
@@ -448,7 +612,6 @@ extern "C"
 JNIEXPORT void JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_setRecordingActive(JNIEnv *env, jclass clazz,
                                                                  jboolean active) {
-    // TODO: implement setRecordingActive()
     if (engine == NULL) {
         HERE LOGF ("engine is NULL");
         return ;
@@ -461,7 +624,7 @@ extern "C"
 JNIEXPORT jint JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_addPluginByName(JNIEnv *env, jclass clazz,
                                                               jstring name) {
-    // TODO: implement addPluginByName()
+    if (engine == nullptr) return 0;
     const char *nativeString = env->GetStringUTFChars(name, 0);
     engine ->addPlugintoRackByName(std::string (nativeString));
     env->ReleaseStringUTFChars(name, nativeString);
@@ -471,17 +634,14 @@ extern "C"
 JNIEXPORT void JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_setPresetValue(JNIEnv *env, jclass clazz, jint plugin,
                                                              jint control, jfloat value) {
-    // TODO: implement setPresetValue()
     if (engine == NULL) {
         LOGF ("engine is NULL");
         return ;
     }
 
     IN
-    if (plugin >= engine -> activePlugins.size()) {
-        LOGE("requested plugin no %d greater than total plugins %d", plugin, engine->activePlugins.size());
-    } else if (control >= engine -> activePlugins.at(plugin)->pluginControls.size()) {
-        LOGE("requested plugin control no %d greater than total plugin controls %d", control, engine->activePlugins.at(plugin)->pluginControls.size());
+    if (!validControl(plugin, control)) {
+        LOGE("setPresetValue: invalid plugin %d control %d", plugin, control);
     } else {
         LOGD("[%s %d] setting control %s to %f", engine->activePlugins.at(plugin)->descriptor->Name, control, engine->activePlugins.at(plugin)->pluginControls.at(control)->name, value);
         engine->activePlugins.at(plugin)->pluginControls.at(control)->setPresetValue(value);
@@ -492,20 +652,21 @@ Java_com_kancrutt_gigginggear_AudioEngine_setPresetValue(JNIEnv *env, jclass cla
 extern "C"
 JNIEXPORT jfloat JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_getPluginPresetValue(JNIEnv *env, jclass clazz,
-                                                                   jint plugin, jint control) {
-    // TODO: implement getPluginPresetValue()
+                                                                    jint plugin, jint control) {
     if (engine == NULL) {
         LOGF ("engine is NULL");
         return -1;
     }
-
+    if (!validControl(plugin, control)) {
+        LOGE("getPluginPresetValue: invalid plugin %d control %d", plugin, control);
+        return -1;
+    }
     return engine->activePlugins.at(plugin)->pluginControls.at(control)->presetValue ;
 }
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_setExportFormat(JNIEnv *env, jclass clazz,
                                                               jint format) {
-    // TODO: implement setExportFormat()
         if (engine == NULL) {
         LOGF ("engine is NULL");
             return;
@@ -516,19 +677,49 @@ Java_com_kancrutt_gigginggear_AudioEngine_setExportFormat(JNIEnv *env, jclass cl
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_clearActiveQueue(JNIEnv *env, jclass clazz) {
-    // TODO: implement clearActiveQueue()
     if (engine == NULL) {
         LOGF ("engine is NULL");
         return;
     }
 
+    // Move the doomed plugins out first: the audio thread only ever sees the
+    // published arrays, never this vector. Rebuild (internally locked)
+    // publishes empty arrays, and only then is the old chain torn down.
+    // The old .clear() leaked every Plugin + SharedLibrary + dlopen + LV2
+    // instance per preset nav until LMK SIGKILLed the app (silent force
+    // close, no tombstone, no Java trace).
+    std::vector<Plugin*> doomed = std::move(engine->activePlugins);
     engine->activePlugins.clear();
+    // A cleared chain has no nodes: drop stale explicit edges too, otherwise
+    // every intermediate rebuild logs "edge references node outside" and
+    // falls back until the new graph is set.
+    engine->graphEdges.clear();
+    engine->hasExplicitGraph = false;
     engine-> buildPluginChain();
+    for (Plugin * p : doomed) {
+        if (p == nullptr) continue;
+        for (PluginControl * control : p->pluginControls) {
+            if (control == nullptr) continue;
+            control->freeMemory();
+            delete control;
+        }
+        p->pluginControls.clear();
+        // Mirror deletePluginFromRack: only lazy handles own their DSP
+        // instance + .so ref.
+        if (engine->lazyLoad) {
+            p->free();
+            if (p->sharedLibrary != nullptr) {
+                p->sharedLibrary->unload();
+                delete p->sharedLibrary;
+            }
+        }
+        delete p;
+    }
 }
 extern "C"
 JNIEXPORT jstring JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_getRecordingFileName(JNIEnv *env, jclass clazz) {
-    // TODO: implement getRecordingFileName()
+    if (engine == nullptr || engine->fileWriter == nullptr) return env->NewStringUTF("");
     LOGD("%s", engine->fileWriter->filename.c_str());
     return env ->NewStringUTF(engine->fileWriter->filename.c_str());
 }
@@ -536,7 +727,6 @@ extern "C"
 JNIEXPORT void JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_setLowLatency(JNIEnv *env, jclass clazz,
                                                             jboolean low_latency) {
-    // TODO: implement setLowLatency()
     if (engine == NULL) {
         LOGF ("engine is NULL");
         return;
@@ -551,7 +741,6 @@ extern "C"
 JNIEXPORT void JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_setSampleRate(JNIEnv *env, jclass clazz,
                                                             jint sample_rate) {
-    // TODO: implement setSampleRate()
     if (engine == NULL) {
         LOGF ("engine is NULL");
         return;
@@ -563,7 +752,6 @@ extern "C"
 JNIEXPORT void JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_setOpusBitRate(JNIEnv *env, jclass clazz,
                                                              jint bitrate) {
-    // TODO: implement setOpusBitRate()
     if (engine == NULL) {
         LOGF ("engine is NULL");
         return;
@@ -574,7 +762,6 @@ Java_com_kancrutt_gigginggear_AudioEngine_setOpusBitRate(JNIEnv *env, jclass cla
 extern "C"
 JNIEXPORT jint JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_getTotalPlugins(JNIEnv *env, jclass clazz) {
-    // TODO: implement getTotalPlugins()
     if (engine == NULL) return 0;
 
     int plugins = 0 ;
@@ -589,7 +776,6 @@ Java_com_kancrutt_gigginggear_AudioEngine_getTotalPlugins(JNIEnv *env, jclass cl
 extern "C"
 JNIEXPORT jboolean JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_wasLowLatency(JNIEnv *env, jclass clazz) {
-    // TODO: implement wasLowLatency()
     if (engine == NULL) return false;
 
     return engine->lowLatencyMode;
@@ -597,18 +783,20 @@ Java_com_kancrutt_gigginggear_AudioEngine_wasLowLatency(JNIEnv *env, jclass claz
 extern "C"
 JNIEXPORT jint JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_getPluginUniqueID(JNIEnv *env, jclass clazz,
-                                                                jint library, jint plugin) {
-    // TODO: implement getPluginUniqueID()
+                                                                 jint library, jint plugin) {
     if (engine == NULL) {
         LOGF ("engine is NULL");
-        return NULL;
+        return 0;
+    }
+    if (!validLibraryPlugin(library, plugin)) {
+        LOGE("getPluginUniqueID: invalid library %d plugin %d", library, plugin);
+        return 0;
     }
     return engine->libraries.at(library)->descriptors.at(plugin)->UniqueID;
 }
 extern "C"
 JNIEXPORT jint JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_getActivePlugins(JNIEnv *env, jclass clazz) {
-    // TODO: implement getActivePlugins()
     if (engine == NULL) {
         LOGF ("engine is NULL");
         return 0;
@@ -618,10 +806,13 @@ Java_com_kancrutt_gigginggear_AudioEngine_getActivePlugins(JNIEnv *env, jclass c
 extern "C"
 JNIEXPORT jfloatArray JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_getActivePluginValues(JNIEnv *env, jclass clazz,
-                                                                    jint plugin) {
-    // TODO: implement getActivePluginValues()
+                                                                     jint plugin) {
     if (engine == NULL) {
         LOGF ("engine is NULL");
+        return 0;
+    }
+    if (!validPlugin(plugin)) {
+        LOGE("getActivePluginValues: invalid plugin %d", plugin);
         return 0;
     }
     // [default, min, max, type]
@@ -641,7 +832,6 @@ extern "C"
 JNIEXPORT void JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_setLazyLoad(JNIEnv *env, jclass clazz,
                                                           jboolean lazy_load) {
-    // TODO: implement setLazyLoad()
     // so finally i learnt this!
     engine == NULL ? NULL : engine -> lazyLoad = lazy_load;
 }
@@ -649,18 +839,23 @@ extern "C"
 JNIEXPORT jint JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_addPluginLazy(JNIEnv *env, jclass clazz,
                                                             jstring library, jint plugin) {
-    // TODO: implement addPluginLazy()
     if (engine == NULL) return -1 ;
     const char *nativeString = env->GetStringUTFChars(library, 0);
     LOGD("Loading lazy plugin [%s : %d]", nativeString, plugin);
-    engine ->addPluginToRackLazy(const_cast<char *>(nativeString), plugin);
+    // Never let a C++ throw cross JNI (process SIGABRT) — fail as an error instead.
+    try {
+        engine ->addPluginToRackLazy(const_cast<char *>(nativeString), plugin);
+    } catch (const std::exception &e) {
+        LOGE("addPluginLazy threw: %s", e.what());
+    } catch (...) {
+        LOGE("addPluginLazy threw unknown exception");
+    }
     env->ReleaseStringUTFChars(library, nativeString);
     return engine -> activePlugins.size();
 }
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_testLV2(JNIEnv *env, jclass clazz) {
-    // TODO: implement testLV2()
 //    engine ->loadPlugin("rkrlv2.so", SharedLibrary::LV2);
 //    engine -> libraries.at(0)->load();
 //    engine ->addPluginToRack(0,0);
@@ -677,7 +872,6 @@ extern "C"
 JNIEXPORT void JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_setLibraryPath(JNIEnv *env, jclass clazz,
                                                              jstring path) {
-    // TODO: implement setLibraryPath()
     IN
     if (engine == NULL) {
         HERE LOGF ("engine is NULL"); OUT
@@ -694,21 +888,27 @@ extern "C"
 JNIEXPORT jint JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_addPluginLazyLV2(JNIEnv *env, jclass clazz,
                                                                jstring library, jint plugin) {
-    // TODO: implement addPluginLazyLV2()
     if (engine == NULL) return -1 ;
     const char *nativeString = env->GetStringUTFChars(library, 0);
     LOGD("Loading lazy plugin [%s : %d]", nativeString, plugin);
-    engine ->addPluginToRackLazy(const_cast<char *>(nativeString), plugin, SharedLibrary::LV2);
+    // Never let a C++ throw cross JNI (process SIGABRT) — fail as an error instead.
+    try {
+        engine ->addPluginToRackLazy(const_cast<char *>(nativeString), plugin, SharedLibrary::LV2);
+    } catch (const std::exception &e) {
+        LOGE("addPluginLazyLV2 threw: %s", e.what());
+    } catch (...) {
+        LOGE("addPluginLazyLV2 threw unknown exception");
+    }
     env->ReleaseStringUTFChars(library, nativeString);
     return engine -> activePlugins.size();
 }
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_setInputVolume(JNIEnv *env, jclass clazz, jfloat volume) {
-    // TODO: implement setVolume()
 //    IN
     if (engine == NULL) {
-        HERE LOGF ("engine is NULL"); OUT
+        LOGE ("engine is NULL");
+        return;
     }
 
     engine -> mFullDuplexPass . inputVolume = volume ;
@@ -718,17 +918,33 @@ extern "C"
 JNIEXPORT void JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_setOutputVolume(JNIEnv *env, jclass clazz,
                                                               jfloat volume) {
-    // TODO: implement setOutputVolume()
 //    IN
+    if (engine == NULL) {
+        LOGE ("engine is NULL");
+        return;
+    }
     engine -> mFullDuplexPass . outputVolume = volume ;
 //    OUT
 }
 
 extern "C"
+JNIEXPORT jfloat JNICALL
+Java_com_kancrutt_gigginggear_AudioEngine_getInputVolume(JNIEnv *env, jclass clazz) {
+    if (engine == NULL) return 1.0f;
+    return engine->mFullDuplexPass.inputVolume;
+}
+
+extern "C"
+JNIEXPORT jfloat JNICALL
+Java_com_kancrutt_gigginggear_AudioEngine_getOutputVolume(JNIEnv *env, jclass clazz) {
+    if (engine == NULL) return 1.0f;
+    return engine->mFullDuplexPass.outputVolume;
+}
+
+extern "C"
 JNIEXPORT void JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_toggleMixer(JNIEnv *env, jclass clazz,
-                                                          jboolean toggle) {
-    // TODO: implement toggleMixer()
+                                                           jboolean toggle) {
     if (engine == NULL) return ;
     engine->mFullDuplexPass.meterEnabled = toggle ;
     if (toggle)
@@ -740,7 +956,6 @@ Java_com_kancrutt_gigginggear_AudioEngine_toggleMixer(JNIEnv *env, jclass clazz,
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_printActiveChain(JNIEnv *env, jclass clazz) {
-    // TODO: implement printActiveChain()
     IN
     if (engine == NULL) return ;
 
@@ -754,16 +969,15 @@ Java_com_kancrutt_gigginggear_AudioEngine_printActiveChain(JNIEnv *env, jclass c
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_bypass(JNIEnv *env, jclass clazz, jboolean state) {
-    // TODO: implement bypass()
     engine == NULL ?  LOGE("[%s] engine is null !", __PRETTY_FUNCTION__ ) :   engine -> mFullDuplexPass.bypass = state ;
 }
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_toggleRecording(JNIEnv *env, jclass clazz,
                                                               jboolean state) {
-    // TODO: implement toggleRecording()
-    engine == NULL ?  LOGE("[%s] engine is null !", __PRETTY_FUNCTION__ ) : engine -> mFullDuplexPass.recordingActive = state ;
-//    engine == NULL ?  LOGE("[%s] engine is null !", __PRETTY_FUNCTION__ ) : HERE ;
+    if (engine == NULL) { LOGE("[%s] engine is null !", __PRETTY_FUNCTION__ ); return; }
+    engine -> mFullDuplexPass.recordingActive = state ;
+    if (engine->fileWriter == NULL) return;
     if (state) {
         engine->fileWriter->startRecording();
     }
@@ -774,7 +988,7 @@ extern "C"
 JNIEXPORT void JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_setFileName(JNIEnv *env, jclass clazz,
                                                           jstring file_name) {
-    // TODO: implement setFileName()
+    if (engine == NULL || engine->fileWriter == NULL) return;
     const char *nativeString = env->GetStringUTFChars(file_name, 0);
     engine->fileWriter->setFileName(std::string (nativeString));
     LOGD("file name set to %s", nativeString);
@@ -783,8 +997,6 @@ Java_com_kancrutt_gigginggear_AudioEngine_setFileName(JNIEnv *env, jclass clazz,
 extern "C"
 JNIEXPORT jint JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_getSampleRate(JNIEnv *env, jclass clazz) {
-    // TODO: implement getSampleRate()
-    // TODO: implement setSampleRate()
     if (engine == NULL) {
         LOGE ("engine is NULL");
         return 48000;
@@ -796,7 +1008,6 @@ Java_com_kancrutt_gigginggear_AudioEngine_getSampleRate(JNIEnv *env, jclass claz
 extern "C"
 JNIEXPORT jboolean JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_getTunerEnabled(JNIEnv *env, jclass clazz) {
-    // TODO: implement getTunerEnabled()
     if (engine == NULL || engine->meter == NULL) {
         LOGF ("engine or meter is NULL");
         return false;
@@ -808,7 +1019,6 @@ extern "C"
 JNIEXPORT void JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_setTunerEnabled(JNIEnv *env, jclass clazz,
                                                               jboolean enabled) {
-    // TODO: implement setTunerEnabled()
     if (engine == NULL || engine->meter == NULL) {
         LOGF ("engine or meter is NULL");
         return ;
@@ -938,17 +1148,22 @@ Java_com_kancrutt_gigginggear_AudioEngine_toggleVideoRecording(JNIEnv *env, jcla
 extern "C"
 JNIEXPORT jlong JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_getTimeStamp(JNIEnv *env, jclass clazz) {
-    // TODO: implement getTimeStamp()
+    if (!engine) return 0;
     return (jlong) engine -> getTimeStamp() ;
 }
 extern "C"
 JNIEXPORT jdouble JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_getLatency(JNIEnv *env, jclass clazz, jboolean input) {
-    // TODO: implement getLatency()
     if (! engine)
         return -1.0;
 
     return engine->getLatency(input);
+}
+extern "C"
+JNIEXPORT jboolean JNICALL
+Java_com_kancrutt_gigginggear_AudioEngine_canLoadModelFile(JNIEnv *env, jclass clazz, jint plugin) {
+    if (!engine) return JNI_FALSE;
+    return engine->canLoadModelFile(plugin) ? JNI_TRUE : JNI_FALSE;
 }
 extern "C"
 JNIEXPORT jstring JNICALL
@@ -958,35 +1173,31 @@ Java_com_kancrutt_gigginggear_AudioEngine_setPluginFilename(JNIEnv *env, jclass 
         return env->NewStringUTF("Audio engine not initialized");
 
     const char *nativeString = env->GetStringUTFChars(filename, 0);
-    bool ok = engine->setPluginFilename(std::string (nativeString), plugin);
+    bool ok = false;
+    // Never let a C++ throw cross JNI (process SIGABRT) — fail as an error string instead.
+    try {
+        ok = engine->setPluginFilename(std::string (nativeString), plugin);
+    } catch (const std::exception &e) {
+        LOGE("setPluginFilename threw: %s", e.what());
+    } catch (...) {
+        LOGE("setPluginFilename threw unknown exception");
+    }
     env->ReleaseStringUTFChars(filename, nativeString);
     if (ok) return nullptr;
     return env->NewStringUTF(engine->lastLoadError.c_str());
 }
 extern "C"
-JNIEXPORT jboolean JNICALL
-Java_com_kancrutt_gigginggear_AudioEngine_canLoadModelFile(JNIEnv *env, jclass clazz, jint plugin) {
-    if (!engine)
-        return JNI_FALSE;
-    return engine->canLoadModelFile(plugin) ? JNI_TRUE : JNI_FALSE;
-}
-extern "C"
 JNIEXPORT jstring JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_getPluginLoadedFileName(JNIEnv *env, jclass clazz, jint plugin) {
-    if (!engine)
-        return nullptr;
-    std::string s = engine->getPluginLoadedFileName(plugin);
-    if (s.empty()) return nullptr;
-    return env->NewStringUTF(s.c_str());
+    if (!engine) return nullptr;
+    std::string f = engine->getPluginLoadedFileName(plugin);
+    if (f.empty()) return nullptr;
+    return env->NewStringUTF(f.c_str());
 }
 extern "C"
 JNIEXPORT jboolean JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_getFilePort(JNIEnv *env, jclass clazz, jint plugin) {
-    // TODO: implement getFilePort()
-    if (engine == NULL)
-        return false ;
-
-    if (engine->activePlugins.size() <= plugin)
+    if (!validPlugin(plugin))
         return false;
 
     if (engine->activePlugins.at (plugin)->filePort == nullptr)
@@ -998,14 +1209,13 @@ extern "C"
 JNIEXPORT void JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_setFilePortValue(JNIEnv *env, jclass clazz,
                                                                jint plugin, jstring filename) {
-    // TODO: implement setFilePortValue()
     IN
     if (engine == nullptr) {
         OUT
         return;
     }
 
-    if (engine->activePlugins.size() <= plugin)
+    if (!validPlugin(plugin))
         return;
 
     const char *nativeString = env->GetStringUTFChars(filename, 0);
@@ -1017,7 +1227,6 @@ Java_com_kancrutt_gigginggear_AudioEngine_setFilePortValue(JNIEnv *env, jclass c
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_popFunction(JNIEnv *env, jclass clazz) {
-    // TODO: implement popFunction()
     if (engine == nullptr)
         return;
 
@@ -1041,7 +1250,6 @@ JNIEXPORT void JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_pushToLockFreeBeforeOutputVolumeAaaaaargh(JNIEnv *env,
                                                                                         jclass clazz,
                                                                                         jboolean setting) {
-    // TODO: implement pushToLockFreeBeforeOutputVolumeAaaaaargh()
     IN
     if (engine == nullptr)
         return;
@@ -1095,17 +1303,16 @@ Java_com_kancrutt_gigginggear_AudioEngine_getActivePluginValue(JNIEnv *env, jcla
     }
 
     LOGD("request plugin %d control %d", plugin, control);
-    if (plugin >= engine->activePlugins.size() || control >= engine->activePlugins.at(plugin)->pluginControls.size()) {
-        LOGE("out of range request! %d [%d] %d [%d]",
-             engine->activePlugins.size(),
-             plugin,
-             engine->activePlugins.at(plugin)->pluginControls.size(),
-             control) ;
+    if (!validControl(plugin, control)) {
+        LOGE("out of range request! %d %d", plugin, control);
         OUT
         return 0 ;
     }
 
-    float val = engine->activePlugins.at(plugin)->pluginControls.at(control)->getValue();
+    auto* controlPtr = engine->activePlugins.at(plugin)->pluginControls.at(control);
+    float val = controlPtr->getValue();
+    LOGI("PARAM_TRACE native_get plugin=%d control=%d raw=%f min=%f max=%f unit=%s",
+         plugin, control, val, controlPtr->getMin(), controlPtr->getMax(), controlPtr->unit.c_str());
     OUT
     return val ;
 }
@@ -1113,10 +1320,15 @@ Java_com_kancrutt_gigginggear_AudioEngine_getActivePluginValue(JNIEnv *env, jcla
 extern "C"
 JNIEXPORT jfloat JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_getActivePluginValueByIndex(JNIEnv *env, jclass clazz,
-                                                                    jint plugin, jint control) {
+                                                                     jint plugin, jint control) {
     IN
     if (engine == NULL) {
         LOGF ("engine is NULL");
+        OUT
+        return 0;
+    }
+    if (!validPlugin(plugin)) {
+        LOGE("getActivePluginValueByIndex: invalid plugin %d", plugin);
         OUT
         return 0;
     }
@@ -1139,12 +1351,14 @@ Java_com_kancrutt_gigginggear_AudioEngine_getActivePluginValueByIndex(JNIEnv *en
 extern "C"
 JNIEXPORT jboolean JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_getActivePluginEnabled(JNIEnv *env, jclass clazz, jint plugin) {
-    // TODO: implement togglePlugin()
     if (engine == NULL) {
         LOGF ("engine is NULL");
         return false;
     }
-
+    if (!validPlugin(plugin)) {
+        LOGE("getActivePluginEnabled: invalid plugin %d", plugin);
+        return false;
+    }
     return engine->activePlugins.at(plugin)->active ;
 }
 
@@ -1152,20 +1366,27 @@ Java_com_kancrutt_gigginggear_AudioEngine_getActivePluginEnabled(JNIEnv *env, jc
 extern "C"
 JNIEXPORT jint JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_getActivePluginID(JNIEnv *env, jclass clazz,
-                                                                jint plugin) {
+                                                                 jint plugin) {
     if (engine == nullptr)
         return -1 ;
+    if (!validPlugin(plugin))
+        return -1;
 
     return engine -> activePlugins.at (plugin)->ID;
 }
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_setPluginControlByIndex(JNIEnv *env, jclass clazz,
-                                                                      jint plugin, jint control,
-                                                                      jfloat value) {
+                                                                       jint plugin, jint control,
+                                                                       jfloat value) {
     IN
     if (engine == NULL) {
         LOGF ("engine is NULL");
+        OUT
+        return;
+    }
+    if (!validPlugin(plugin)) {
+        LOGE("setPluginControlByIndex: invalid plugin %d", plugin);
         OUT
         return;
     }
@@ -1238,7 +1459,7 @@ Java_com_kancrutt_gigginggear_AudioEngine_setBufferSizeFactor(JNIEnv *env, jclas
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_latencyTuner(JNIEnv *env, jclass clazz) {
-    if (engine == nullptr)
+    if (engine == nullptr || !engine->mIsEffectOn || engine->latencyTuner == nullptr || engine->latencyTunerOut == nullptr)
         return;
 
     engine->latencyTuner->requestReset();
@@ -1250,25 +1471,26 @@ Java_com_kancrutt_gigginggear_AudioEngine_latencyTuner(JNIEnv *env, jclass clazz
 extern "C"
 JNIEXPORT jint JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_getControlType(JNIEnv *env, jclass clazz, jint plugin,
-                                                             jint control) {
-    // TODO: implement getControlType()
+                                                              jint control) {
     if (engine == nullptr)
         return -1;
-
+    if (!validControl(plugin, control)) {
+        LOGE("getControlType: invalid plugin %d control %d", plugin, control);
+        return -1;
+    }
     return engine->activePlugins.at(plugin)->pluginControls.at(control)->type;
 }
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_setAtomPort(JNIEnv *env, jclass clazz, jint plugin, int control, jstring text) {
-    // TODO: implement setAtomPort()
     IN
     if (engine == nullptr) {
         OUT
         return;
     }
 
-    if (engine->activePlugins.size() <= plugin) {
-        LOGW ("plugin %d is more or equal than active plugin size %d", plugin, engine->activePlugins.size());
+    if (!validPlugin(plugin)) {
+        LOGW ("plugin %d is out of range (size %d)", plugin, (int) engine->activePlugins.size());
         return;
     }
 
@@ -1283,12 +1505,15 @@ Java_com_kancrutt_gigginggear_AudioEngine_setAtomPort(JNIEnv *env, jclass clazz,
 extern "C"
 JNIEXPORT jboolean JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_getControlIsLogarithmic(JNIEnv *env, jclass clazz,
-                                                                      jint plugin, jint control) {
-    // TODO: implement getControlIsLogarithmic()
+                                                                       jint plugin, jint control) {
     if (engine == nullptr) {
         OUT
         return false;
     }
-
+    if (!validControl(plugin, control)) {
+        LOGE("getControlIsLogarithmic: invalid plugin %d control %d", plugin, control);
+        OUT
+        return false;
+    }
     return engine -> activePlugins.at(plugin)->pluginControls.at(control)->isLogarithmic;
 }

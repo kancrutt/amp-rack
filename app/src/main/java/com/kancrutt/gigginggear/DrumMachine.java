@@ -37,7 +37,6 @@ public class DrumMachine extends LinearLayout {
     String dir = "drumkits/default/" ;
     ToggleButton playButton ;
     int bpm = 100 ;
-    SkinEngine skinEngine ;
     DisplayMetrics displayMetrics ;
     String [] samples ;
     int cols = 8 ;

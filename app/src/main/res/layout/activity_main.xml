@@ -4,7 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/gg_bg"
+    android:background="@color/gg_glass_bg"
     tools:context=".MainActivity">
 
     <ImageView
@@ -26,11 +26,11 @@
     <LinearLayout
         android:id="@+id/bottom_nav_wrapper"
         android:layout_width="match_parent"
-        android:layout_height="52dp"
-        android:background="#0B0B0C"
+        android:layout_height="58dp"
+        android:background="@drawable/glass_nav_bg"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:elevation="12dp"
+        android:elevation="8dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintLeft_toLeftOf="parent"
         app:layout_constraintRight_toRightOf="parent">
@@ -48,14 +48,15 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="IN"
-                android:textColor="#8F94A0"
+                android:textColor="@color/gg_glass_text_secondary"
                 android:textSize="8sp"
-                android:textStyle="bold" />
+                android:textStyle="bold"
+                android:fontFamily="@font/plus_jakarta_sans" />
 
             <com.kancrutt.gigginggear.VerticalMeterView
                 android:id="@+id/meter_input"
                 android:layout_width="14dp"
-                android:layout_height="42dp"
+                android:layout_height="44dp"
                 android:layout_marginTop="2dp" />
         </LinearLayout>
 
@@ -65,13 +66,15 @@
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
-            android:background="#0B0B0C"
+            android:background="@android:color/transparent"
             app:elevation="0dp"
-            app:labelVisibilityMode="labeled"
+app:itemIconSize="20dp"
+        app:labelVisibilityMode="labeled"
             app:itemIconTint="@color/bottom_nav_icon_tint"
-            app:itemTextColor="@color/white"
-            app:itemActiveIndicatorStyle="@android:style/Widget"
-            app:itemRippleColor="@color/gg_accent"
+            app:itemTextColor="@color/bottom_nav_icon_tint"
+            app:itemRippleColor="@color/gg_ripple"
+            app:itemTextAppearanceActive="@style/BottomNavTextActive"
+            app:itemTextAppearanceInactive="@style/BottomNavTextInactive"
             app:menu="@menu/bottom" />
 
         <!-- Right Meter (Output Signal) -->
@@ -87,14 +90,15 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="OUT"
-                android:textColor="#8F94A0"
+                android:textColor="@color/gg_glass_text_secondary"
                 android:textSize="8sp"
-                android:textStyle="bold" />
+                android:textStyle="bold"
+                android:fontFamily="@font/plus_jakarta_sans" />
 
             <com.kancrutt.gigginggear.VerticalMeterView
                 android:id="@+id/meter_output"
                 android:layout_width="14dp"
-                android:layout_height="42dp"
+                android:layout_height="44dp"
                 android:layout_marginTop="2dp" />
         </LinearLayout>
     </LinearLayout>

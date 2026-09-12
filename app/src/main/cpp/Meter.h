@@ -36,7 +36,7 @@ class Meter {
     typedef struct staticBuffer_t{
         int overruns;
         float pos;
-        float data[192];
+        float data[1024];
         bool isInput ;
 //    float *data;
     } staticBuffer_t;

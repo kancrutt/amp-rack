@@ -1,17 +1,32 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Base application theme. -->
-    <style name="Theme.AmpRack" parent="Theme.MaterialComponents.DayNight.DarkActionBar">
+    <style name="Theme.AmpRack" parent="Theme.Material3.Dark.NoActionBar">
         <!-- Primary brand color. -->
-        <item name="colorPrimary">#2196F3</item>
-        <item name="colorPrimaryVariant">@color/teal</item>
-        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorPrimary">@color/gg_accent</item>
+        <item name="colorOnPrimary">@color/gg_dark_base</item>
+        <item name="colorPrimaryContainer">#2A2215</item>
+        <item name="colorOnPrimaryContainer">@color/gg_accent</item>
         <!-- Secondary brand color. -->
-        <item name="colorSecondary">@color/dodger_blue</item>
-        <item name="colorSecondaryVariant">@color/medium_sea_green</item>
-        <item name="colorOnSecondary">@color/white</item>
+        <item name="colorSecondary">@color/gg_glass_text_secondary</item>
+        <item name="colorOnSecondary">@color/gg_dark_base</item>
+        <item name="colorSecondaryContainer">@color/gg_surface_2</item>
+        <item name="colorOnSecondaryContainer">@color/gg_glass_text_primary</item>
+        <!-- Background & Surface Colors -->
+        <item name="android:colorBackground">@color/gg_dark_base</item>
+        <item name="colorSurface">@color/gg_surface</item>
+        <item name="colorOnSurface">@color/gg_glass_text_primary</item>
+        <item name="colorSurfaceVariant">@color/gg_surface_2</item>
+        <item name="colorOnSurfaceVariant">@color/gg_glass_text_secondary</item>
+        <item name="colorOutline">@color/gg_border_subtle</item>
+        <!-- Neutral black-white glassy alert dialogs (applies to ALL AlertDialogs) -->
+        <item name="android:alertDialogTheme">@style/ThemeOverlay.Giggin.Dialog</item>
+        <item name="alertDialogTheme">@style/ThemeOverlay.Giggin.Dialog</item>
+        <item name="materialAlertDialogTheme">@style/ThemeOverlay.Giggin.Dialog</item>
         <!-- Status bar color. -->
-        <item name="android:statusBarColor" tools:targetApi="l">@color/black</item>
-        <!-- Customize your theme here. -->
+        <item name="android:statusBarColor" tools:targetApi="l">@color/gg_dark_base</item>
+        <item name="android:navigationBarColor" tools:targetApi="l">@color/gg_dark_base</item>
+        <!-- Disable pill shape active indicator on BottomNav -->
+        <item name="bottomNavigationStyle">@style/Widget.MaterialComponents.BottomNavigationView</item>
     </style>
 
     <style name="Red_Pink" parent="Theme.AmpRack">

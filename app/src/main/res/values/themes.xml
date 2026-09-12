@@ -5,26 +5,32 @@
         <item name="fontFamily">@font/plus_jakarta_sans</item>
         <item name="android:fontFamily">@font/plus_jakarta_sans</item>
         <!-- Primary brand color (Material 3 Gold / Orange Accent) -->
-        <item name="colorPrimary">#FFAA00</item>
-        <item name="colorOnPrimary">#121214</item>
+        <item name="colorPrimary">@color/gg_glass_text_primary</item>
+        <item name="colorOnPrimary">@color/gg_dark_base</item>
         <item name="colorPrimaryContainer">#2A2215</item>
-        <item name="colorOnPrimaryContainer">#FFAA00</item>
+        <item name="colorOnPrimaryContainer">@color/gg_accent</item>
         <!-- Secondary brand color. -->
-        <item name="colorSecondary">#8F94A0</item>
-        <item name="colorOnSecondary">#121214</item>
-        <item name="colorSecondaryContainer">#1E2024</item>
-        <item name="colorOnSecondaryContainer">#ECEFF1</item>
+        <item name="colorSecondary">@color/gg_glass_text_secondary</item>
+        <item name="colorOnSecondary">@color/gg_dark_base</item>
+        <item name="colorSecondaryContainer">@color/gg_surface_2</item>
+        <item name="colorOnSecondaryContainer">@color/gg_glass_text_primary</item>
         <!-- Background & Surface Colors (Dark Pro Audio Tone) -->
-        <item name="android:colorBackground">#121214</item>
-        <item name="colorSurface">#1A1C20</item>
-        <item name="colorOnSurface">#ECEFF1</item>
-        <item name="colorSurfaceVariant">#24262B</item>
-        <item name="colorOnSurfaceVariant">#8F94A0</item>
-        <item name="colorOutline">#3A3D45</item>
-        <item name="colorOutlineVariant">#2E3138</item>
+        <item name="android:colorBackground">@color/gg_dark_base</item>
+        <item name="colorSurface">@color/gg_surface</item>
+        <item name="colorOnSurface">@color/gg_glass_text_primary</item>
+        <item name="colorSurfaceVariant">@color/gg_surface_2</item>
+        <item name="colorOnSurfaceVariant">@color/gg_glass_text_secondary</item>
+        <item name="colorOutline">@color/gg_border_subtle</item>
+        <item name="colorOutlineVariant">@color/gg_border_subtle</item>
+        <!-- Neutral black-white glassy alert dialogs (applies to ALL AlertDialogs) -->
+        <item name="android:alertDialogTheme">@style/ThemeOverlay.Giggin.Dialog</item>
+        <item name="alertDialogTheme">@style/ThemeOverlay.Giggin.Dialog</item>
+        <item name="materialAlertDialogTheme">@style/ThemeOverlay.Giggin.Dialog</item>
         <!-- Status bar color. -->
-        <item name="android:statusBarColor" tools:targetApi="l">#121214</item>
-        <item name="android:navigationBarColor" tools:targetApi="l">#0B0B0C</item>
+        <item name="android:statusBarColor" tools:targetApi="l">@color/gg_dark_base</item>
+        <item name="android:navigationBarColor" tools:targetApi="l">@color/gg_dark_base</item>
+        <!-- Disable pill shape active indicator on BottomNav -->
+        <item name="bottomNavigationStyle">@style/Widget.MaterialComponents.BottomNavigationView</item>
         <!-- Category icon tints (UI/UX spec 4.2 two-axis color system) -->
         <item name="color_cat_amp_active">@color/color_cat_amp_active</item>
         <item name="color_cat_cab_active">@color/color_cat_cab_active</item>
@@ -50,6 +56,52 @@
         <item name="color_cat_wah_inactive">@color/color_cat_wah_inactive</item>
         <item name="color_cat_volume_inactive">@color/color_cat_volume_inactive</item>
         <item name="color_cat_noisegate_inactive">@color/color_cat_noisegate_inactive</item>
+    </style>
+
+    <!-- Neutral black-white glassy alert dialog theme (no brand accent) -->
+    <style name="ThemeOverlay.Giggin.Dialog" parent="Theme.Material3.Dark.Dialog.Alert">
+        <item name="colorPrimary">@color/gg_glass_text_primary</item>
+        <item name="colorOnPrimary">@color/gg_dark_base</item>
+        <item name="colorSecondary">@color/gg_glass_text_secondary</item>
+        <item name="colorOnSecondary">@color/gg_dark_base</item>
+        <item name="colorSurface">@color/gg_glass_surface_overlay</item>
+        <item name="colorOnSurface">@color/gg_glass_text_primary</item>
+        <item name="colorSurfaceVariant">@color/gg_surface_2</item>
+        <item name="colorOnSurfaceVariant">@color/gg_glass_text_secondary</item>
+        <item name="colorOutline">@color/gg_glass_border</item>
+        <item name="colorOutlineVariant">@color/gg_glass_border</item>
+        <!-- Neutral accent for framework AlertDialog buttons (kills orange) -->
+        <item name="android:colorAccent">@color/gg_glass_text_primary</item>
+        <!-- Glassy translucent rounded background -->
+        <item name="android:windowBackground">@drawable/glass_overlay_bg</item>
+        <item name="android:backgroundDimAmount">0.55</item>
+        <!-- Neutral text -->
+        <item name="android:textColorPrimary">@color/gg_glass_text_primary</item>
+        <item name="android:textColorSecondary">@color/gg_glass_text_secondary</item>
+        <item name="android:textColorHint">@color/gg_hint</item>
+        <!-- Material3 card corner radius -->
+        <item name="shapeAppearanceMediumComponent">@style/ShapeAppearance.Giggin.Dialog</item>
+        <!-- Title / body typography -->
+        <item name="materialAlertDialogTitleTextStyle">@style/TextAppearance.Giggin.Dialog.Title</item>
+        <item name="materialAlertDialogBodyTextStyle">@style/TextAppearance.Giggin.Dialog.Body</item>
+    </style>
+
+    <style name="ShapeAppearance.Giggin.Dialog" parent="ShapeAppearance.Material3.MediumComponent">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">@dimen/gg_glass_radius_dialog</item>
+    </style>
+
+    <style name="TextAppearance.Giggin.Dialog.Title" parent="TextAppearance.Material3.TitleLarge">
+        <item name="fontFamily">@font/plus_jakarta_sans</item>
+        <item name="android:fontFamily">@font/plus_jakarta_sans</item>
+        <item name="android:textColor">@color/gg_glass_text_primary</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="TextAppearance.Giggin.Dialog.Body" parent="TextAppearance.Material3.BodyLarge">
+        <item name="fontFamily">@font/plus_jakarta_sans</item>
+        <item name="android:fontFamily">@font/plus_jakarta_sans</item>
+        <item name="android:textColor">@color/gg_glass_text_secondary</item>
     </style>
 
     <!-- Light theme -->
@@ -98,8 +150,8 @@
         <item name="colorPrimaryVariant">@color/teal</item>
         <item name="colorOnPrimary">@color/white</item>
         <!-- Secondary brand color. -->
-        <item name="colorSecondary">@color/orange_red</item>
-        <item name="colorSecondaryVariant">@color/dark_orange</item>
+        <item name="colorSecondary">@color/gg_glass_text_primary</item>
+        <item name="colorSecondaryVariant">@color/gg_glass_text_secondary</item>
         <item name="colorOnSecondary">@color/white</item>
         <!-- Status bar color. -->
         <item name="android:statusBarColor" tools:targetApi="l">@color/black</item>
@@ -119,4 +171,19 @@
 
     <style name="Theme.MySplash.PopupOverlay" parent="ThemeOverlay.AppCompat.Light" />
 
+    <!-- Bottom Navigation typography styles -->
+    <style name="BottomNavTextActive" parent="TextAppearance.MaterialComponents.Caption">
+        <item name="fontFamily">@font/plus_jakarta_sans</item>
+        <item name="android:fontFamily">@font/plus_jakarta_sans</item>
+        <item name="android:textSize">11sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/gg_accent</item>
+    </style>
+
+    <style name="BottomNavTextInactive" parent="TextAppearance.MaterialComponents.Caption">
+        <item name="fontFamily">@font/plus_jakarta_sans</item>
+        <item name="android:fontFamily">@font/plus_jakarta_sans</item>
+        <item name="android:textSize">10.5sp</item>
+        <item name="android:textColor">@color/gg_glass_text_secondary</item>
+    </style>
 </resources>

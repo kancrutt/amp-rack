@@ -4,7 +4,7 @@
     android:id="@+id/super_parent"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#15171B">
+    android:background="@color/gg_glass_bg">
 
     <LinearLayout
         android:id="@+id/rack_master"
@@ -12,152 +12,189 @@
         android:layout_height="match_parent"
         android:orientation="vertical">
 
-        <!-- Top Bar: Knob+Preset(flex) | Logo(collapsible) | Scene+SR+CPU (phone/tablet adaptive).
-             Left zone is weight-based so the preset name gets ALL leftover space;
-             Rack.java hides the logo first when width is tight (defined priority). -->
+        <!-- ================= TOP HEADER BAR (capsule/pill, floating) =================
+             Mockup order (left->right): Volume | Divider | Save | Preset nav |
+             Scene dropdown | Divider | Tempo | CPU. Every id below has live
+             backend wiring in Rack.java — zero dummy UI. -->
         <LinearLayout
             android:id="@+id/routing_header_bar"
             android:layout_width="match_parent"
             android:layout_height="@dimen/rack_top_bar_height"
-            android:background="#1A1C20"
+            android:layout_marginStart="10dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginEnd="10dp"
+            android:background="@drawable/glass_topbar_bg"
+            android:elevation="6dp"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingStart="6dp"
-            android:paddingEnd="6dp">
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp">
 
-            <!-- LEFT ZONE: knob + preset display + quick-save (flex) -->
+            <!-- [1] Master Volume: speaker icon + slider + % text -->
+            <ImageView
+                android:id="@+id/top_volume_icon"
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:contentDescription="Master volume"
+                android:src="@drawable/ic_baseline_volume_up_24"
+                android:tint="@color/gg_glass_text_secondary" />
+
             <LinearLayout
-                android:id="@+id/top_left_zone"
-                android:layout_width="0dp"
+                android:id="@+id/top_volume_knob_container"
+                android:layout_width="wrap_content"
                 android:layout_height="match_parent"
-                android:layout_weight="1"
+                android:paddingStart="6dp"
+                android:paddingEnd="2dp"
+                android:gravity="center" />
+
+            <TextView
+                android:id="@+id/top_volume_val"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="2dp"
+                android:fontFamily="@font/plus_jakarta_sans"
+                android:text="80%"
+                android:textColor="@color/gg_glass_text_secondary"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <!-- [2] Vertical Divider 1 -->
+            <View
+                android:id="@+id/top_divider_1"
+                android:layout_width="1dp"
+                android:layout_height="18dp"
+                android:layout_marginStart="12dp"
+                android:layout_marginEnd="12dp"
+                android:background="#333333" />
+
+            <!-- [3] Save button: bordered square floppy -->
+            <ImageView
+                android:id="@+id/top_quick_save"
+                android:layout_width="26dp"
+                android:layout_height="26dp"
+                android:padding="4dp"
+                android:background="@drawable/glass_save_bg"
+                android:contentDescription="Save preset"
+                android:src="@drawable/ic_baseline_save_24"
+                android:tint="@color/gg_glass_text_secondary" />
+
+            <!-- [4] Preset Controller: < name > — name capped at 20 chars so the
+                 arrows hug the name proportionally, never pushed far right. -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
-                <LinearLayout
-                    android:id="@+id/top_volume_knob_container"
-                    android:layout_width="wrap_content"
-                    android:layout_height="match_parent"
-                    android:paddingStart="2dp"
-                    android:paddingEnd="2dp"
-                    android:gravity="center" />
+                <ImageButton
+                    android:id="@+id/preset_prev"
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:background="@android:color/transparent"
+                    android:contentDescription="Previous preset"
+                    android:src="@drawable/ic_baseline_arrow_back_ios_new_24"
+                    android:tint="@color/gg_glass_text_primary" />
 
-                <TextView
-                    android:id="@+id/top_volume_val"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="2dp"
-                    android:layout_marginEnd="6dp"
-                    android:fontFamily="@font/plus_jakarta_sans"
-                    android:text="80%"
-                    android:textColor="#FFFFFF"
-                    android:textSize="10.5sp"
-                    android:textStyle="bold" />
-
-                <!-- Combined "1  CLEAN": number bold orange + white name, tap to rename.
-                     No maxWidth: grows until collision, logo collapses first, THEN it truncates. -->
                 <TextView
                     android:id="@+id/top_preset_display"
-                    android:layout_width="0dp"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="4dp"
-                    android:layout_weight="1"
+                    android:layout_marginStart="6dp"
+                    android:layout_marginEnd="6dp"
                     android:ellipsize="end"
+                    android:ems="12"
+                    android:fontFamily="@font/plus_jakarta_sans"
+                    android:maxEms="20"
                     android:maxLines="1"
-                    android:text="1  CLEAN"
-                    android:textColor="#8F94A0"
-                    android:textSize="13sp"
+                    android:text="004 Brit MegaGuitar"
+                    android:textColor="@color/gg_glass_text_primary"
+                    android:textSize="12sp"
                     android:textStyle="bold" />
 
-                <!-- Quick-save floppy icon: save current chain to preset -->
-                <ImageView
-                    android:id="@+id/top_quick_save"
-                    android:layout_width="16dp"
-                    android:layout_height="16dp"
-                    android:layout_marginStart="3dp"
-                    android:contentDescription="Save preset"
-                    android:src="@drawable/ic_baseline_save_24"
-                    android:tint="#FFAA00" />
+                <ImageButton
+                    android:id="@+id/preset_next"
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:background="@android:color/transparent"
+                    android:contentDescription="Next preset"
+                    android:src="@drawable/ic_baseline_arrow_forward_ios_24"
+                    android:tint="@color/gg_glass_text_primary" />
             </LinearLayout>
 
-            <!-- CENTER: Logo — first element collapsed on narrow screens -->
-            <ImageView
-                android:id="@+id/top_logo"
-                android:layout_width="wrap_content"
-                android:layout_height="20dp"
-                android:layout_marginStart="4dp"
-                android:layout_marginEnd="4dp"
-                android:contentDescription="Giggin' Gear"
-                android:maxWidth="64dp"
-                android:scaleType="fitCenter"
-                android:src="@drawable/logo" />
-
-            <!-- RIGHT ZONE: Scene + BPM + SampleRate + CPU (intrinsic size only) -->
-            <LinearLayout
-                android:id="@+id/top_right_zone"
-                android:layout_width="wrap_content"
+            <View
+                android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:gravity="center_vertical|end"
-                android:orientation="horizontal">
+                android:layout_weight="1" />
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/top_scene_btn"
-                    style="@style/Widget.Material3.Button.OutlinedButton"
-                    android:layout_width="wrap_content"
-                    android:layout_height="22dp"
-                    android:minWidth="0dp"
-                    android:minHeight="22dp"
-                    android:insetTop="0dp"
-                    android:insetBottom="0dp"
-                    android:paddingStart="4dp"
-                    android:paddingTop="0dp"
-                    android:paddingEnd="4dp"
-                    android:paddingBottom="0dp"
-                    android:text="SC1"
-                    android:textColor="#FFAA00"
-                    android:textSize="11sp"
-                    android:textStyle="bold"
-                    app:cornerRadius="6dp"
-                    app:strokeColor="#555860" />
+            <!-- [5] Scene selector pill dropdown ("Scene 1 v") -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/top_scene_dropdown"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="wrap_content"
+                android:layout_height="22dp"
+                android:minWidth="0dp"
+                android:minHeight="22dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:paddingStart="10dp"
+                android:paddingTop="0dp"
+                android:paddingEnd="4dp"
+                android:paddingBottom="0dp"
+                android:layout_marginStart="4dp"
+                android:text="Scene 1"
+                android:textColor="@color/gg_glass_text_primary"
+                android:textSize="10.5sp"
+                android:textStyle="bold"
+                app:icon="@drawable/baseline_arrow_drop_down_24"
+                app:iconGravity="textEnd"
+                app:iconSize="14dp"
+                app:iconTint="@color/gg_glass_text_primary"
+                app:cornerRadius="11dp"
+                app:strokeColor="@color/gg_glass_text_secondary"
+                app:strokeWidth="1dp" />
 
-                <TextView
-                    android:id="@+id/top_bpm_text"
-                    android:layout_width="wrap_content"
-                    android:layout_height="match_parent"
-                    android:gravity="center_vertical"
-                    android:layout_marginStart="4dp"
-                    android:text=""
-                    android:textColor="#FFAA00"
-                    android:textSize="11sp"
-                    android:textStyle="bold" />
+            <!-- [6] Vertical Divider 2 -->
+            <View
+                android:id="@+id/top_divider_2"
+                android:layout_width="1dp"
+                android:layout_height="18dp"
+                android:layout_marginStart="12dp"
+                android:layout_marginEnd="12dp"
+                android:background="#333333" />
 
-                <TextView
-                    android:id="@+id/top_sr_text"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="3dp"
-                    android:text=""
-                    android:textColor="#8F94A0"
-                    android:textSize="11sp"
-                    android:textStyle="bold" />
+            <!-- [7] Tempo Display -->
+            <TextView
+                android:id="@+id/top_bpm_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="120 BPM"
+                android:textColor="@color/gg_glass_text_primary"
+                android:textSize="11sp"
+                android:textStyle="bold" />
 
-                <TextView
-                    android:id="@+id/cpu_meter_text"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="3dp"
-                    android:text=""
-                    android:textColor="#D7DBE2"
-                    android:textSize="11sp"
-                    android:textStyle="bold" />
-            </LinearLayout>
+            <!-- [8] CPU Display -->
+            <TextView
+                android:id="@+id/cpu_meter_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:text="CPU 5%"
+                android:textColor="@color/gg_glass_text_primary"
+                android:textSize="11sp"
+                android:textStyle="bold" />
         </LinearLayout>
 
-        <!-- Upper Half: Signal Chain Canvas (Horizontal Flowchart) -->
+        <!-- Upper Half: Signal Chain Canvas — floating rounded glassy card,
+             same model as the header (glass_topbar_bg: 14dp + 1dp stroke) -->
         <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="@dimen/signal_chain_height"
-            android:background="#1A1C20"
+            android:layout_marginStart="10dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginEnd="10dp"
+            android:background="@drawable/glass_topbar_bg"
+            android:elevation="6dp"
             android:paddingStart="8dp"
             android:paddingEnd="8dp">
 
@@ -166,51 +203,62 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:paddingStart="4dp"
-                android:paddingEnd="72dp" />
+                android:paddingEnd="52dp" />
 
-            <!-- FAB to open Plugin Picker BottomSheet -->
-            <com.google.android.material.floatingactionbutton.FloatingActionButton
+            <!-- Square rounded "+" button at far right -->
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/fab_add_block"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
                 android:layout_gravity="end|center_vertical"
-                android:layout_marginEnd="18dp"
+                android:layout_marginEnd="10dp"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:padding="0dp"
                 android:contentDescription="Add Block"
-                android:src="@android:drawable/ic_input_add"
-                app:backgroundTint="#FFAA00"
-                app:fabSize="mini"
-                app:tint="#121214" />
+                android:text="+"
+                android:textColor="@color/gg_accent"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                app:cornerRadius="8dp"
+                app:strokeColor="@color/gg_accent"
+                app:strokeWidth="1.5dp" />
         </FrameLayout>
 
-        <!-- Divider Line -->
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1.5dp"
-            android:background="#2E3138" />
-
-        <!-- Lower Half: Inline Split-Screen Parameter Editor -->
+        <!-- Lower Half: Glass Parameter Editor — floating rounded glassy card,
+             same model as the header (glass_topbar_bg: 14dp + 1dp stroke).
+             (The old full-bleed hairline divider is gone: the card gap replaces it.) -->
         <LinearLayout
             android:id="@+id/parameter_editor_container"
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
-            android:background="#15171B"
+            android:layout_marginStart="10dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginEnd="10dp"
+            android:layout_marginBottom="8dp"
+            android:background="@drawable/glass_topbar_bg"
+            android:elevation="6dp"
             android:orientation="horizontal"
             android:paddingStart="6dp"
             android:paddingEnd="6dp"
-            android:paddingTop="2dp"
-            android:paddingBottom="2dp">
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp">
 
             <!-- LEFT COLUMN: full plugin identity (title, subtype, badge, POWER) + MODEL row + gear render + info strip -->
             <!-- Wrapped in NestedScrollView so the entire panel scrolls on short screens -->
             <androidx.core.widget.NestedScrollView
                 android:layout_width="@dimen/param_gear_col_width"
                 android:layout_height="match_parent"
-                android:background="#0C0D0F"
-                android:paddingStart="5dp"
-                android:paddingTop="1dp"
-                android:paddingEnd="5dp"
-                android:paddingBottom="5dp"
+                android:background="@drawable/glass_panel_bg"
+                android:paddingStart="8dp"
+                android:paddingTop="6dp"
+                android:paddingEnd="8dp"
+                android:paddingBottom="6dp"
+                android:layout_marginEnd="4dp"
                 android:fillViewport="true">
 
             <LinearLayout
@@ -227,9 +275,9 @@
 
                     <View
                         android:id="@+id/detail_led"
-                        android:layout_width="6dp"
-                        android:layout_height="6dp"
-                        android:layout_marginEnd="5dp"
+                        android:layout_width="7dp"
+                        android:layout_height="7dp"
+                        android:layout_marginEnd="6dp"
                         android:background="@drawable/led_glowing_active" />
 
                     <TextView
@@ -240,22 +288,22 @@
                         android:ellipsize="end"
                         android:fontFamily="@font/plus_jakarta_sans"
                         android:maxLines="1"
-                        android:text="Metal Guitar (MIX READY)"
-                        android:textColor="#FFFFFF"
-                        android:textSize="11.5sp"
+                        android:text="Neural Amp Modeler"
+                        android:textColor="@color/gg_glass_text_primary"
+                        android:textSize="12sp"
                         android:textStyle="bold" />
 
                     <com.google.android.material.switchmaterial.SwitchMaterial
                         android:id="@+id/detail_enabled_switch"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="3dp"
+                        android:layout_marginStart="2dp"
                         android:checked="true"
-                        android:scaleX="0.72"
-                        android:scaleY="0.72"
-                        app:switchMinWidth="40dp"
-                        app:thumbTint="#00E676"
-                        app:trackTint="#2A3D2E" />
+                        android:scaleX="0.75"
+                        android:scaleY="0.75"
+                        app:switchMinWidth="36dp"
+                        app:thumbTint="@color/gg_node_status_active"
+                        app:trackTint="@color/gg_glass_surface_card" />
 
                     <TextView
                         android:id="@+id/detail_enabled_label"
@@ -263,8 +311,8 @@
                         android:layout_height="wrap_content"
                         android:layout_marginStart="1dp"
                         android:text="ON"
-                        android:textColor="#00E676"
-                        android:textSize="8sp"
+                        android:textColor="@color/gg_node_status_active"
+                        android:textSize="9sp"
                         android:textStyle="bold" />
 
                     <!-- Legacy button kept hidden for code compatibility -->
@@ -285,103 +333,93 @@
                     android:ellipsize="end"
                     android:maxLines="1"
                     android:text="AMP · NEURAL AMP (NAM)"
-                    android:textColor="#8F94A0"
-                    android:textSize="8sp" />
+                    android:textColor="@color/gg_glass_text_secondary"
+                    android:textSize="9sp"
+                    android:fontFamily="@font/plus_jakarta_sans" />
 
                 <!-- MODEL Browser Row -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="20dp"
-                    android:layout_marginTop="4dp"
-                    android:background="#24262B"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingStart="4dp"
-                    android:paddingEnd="4dp">
+<androidx.constraintlayout.widget.ConstraintLayout
+                android:layout_width="match_parent"
+                android:layout_height="26dp"
+                android:layout_marginTop="6dp"
+                android:background="@drawable/glass_card_bg"
+                android:paddingStart="8dp"
+                android:paddingEnd="4dp">
 
                     <TextView
+                        android:id="@+id/detail_model_name"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginEnd="4dp"
-                        android:text="MODEL:"
-                        android:textColor="#8F94A0"
-                        android:textSize="8sp"
-                        android:textStyle="bold" />
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:text="MODEL"
+                        android:textColor="@color/gg_glass_text_secondary"
+                        android:textSize="9sp"
+                        android:fontFamily="@font/plus_jakarta_sans"
+                        android:visibility="gone"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toTopOf="parent"
+                        app:layout_constraintBottom_toBottomOf="parent" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/detail_model_browse_btn"
                         style="@style/Widget.Material3.Button.TonalButton"
                         android:layout_width="wrap_content"
-                        android:layout_height="18dp"
-                        android:minHeight="18dp"
-                        android:backgroundTint="#363942"
-                        android:paddingLeft="5dp"
+                        android:layout_height="20dp"
+                        android:minHeight="20dp"
+                        android:backgroundTint="@color/gg_glass_surface_selected"
+                        android:paddingLeft="8dp"
                         android:paddingTop="0dp"
-                        android:paddingRight="5dp"
+                        android:paddingRight="8dp"
                         android:paddingBottom="0dp"
                         android:insetTop="0dp"
                         android:insetBottom="0dp"
                         android:text="Browse"
-                        android:textColor="#FFFFFF"
-                        android:textSize="7.5sp"
-                        app:cornerRadius="3dp" />
+                        android:textColor="@color/gg_glass_text_primary"
+                        android:textSize="8.5sp"
+                        android:fontFamily="@font/plus_jakarta_sans"
+                        app:cornerRadius="4dp"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintTop_toTopOf="parent"
+                        app:layout_constraintBottom_toBottomOf="parent" />
+                </androidx.constraintlayout.widget.ConstraintLayout>
 
-                    <View
-                        android:layout_width="0dp"
-                        android:layout_height="1dp"
-                        android:layout_weight="1" />
-                </LinearLayout>
-
-                <!-- Gear render fills remaining height; info strip overlays bottom -->
+                <!-- Gear Graphic & Description Stack -->
                 <FrameLayout
                     android:layout_width="match_parent"
-                    android:layout_height="0dp"
-                    android:layout_weight="1"
-                    android:layout_marginTop="5dp"
-                    android:background="#0C0D0F">
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp">
 
                     <ImageView
                         android:id="@+id/detail_gear_render"
                         android:layout_width="match_parent"
-                        android:layout_height="match_parent"
+                        android:layout_height="100dp"
                         android:scaleType="fitCenter"
                         android:src="@drawable/gg_gear_placeholder" />
-
-                    <ScrollView
-                        android:layout_width="match_parent"
-                        android:layout_height="92dp"
-                        android:layout_gravity="bottom"
-                        android:background="#99000000"
-                        android:fadeScrollbars="false"
-                        android:scrollbars="vertical">
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:orientation="vertical"
-                            android:padding="5dp">
-
-                            <TextView
-                                android:id="@+id/detail_gear_info_type"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:text="AMP · NAM"
-                                android:textColor="#FFAA00"
-                                android:textSize="10.5sp"
-                                android:textStyle="bold" />
-
-                            <TextView
-                                android:id="@+id/detail_gear_info_desc"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="2dp"
-                                android:lineSpacingExtra="1dp"
-                                android:text="Full plugin description"
-                                android:textColor="#ECEFF1"
-                                android:textSize="8.5sp" />
-                        </LinearLayout>
-                    </ScrollView>
                 </FrameLayout>
+
+                <TextView
+                    android:id="@+id/detail_gear_info_type"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="Neural Amp Modeler"
+                    android:textColor="@color/gg_accent"
+                    android:textSize="11sp"
+                    android:textStyle="bold"
+                    android:fontFamily="@font/plus_jakarta_sans" />
+
+                <TextView
+                    android:id="@+id/detail_gear_info_desc"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:lineSpacingExtra="1dp"
+                    android:text="Deep learning plugin to create models of guitar amplifiers and pedals with state-of-the-art accuracy."
+                    android:textColor="@color/gg_glass_text_secondary"
+                    android:textSize="9.5sp"
+                    android:fontFamily="@font/plus_jakarta_sans" />
             </LinearLayout>
             </androidx.core.widget.NestedScrollView>
 
@@ -409,10 +447,10 @@
                         android:layout_width="wrap_content"
                         android:layout_height="match_parent"
                         android:layout_marginEnd="4dp"
-                        android:background="#1E2024"
+                        android:background="@drawable/glass_panel_bg"
                         android:orientation="vertical"
-                        android:paddingStart="4dp"
-                        android:paddingEnd="4dp"
+                        android:paddingStart="6dp"
+                        android:paddingEnd="6dp"
                         android:paddingTop="2dp"
                         android:paddingBottom="2dp"
                         android:visibility="gone">
@@ -422,9 +460,10 @@
                             android:layout_height="wrap_content"
                             android:layout_gravity="center_horizontal"
                             android:text="LEVEL"
-                            android:textColor="#8F94A0"
+                            android:textColor="@color/gg_glass_text_secondary"
                             android:textSize="8sp"
-                            android:textStyle="bold" />
+                            android:textStyle="bold"
+                            android:fontFamily="@font/plus_jakarta_sans" />
 
                         <HorizontalScrollView
                             android:layout_width="wrap_content"
@@ -447,12 +486,12 @@
                         android:layout_width="0dp"
                         android:layout_height="match_parent"
                         android:layout_weight="1"
-                        android:background="#1E2024"
+                        android:background="@drawable/glass_panel_bg"
                         android:orientation="vertical"
-                        android:paddingStart="4dp"
-                        android:paddingEnd="4dp"
-                        android:paddingTop="2dp"
-                        android:paddingBottom="2dp">
+                        android:paddingStart="8dp"
+                        android:paddingEnd="8dp"
+                        android:paddingTop="4dp"
+                        android:paddingBottom="4dp">
 
                         <TextView
                             android:id="@+id/panel_tone_title"
@@ -460,24 +499,26 @@
                             android:layout_height="wrap_content"
                             android:layout_gravity="center_horizontal"
                             android:text="CONTROLS"
-                            android:textColor="#8F94A0"
-                            android:textSize="8sp"
-                            android:textStyle="bold" />
+                            android:textColor="@color/gg_glass_text_secondary"
+                            android:textSize="9sp"
+                            android:textStyle="bold"
+                            android:fontFamily="@font/plus_jakarta_sans" />
 
-                        <HorizontalScrollView
+                        <androidx.core.widget.NestedScrollView
                             android:layout_width="match_parent"
                             android:layout_height="match_parent"
                             android:fillViewport="true"
-                            android:scrollbars="horizontal">
+                            android:scrollbars="vertical">
 
-                            <!-- Center-justified when few knobs; scrolls when many -->
+                            <!-- Vertical list of slider rows for controls -->
                             <LinearLayout
                                 android:id="@+id/container_tone_knobs"
-                                android:layout_width="wrap_content"
-                                android:layout_height="match_parent"
-                                android:gravity="center_vertical"
-                                android:orientation="horizontal" />
-                        </HorizontalScrollView>
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:orientation="vertical"
+                                android:paddingTop="4dp"
+                                android:paddingBottom="4dp" />
+                        </androidx.core.widget.NestedScrollView>
                     </LinearLayout>
                 </LinearLayout>
             </LinearLayout>

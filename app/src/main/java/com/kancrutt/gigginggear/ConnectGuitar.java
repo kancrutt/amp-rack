@@ -2,7 +2,7 @@ package com.kancrutt.gigginggear;
 
 import androidx.appcompat.app.AppCompatActivity;
 
-import android.app.AlertDialog;
+import androidx.appcompat.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Typeface;
@@ -48,7 +48,7 @@ public class ConnectGuitar extends AppCompatActivity {
         getSupportActionBar().hide();
         MainActivity.applyWallpaper(context, getWindow(),getResources(), findViewById(R.id.bg), getWindowManager().getDefaultDisplay().getWidth(), getWindowManager().getDefaultDisplay().getHeight()); //finally
         if (jsonObject == null) {
-            new AlertDialog.Builder(context)
+            MainActivity.dialogBuilder(context)
                     .setTitle("Unable to parse config file")
                     .setMessage("There is a problem with the build. Please update or report to developer!")
                     .setNegativeButton(android.R.string.ok, null)

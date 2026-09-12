@@ -63,6 +63,8 @@ public:
     bool setAudioApi(oboe::AudioApi);
     bool isAAudioRecommended(void);
     void addPluginToRack(int libraryIndex, int pluginIndex);
+    int  addRoutingBlock(bool isSplit); // 1 = SPLIT (1-in/2-out), 0 = MERGE (2-in/1-out)
+    void insertRoutingBlock(int index, bool isSplit);
 
     int32_t           mSampleRate = oboe::kUnspecified;
     void * handle ;
@@ -85,11 +87,18 @@ public:
     int moveActivePluginUp(int _p);
     int moveActivePlugin(int from, int to);
     void buildPluginChain();
+    // Re-create LADSPA plugins instantiated before the streams opened (wrong
+    // sample rate) at the real rate, preserving control values. Safe to call
+    // when the audio callback is not running (e.g. right after openStreams).
+    void reinitPluginsAtSampleRate();
     void addPluginToRackLazy(char * library, int pluginIndex, SharedLibrary::PluginType _type = SharedLibrary::LADSPA);
     int addPlugintoRackByName(std::string);
     int lowLatency = 12 ;
+    // Guitar input stays mono; playback is stereo. The DSP core remains mono
+    // (bit-identical to the old build) and is fanned out to both output
+    // channels in onBothStreamsReady. Recordings stay mono (queue data).
     const int32_t     mInputChannelCount = oboe::ChannelCount::Mono;
-    const int32_t     mOutputChannelCount = oboe::ChannelCount::Mono;
+    const int32_t     mOutputChannelCount = oboe::ChannelCount::Stereo;
     const oboe::AudioFormat mFormat = oboe::AudioFormat::Float; // for easier processing
 
     std::shared_ptr<oboe::AudioStream> mRecordingStream;
@@ -99,7 +108,7 @@ public:
 
     void test();
     long getTimeStamp();
-    oboe::LatencyTuner *latencyTuner, *latencyTunerOut;
+    oboe::LatencyTuner *latencyTuner = nullptr, *latencyTunerOut = nullptr;
 
 private:
     int32_t           mRecordingDeviceId = oboe::kUnspecified;
@@ -133,7 +142,11 @@ public:
     double getLatency(bool input);
 
     bool setPluginFilename(std::string filename, int plugin);
+    // Engine truth for UI gating (labels, badges, T3K targeting): can a model
+    // file actually be attached to this slot? Mirrors setPluginFilename's
+    // acceptance without touching anything.
     bool canLoadModelFile(int plugin);
+    // Read-back of the model file actually connected to the plugin (engine-level, not UI)
     std::string getPluginLoadedFileName(int plugin);
     std::string lastLoadError;
 

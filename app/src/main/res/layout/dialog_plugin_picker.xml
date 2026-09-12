@@ -3,17 +3,9 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="#15171B"
+    android:background="@drawable/glass_overlay_bg"
     android:orientation="vertical"
     android:padding="16dp">
-
-    <!-- Handle Bar -->
-    <View
-        android:layout_width="40dp"
-        android:layout_height="4dp"
-        android:layout_gravity="center_horizontal"
-        android:layout_marginBottom="12dp"
-        android:background="#3A3A3C" />
 
     <!-- Header Row -->
     <RelativeLayout
@@ -25,155 +17,125 @@
             android:id="@+id/picker_title"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_alignParentLeft="true"
+            android:layout_alignParentStart="true"
             android:layout_centerVertical="true"
             android:fontFamily="@font/plus_jakarta_sans"
             android:text="ADD EFFECT BLOCK"
-            android:textColor="#FFFFFF"
-            android:textSize="18sp"
-            android:letterSpacing="0.05" />
+            android:textColor="@color/gg_glass_text_primary"
+            android:textSize="14sp"
+            android:textStyle="bold" />
 
         <ImageButton
             android:id="@+id/picker_close_btn"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
-            android:layout_alignParentRight="true"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_alignParentEnd="true"
             android:layout_centerVertical="true"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:src="@drawable/ic_baseline_close_24"
-            app:tint="#8E8E93" />
+            app:tint="@color/gg_glass_text_secondary" />
     </RelativeLayout>
 
-    <!-- Search Bar -->
-    <EditText
-        android:id="@+id/picker_search"
+    <!-- Search Box for Effects / Routing -->
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="44dp"
-        android:layout_marginBottom="12dp"
-        android:background="#1E1E22"
-        android:drawableLeft="@drawable/ic_baseline_close_24"
-        android:drawablePadding="8dp"
-        android:hint="Search plugins..."
-        android:paddingLeft="12dp"
-        android:paddingRight="12dp"
-        android:textColor="#FFFFFF"
-        android:textColorHint="#6C6C70"
-        android:textSize="14sp"
-        app:drawableTint="#6C6C70" />
+        android:layout_height="38dp"
+        android:layout_marginBottom="10dp"
+        android:background="@drawable/glass_card_bg"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp">
 
-    <!-- Category Tabs Horizontal Scroll -->
-    <HorizontalScrollView
+        <ImageView
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:src="@drawable/ic_baseline_search_24"
+            app:tint="@color/gg_glass_text_secondary" />
+
+        <EditText
+            android:id="@+id/picker_search_input"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:background="@null"
+            android:fontFamily="@font/plus_jakarta_sans"
+            android:hint="Search effects…"
+            android:textColor="@color/gg_glass_text_primary"
+            android:textColorHint="@color/gg_glass_text_secondary"
+            android:textSize="12sp"
+            android:imeOptions="actionDone"
+            android:singleLine="true" />
+
+        <ImageButton
+            android:id="@+id/picker_search_clear"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_baseline_close_24"
+            android:visibility="gone"
+            app:tint="@color/gg_glass_text_secondary" />
+    </LinearLayout>
+
+    <!-- TONE3000 Entry (full-logo context) — spec §5/6/25 -->
+    <LinearLayout
+        android:id="@+id/t3k_entry_container"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="12dp"
-        android:scrollbars="none">
+        android:orientation="vertical"
+        android:visibility="gone"
+        android:layout_marginBottom="10dp" />
 
-        <com.google.android.material.chip.ChipGroup
-            android:id="@+id/picker_category_chips"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            app:singleLine="true"
-            app:singleSelection="true">
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chip_cat_all"
-                style="@style/Widget.MaterialComponents.Chip.Choice"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:checked="true"
-                android:text="ALL"
-                android:textColor="#FFFFFF"
-                app:chipBackgroundColor="#1E1E22"
-                app:chipStrokeColor="#FF9500"
-                app:chipStrokeWidth="1dp" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chip_cat_amps"
-                style="@style/Widget.MaterialComponents.Chip.Choice"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="AMP/CAB"
-                android:textColor="#FFFFFF"
-                app:chipBackgroundColor="#1E1E22"
-                app:chipStrokeColor="#3A3A3C"
-                app:chipStrokeWidth="1dp" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chip_cat_overdrive"
-                style="@style/Widget.MaterialComponents.Chip.Choice"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="OVERDRIVE"
-                android:textColor="#FFFFFF"
-                app:chipBackgroundColor="#1E1E22"
-                app:chipStrokeColor="#3A3A3C"
-                app:chipStrokeWidth="1dp" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chip_cat_distortion"
-                style="@style/Widget.MaterialComponents.Chip.Choice"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="DISTORTION"
-                android:textColor="#FFFFFF"
-                app:chipBackgroundColor="#1E1E22"
-                app:chipStrokeColor="#3A3A3C"
-                app:chipStrokeWidth="1dp" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chip_cat_modulation"
-                style="@style/Widget.MaterialComponents.Chip.Choice"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="MODULATION"
-                android:textColor="#FFFFFF"
-                app:chipBackgroundColor="#1E1E22"
-                app:chipStrokeColor="#3A3A3C"
-                app:chipStrokeWidth="1dp" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chip_cat_delay"
-                style="@style/Widget.MaterialComponents.Chip.Choice"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="DELAY"
-                android:textColor="#FFFFFF"
-                app:chipBackgroundColor="#1E1E22"
-                app:chipStrokeColor="#3A3A3C"
-                app:chipStrokeWidth="1dp" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chip_cat_reverb"
-                style="@style/Widget.MaterialComponents.Chip.Choice"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="REVERB"
-                android:textColor="#FFFFFF"
-                app:chipBackgroundColor="#1E1E22"
-                app:chipStrokeColor="#3A3A3C"
-                app:chipStrokeWidth="1dp" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chip_cat_utility"
-                style="@style/Widget.MaterialComponents.Chip.Choice"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="UTILITY"
-                android:textColor="#FFFFFF"
-                app:chipBackgroundColor="#1E1E22"
-                app:chipStrokeColor="#3A3A3C"
-                app:chipStrokeWidth="1dp" />
-
-        </com.google.android.material.chip.ChipGroup>
-    </HorizontalScrollView>
-
-    <!-- Plugins RecyclerView -->
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/picker_recycler_view"
+    <!-- Two-Column Body: Left Categories, Right Effects/Routing List -->
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:clipToPadding="false"
-        android:paddingBottom="16dp" />
+        android:layout_height="320dp"
+        android:orientation="horizontal">
 
+        <!-- Left Category Column (Scrollable) -->
+        <ScrollView
+            android:layout_width="140dp"
+            android:layout_height="match_parent"
+            android:background="@drawable/glass_panel_bg"
+            android:padding="4dp">
+
+            <LinearLayout
+                android:id="@+id/picker_cat_container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+        </ScrollView>
+
+        <!-- Right Effects/Plugins List Column (Scrollable) -->
+        <ScrollView
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:background="@drawable/glass_panel_bg"
+            android:padding="4dp">
+
+            <LinearLayout
+                android:id="@+id/picker_items_container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+        </ScrollView>
+    </LinearLayout>
+
+    <!-- Bottom Close Button -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/picker_bottom_close_btn"
+        style="@style/Widget.Material3.Button.TonalButton"
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:layout_marginTop="12dp"
+        android:backgroundTint="@color/gg_surface_2"
+        android:text="CLOSE"
+        android:textColor="@color/gg_glass_text_primary"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:fontFamily="@font/plus_jakarta_sans"
+        app:cornerRadius="8dp" />
 </LinearLayout>

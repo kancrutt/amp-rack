@@ -91,9 +91,9 @@
         android:text="LOAD"
         android:textSize="10sp"
         android:textStyle="bold"
-        android:textColor="#FFAA00"
+        android:textColor="@color/gg_accent"
         app:cornerRadius="8dp"
-        app:strokeColor="#FFAA00"
+        app:strokeColor="@color/gg_accent"
         app:strokeWidth="1dp"/>
 
     <ToggleButton
@@ -119,7 +119,7 @@
         android:padding="0dp"
         android:contentDescription="Delete preset"
         app:icon="@drawable/ic_baseline_delete_forever_24"
-        app:iconTint="#FF3B30"
+        app:iconTint="@color/gg_danger"
         app:iconGravity="textStart"
         app:iconPadding="0dp"/>
 </LinearLayout>

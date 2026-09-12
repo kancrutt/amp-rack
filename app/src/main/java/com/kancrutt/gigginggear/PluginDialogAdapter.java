@@ -51,18 +51,12 @@ public class PluginDialogAdapter extends RecyclerView.Adapter <PluginDialogAdapt
         String pluginName = pluginNames.get(position) ;
         String desc = descriptions.get(position);
         holder.description.setText(desc);
-        if (mainActivity.isPluginLV2(pluginName))
-            holder.pluginName.setText(/*"[LV2] " + */ pluginName);
-        else
-            holder.pluginName.setText(pluginName);
+        holder.pluginName.setText(PluginNaming.displayName(pluginName));
         holder.button.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 if (mainActivity.dataAdapter.plugins.size() > 1 && MainActivity.proVersion == false) {
                     Log.w(TAG, "onClick: " + String.format("already %d plugins in queue", mainActivity.dataAdapter.plugins.size()));
-//                    Intent intent = new Intent(mainActivity, Purchase.class);
-//                    context.startActivity(intent);
-//                    return;
                 }
 
                 int pos = holder.getAdapterPosition();
@@ -105,8 +99,6 @@ public class PluginDialogAdapter extends RecyclerView.Adapter <PluginDialogAdapt
         });
 
         if (mainActivity.useTheme) {
-            mainActivity.skinEngine.cardText(holder.pluginName);
-            // Removed mainActivity.skinEngine.card() to prevent legacy metal textures!
         }
     }
 
@@ -250,7 +242,7 @@ public class PluginDialogAdapter extends RecyclerView.Adapter <PluginDialogAdapt
                 } else if (cat.contains("reverb")) {
                     matches = (c == CategoryHelper.Category.REVERB);
                 } else if (cat.contains("utility")) {
-                    matches = (c == CategoryHelper.Category.EQ || c == CategoryHelper.Category.DYNAMICS || c == CategoryHelper.Category.GATE || c == CategoryHelper.Category.VOLUME);
+                    matches = (c == CategoryHelper.Category.EQ || c == CategoryHelper.Category.DYNAMICS || c == CategoryHelper.Category.GATE || c == CategoryHelper.Category.UTILITY);
                 }
 
                 if (matches) {

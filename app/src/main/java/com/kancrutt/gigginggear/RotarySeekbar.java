@@ -53,7 +53,12 @@ public class RotarySeekbar extends View {
     private final int OPENING_TEXT_MARGIN = dpToPx(2);
     private boolean mbScrolling = false;
 
-    private int mNumSteps = 1;
+    // Default granularity: setValue() snaps to 1/numSteps of the range, and
+    // setOnValueChangedListener() fires immediately on registration. With the
+    // old default (1) every programmatic setValue() snapped to min/max — e.g.
+    // the master-volume setValue(80) rendered + wrote 100. 100 steps = 1%
+    // granularity; discrete params override via setNumSteps() at their call site.
+    private int mNumSteps = 100;
     private float mMinValue = 0;
     private float mMaxValue = 100;
     private int mValueNumDigits = 1;
@@ -410,6 +415,10 @@ public class RotarySeekbar extends View {
         }
     }
 
+    public void setNumSteps(int steps) {
+        mNumSteps = Math.max(1, steps);
+    }
+
     public void setValueByStep(int step) {
         // setValue will enforce clamping of the value
         setValue(mMinValue+step*(mMaxValue-mMinValue)/mNumSteps);
@@ -497,8 +506,34 @@ public class RotarySeekbar extends View {
         return rotation;
     }
 
+    private boolean mLogarithmic = false;
+
+    public void setLogarithmic(boolean logarithmic) {
+        mLogarithmic = logarithmic && mMinValue > 0 && mMaxValue > 0;
+    }
+
+    private boolean isLogActive() {
+        return mLogarithmic && mMinValue > 0 && mMaxValue > 0;
+    }
+
+    private float valueProgress(float value) {
+        if (isLogActive()) {
+            float p = (float) ((Math.log(value) - Math.log(mMinValue)) / (Math.log(mMaxValue) - Math.log(mMinValue)));
+            return Math.max(0f, Math.min(1f, p));
+        }
+        return (value - mMinValue) / (mMaxValue - mMinValue);
+    }
+
+    private float progressValue(float progress) {
+        if (isLogActive()) {
+            float p = Math.max(0f, Math.min(1f, progress));
+            return (float) Math.exp(Math.log(mMinValue) + p * (Math.log(mMaxValue) - Math.log(mMinValue)));
+        }
+        return mMinValue + progress * (mMaxValue - mMinValue);
+    }
+
     public float valueToRotation() {
-        float rotation = (270- mSectorHalfOpening -(mValue-mMinValue)/(mMaxValue-mMinValue)*(360-2* mSectorHalfOpening));
+        float rotation = (270- mSectorHalfOpening -valueProgress(mValue)*(360-2* mSectorHalfOpening));
         return clampRotation(rotation);
     }
 
@@ -833,7 +868,7 @@ public class RotarySeekbar extends View {
         else if (sweepRatio < 0.0f)
             sweepRatio = 0.0f;
 
-        return snapValueToSteps((mMaxValue - mMinValue) * sweepRatio + mMinValue);
+        return snapValueToSteps(progressValue(sweepRatio));
     }
 
     public boolean showValue() { return mShowValue; }

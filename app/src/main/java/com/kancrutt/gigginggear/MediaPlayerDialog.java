@@ -1,6 +1,6 @@
 package com.kancrutt.gigginggear;
 
-import android.app.AlertDialog;
+import androidx.appcompat.app.AlertDialog;
 import android.app.Dialog;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -39,7 +39,7 @@ public class MediaPlayerDialog {
     public Dialog create (MainActivity context) {
         mainActivity = context ;
         mediaPlayer = mainActivity.mediaPlayer;
-        AlertDialog.Builder builder = new AlertDialog.Builder(context);
+        AlertDialog.Builder builder = MainActivity.dialogBuilder(context);
         LayoutInflater inflater = context.getLayoutInflater();
 
         ConstraintLayout constraintLayout = (ConstraintLayout) inflater.inflate(R.layout.media_player_dialog, null);
@@ -212,7 +212,7 @@ public class MediaPlayerDialog {
         deleteFile.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                AlertDialog.Builder builder = new AlertDialog.Builder(context);
+                AlertDialog.Builder builder = MainActivity.dialogBuilder(context);
                 builder.setMessage("Are you sure you want to delete this file?")
                         .setTitle("Delete " + mainActivity.lastRecordedFileName)
                         .setPositiveButton("Delete", new DialogInterface.OnClickListener() {

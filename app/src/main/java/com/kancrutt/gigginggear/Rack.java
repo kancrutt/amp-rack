@@ -46,7 +46,6 @@ import androidx.annotation.Nullable;
 import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.constraintlayout.widget.ConstraintSet;
 import androidx.fragment.app.Fragment;
-import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -193,14 +192,14 @@ public class Rack extends Fragment {
             mainActivity.linearLayoutPluginDialog.post(new Runnable() {
                 @Override
                 public void run() {
-                    mainActivity.skinEngine.card(mainActivity.linearLayoutPluginDialog);
+                    
 
                 }
             });
 
         toggleVideo = mainActivity.findViewById(R.id.video_button);
         if (mainActivity.useTheme) {
-            mainActivity.skinEngine.toggleWithKey(mainActivity.rack.toggleVideo, "icons", "camera", "camera", true);
+            
 
         }
 
@@ -228,14 +227,6 @@ public class Rack extends Fragment {
                 toggleVideo.setChecked(true);
             }
         });
-        if (mainActivity.useTheme) {
-            Bitmap b = mainActivity.skinEngine.bitmapDrawable("card", "bg").getBitmap();
-            if (b != null) {
-                Log.d(TAG, "onViewCreated: " + b.getHeight());
-                videoPreview.setBackground(new BitmapDrawable(Bitmap.createScaledBitmap(b, 90, (220 / 90) * b.getHeight(), true)));
-            }
-//            mainActivity.skinEngine.card(videoPreview);
-        }
 
         videoRecord.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
@@ -413,8 +404,11 @@ public class Rack extends Fragment {
             signalChainCanvas.setOnDeleteNodeListener(node -> {
                 if (node != null && node.id >= 0) {
                     try {
-                        mainActivity.deletePluginAndSyncTone3000(node.id);
-                        if (mainActivity.dataAdapter != null) mainActivity.dataAdapter.notifyDataSetChanged();
+                        AudioEngine.deletePlugin(node.id);
+                        signalChainCanvas.postDelayed(() -> {
+                            signalChainCanvas.loadFromActivePlugins();
+                            if (mainActivity.dataAdapter != null) mainActivity.dataAdapter.notifyDataSetChanged();
+                        }, 80);
                     } catch (Exception e) {
                         Log.e(TAG, "deletePlugin failed for index " + node.id, e);
                     }
@@ -572,7 +566,7 @@ public class Rack extends Fragment {
             quickSaveBtn.setOnClickListener(v -> showQuickSaveDialog());
         }
 
-        com.google.android.material.button.MaterialButton sceneBtn = view.findViewById(R.id.top_scene_btn);
+        com.google.android.material.button.MaterialButton sceneBtn = view.findViewById(R.id.top_scene_dropdown);
         SharedPreferences scenePrefs = getContext().getSharedPreferences("giggingear_scenes", android.content.Context.MODE_PRIVATE);
         String[] defaultSceneNames = getContext().getResources().getStringArray(R.array.scene_slots);
         final java.util.ArrayList<String> sceneNames = new java.util.ArrayList<>();
@@ -645,7 +639,7 @@ public class Rack extends Fragment {
             return insets;
         });
 
-        FloatingActionButton fabAddBlock = view.findViewById(R.id.fab_add_block);
+        com.google.android.material.button.MaterialButton fabAddBlock = view.findViewById(R.id.fab_add_block);
         if (fabAddBlock != null) {
             fabAddBlock.setOnClickListener(v -> {
                 PluginPickerFragment.newInstance().show(getParentFragmentManager(), "plugin_picker");
@@ -790,27 +784,7 @@ public class Rack extends Fragment {
             TextView textView = view.findViewById(R.id.app_main_title);
             textView.setText("Pro");
             (view.findViewById(R.id.pro_label)).setVisibility(View.VISIBLE);
-        } else {
-            TextView proLabel = view.findViewById(R.id.pro_label);
-            proLabel.setVisibility(View.VISIBLE);
-            proLabel.setEnabled(true);
-            proLabel.setText("Get Pro");
-            proLabel.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    startActivity(new Intent(mainActivity, Purchase.class));
-                }
-            });
         }
-
-        getPro.setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
-            @Override
-            public boolean onMenuItemClick(MenuItem menuItem) {
-                Intent intent = new Intent(mainActivity, Purchase.class);
-                startActivity(intent);
-                return true;
-            }
-        });
 
         MenuItem connectGuitar = optionsMenu.getMenu().getItem(4);
         connectGuitar.setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
@@ -1081,8 +1055,7 @@ public class Rack extends Fragment {
             });
             mainActivity.toggleMixer.setOnCheckedChangeListener((compoundButton, b) -> {
                 AudioEngine.toggleMixer(!b);
-                if (mainActivity.useTheme && mainActivity.skinEngine != null)
-                    mainActivity.skinEngine.toggleWithKey(mainActivity.toggleMixer, "icons", "mixer-on", "mixer-off", !b);
+                    
                 if (mixer != null) mixer.setVisibility(GONE);
             });
             mainActivity.toggleMixer.setChecked(mainActivity.defaultSharedPreferences.getBoolean("toggleMixer", false));
@@ -1250,7 +1223,7 @@ public class Rack extends Fragment {
                 outLabel = mainActivity.findViewById(R.id.mixer_output_label);
 
 
-        if (mainActivity.skinEngine == null || ! mainActivity.skinEngine.hasKnob()) {
+        if (true) {
             inLabel.setOnLongClickListener(new View.OnLongClickListener() {
                 @Override
                 public boolean onLongClick(View v) {
@@ -1269,71 +1242,71 @@ public class Rack extends Fragment {
         }
 
         if (mainActivity.useTheme) {
-            mainActivity.skinEngine.cardText(mainActivity.patchDesc);
-            mainActivity.skinEngine.cardText(mainActivity.hidePanel);
-            mainActivity.skinEngine.cardText(mainActivity.triggerRecordToggle);
+            
+            
+            
             mainActivity.toggleMixer.setCompoundDrawables(null,null,null,null);
 
-            mainActivity.skinEngine.cardText(mixerLabel);
-            mainActivity.skinEngine.cardText(patchName);
-            mainActivity.skinEngine.cardText(inLabel);
-            mainActivity.skinEngine.cardText(outLabel);
-            mainActivity.skinEngine.cardText(patchLabel);
+            
+            
+            
+            
+            
 
-            mainActivity.skinEngine.cardText(inRotaryDisplay);
-            mainActivity.skinEngine.cardText(outRotaryDisplay);
-            mainActivity.skinEngine.cardText(inRotaryLabel);
-            mainActivity.skinEngine.cardText(outRotaryLabel);
+            
+            
+            
+            
 
             boolean mixerIsVisible  = false ;
             if (mixer.getVisibility() == View.VISIBLE)
                 mixerIsVisible = true ;
 
-            mainActivity.skinEngine.toggleWithKey(mainActivity.toggleMixer, "icons", "mixer-on", "mixer-off", mixerIsVisible);
+            
 
             ImageView wallpaper = mainActivity.findViewById(R.id.wallpaper);
             // Disabled legacy wallpaper and header texturing to allow clean pedalboard canvas!
             // mainActivity.skinEngine.wallpaper(wallpaper);
             // mainActivity.skinEngine.header(mainActivity.findViewById(R.id.master_button_box));
 
-            mainActivity.skinEngine.toggle(toggleButton, false);
+            
             toggleButton.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
                 @Override
                 public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
                     Log.d(TAG, "onCheckedChanged() called with: buttonView = [" + buttonView + "], isChecked = [" + isChecked + "]");
 //                    mainActivity.toggleEffect(!isChecked);
                     mainActivity.onOff.setChecked(isChecked);
-                    mainActivity.skinEngine.toggle(toggleButton, isChecked);
+                    
                 }
             });
 
             toggleButton.setVisibility(View.VISIBLE);
             mainActivity.onOff.setVisibility(GONE);
 
-            mainActivity.skinEngine.view (optionsBtn, "menu", "overflow", SkinEngine.Resize.Height, .5f);
+            
             optionsBtn.setCompoundDrawables(null, null, null, null);
-            mainActivity.skinEngine.setLogo(mainActivity.findViewById(R.id.logo_img));
+            
 
-            mainActivity.skinEngine.slider(mainActivity.inputVolume);
-            mainActivity.skinEngine.slider(mainActivity.outputVolume);
-            mainActivity.skinEngine.card (mixer);
+            
+            
+            
 
             if (mixer.getVisibility() == View.VISIBLE) {
                 mixerInit = true ;
-//                mainActivity.skinEngine.toggleWithKey(mainActivity.toggleMixer, "icons", "mixer-on", "mixer-off", true);
+//                
 
                 mixer.post(new Runnable() {
                     @Override
                     public void run() {
                         Log.i(TAG, "run: theming mixer");
-                        mainActivity.skinEngine.card(mixer);
-                        mainActivity.skinEngine.toggleWithKey(mainActivity.toggleMixer, "icons", "mixer-on", "mixer-off", true);
+                        
+                        
 
                     }
                 });
             }
 
-            if (mainActivity.skinEngine.hasKnob()) {
+            if (true) {
                 LinearLayout rotaryRack = mainActivity.findViewById(R.id.rotary_rack);
                 rotaryRack.setVisibility(View.VISIBLE);
 
@@ -1341,9 +1314,9 @@ public class Rack extends Fragment {
                 mainActivity.rotarySeekbarOut = mainActivity.findViewById(R.id.rotary_output_volume);
                 mainActivity.displayIn = mainActivity.findViewById(R.id.rotary_input_display);
                 mainActivity.displayOut = mainActivity.findViewById(R.id.rotary_output_display);
-                mainActivity.skinEngine.rotary(mainActivity.rotarySeekbarIn, 3, 0, 100, 50);
+                
 
-                mainActivity.skinEngine.rotary(mainActivity.rotarySeekbarOut, 3, 0, 100, 50);
+                
                 mainActivity.rotarySeekbarIn.setValue(mainActivity.defaultSharedPreferences.getFloat("inputVolume", 1.0f) * 100);
                 mainActivity.rotarySeekbarOut.setValue(mainActivity.defaultSharedPreferences.getFloat("outputVolume", 1.0f)*100);
                 mainActivity.displayIn.setText(String.valueOf((int) (mainActivity.defaultSharedPreferences.getFloat("inputVolume", 1.0f)* 100)));
@@ -1797,6 +1770,15 @@ public class Rack extends Fragment {
 
     private int dp(float value) {
         return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
+    void onPresetLoadedFromList(int position, String fPresetName) {
+        if (mainActivity == null) return;
+        currentPresetNumber = position + 1;
+        String name = fPresetName != null ? fPresetName : "";
+        if (mainActivity.patchName != null) mainActivity.patchName.setText(name);
+        mainActivity.syncTopBarPresetInfo(currentPresetNumber);
+        updateTopBarPresetDisplay(currentPresetNumber, name);
     }
 
     private View topBarForCollapse;

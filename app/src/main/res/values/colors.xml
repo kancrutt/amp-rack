@@ -20,13 +20,13 @@
     <color name="cold">#FFD700</color>
     <color name="pink">#FFC0CB</color>
     <color name="light_pink">#FFB6C1</color>
-    <color name="orange">#FFA500</color>
+    <color name="orange">#FFFFFF</color>
     <color name="light_salmon">#FFA07A</color>
-    <color name="dark_orange">#FF8C00</color>
+    <color name="dark_orange">#F5F5F5</color>
     <color name="coral">#FF7F50</color>
     <color name="hot_pink">#FF69B4</color>
     <color name="tomato">#FF6347</color>
-    <color name="orange_red">#FF4500</color>
+    <color name="orange_red">#E0E0E0</color>
     <color name="deep_pink">#FF1493</color>
     <color name="fuchsia">#FF00FF</color>
     <color name="magenta">#FF00FF</color>
@@ -143,14 +143,36 @@
     <color name="fui_transparent">#00000000</color>
     <color name="colorPrimary">#FFAA00</color>
 
+    <!-- ============================================================
+         VERSION 2.0 VISUAL STYLE GUIDE TOKENS
+         ============================================================ -->
+    <!-- Dark Base: #0E0F12 -->
+    <color name="gg_dark_base">#0E0F12</color>
+    <!-- Surface: #17191E -->
+    <color name="gg_surface">#17191E</color>
+    <!-- Surface-2 (elevated): #1F2228 -->
+    <color name="gg_surface_2">#1F2228</color>
+    <!-- Surface-glass: rgba(31, 34, 40, 0.65) -> #A61F2228 -->
+    <color name="gg_surface_glass">#A61F2228</color>
+    <!-- Border: rgba(255, 255, 255, 0.08) -> #14FFFFFF -->
+    <color name="gg_border_subtle">#14FFFFFF</color>
+    <!-- Accent (primary): #FFFFFF (neutral) -->
+    <color name="gg_accent_orange">#FFFFFF</color>
+    <!-- Accent (secondary): #22C55E (green) -->
+    <color name="gg_accent_green">#22C55E</color>
+    <!-- Text Primary: #E6E6E6 -->
+    <color name="gg_text_primary_v2">#E6E6E6</color>
+    <!-- Text Secondary: #A1A1AA -->
+    <color name="gg_text_secondary_v2">#A1A1AA</color>
+
     <!-- Phase 2.4/2.5 dark UI tokens -->
-    <color name="gg_bg">#121214</color>
-    <color name="gg_card">#1E1E22</color>
-    <color name="gg_border">#3A3A3C</color>
-    <color name="gg_secondary">#8E8E93</color>
-    <color name="gg_hint">#6C6C70</color>
-    <color name="gg_accent">#FF9500</color>
-    <color name="gg_text">#FFFFFF</color>
+    <color name="gg_bg">#0E0F12</color>
+    <color name="gg_card">#17191E</color>
+    <color name="gg_border">#14FFFFFF</color>
+    <color name="gg_secondary">#A1A1AA</color>
+    <color name="gg_hint">#71717A</color>
+    <color name="gg_accent">#FFFFFF</color>
+    <color name="gg_text">#E6E6E6</color>
 
     <!-- ============================================================
          ICON CATEGORY COLOR SYSTEM
@@ -270,23 +292,51 @@
     <color name="color_cat_volume_inactive">#004D54</color>
     <color name="color_cat_noisegate_inactive">#593E00</color>
 
+    <!-- ============================================================
+         GLASSMORPHISM / GLIMMER DESIGN TOKENS (v2.0)
+         Surface hierarchy, borders, glow, text on glass
+         ============================================================ -->
+
+    <!-- Level 0: Background (fully opaque, darkest #0E0F12) -->
+    <color name="gg_glass_bg">#0E0F12</color>
+
+    <!-- Level 1: Base glass surface (#17191E with alpha or solid) -->
+    <color name="gg_glass_surface">#E617191E</color>
+
+    <!-- Level 2: Elevated glass card (#1F2228 with alpha) -->
+    <color name="gg_glass_surface_card">#DF1F2228</color>
+
+    <!-- Level 3: Active/selected glass -->
+    <color name="gg_glass_surface_selected">#D1272B33</color>
+    <color name="gg_surface_selected">#272B33</color>
+
+    <!-- Level 4: Dialog / modal overlay -->
+    <color name="gg_glass_surface_overlay">#F217191E</color>
+
+    <!-- Glass borders (rgba(255,255,255,0.08) -> #14FFFFFF) -->
+    <color name="gg_glass_border">#14FFFFFF</color>
+    <color name="gg_glass_border_accent">#4DFF8A00</color>
+    <color name="gg_glass_border_dim">#0DFFFFFF</color>
+
+    <!-- Glow / accent for active elements -->
+    <color name="gg_glass_glow_accent">#1AFF8A00</color>
+    <color name="gg_glass_glow_selected">#14FFFFFF</color>
+
+    <!-- Glass text hierarchy -->
     <color name="gg_glass_text_primary">#E6E6E6</color>
     <color name="gg_glass_text_secondary">#A1A1AA</color>
     <color name="gg_glass_text_disabled">#52525B</color>
-    <color name="gg_glass_bg">#0E0F12</color>
-    <color name="gg_glass_border">#FFFFFF</color>
-    <color name="gg_glass_border_accent">#FF8A00</color>
-    <color name="gg_glass_border_dim">#FFFFFF</color>
-    <color name="gg_glass_divider">#FFFFFF</color>
-    <color name="gg_glass_glow_accent">#FF8A00</color>
-    <color name="gg_glass_glow_selected">#FFFFFF</color>
-    <color name="gg_glass_shadow">#000000</color>
-    <color name="gg_glass_surface">#17191E</color>
-    <color name="gg_glass_surface_card">#1F2228</color>
-    <color name="gg_glass_surface_overlay">#17191E</color>
-    <color name="gg_glass_surface_selected">#272B33</color>
-    <color name="gg_surface">#17191E</color>
-    <color name="gg_surface_2">#1F2228</color>
-    <color name="gg_surface_glass">#1F2228</color>
-    <color name="gg_surface_selected">#272B33</color>
+
+    <!-- Glass dividers -->
+    <color name="gg_glass_divider">#14FFFFFF</color>
+
+    <!-- Glassy tap ripple (16% white — subtle glow, never a white flash) -->
+    <color name="gg_ripple">#29FFFFFF</color>
+
+    <!-- Glass shadow / elevation tint -->
+    <color name="gg_glass_shadow">#40000000</color>
+
+    <!-- Semantic colors -->
+    <color name="gg_danger">#EF4444</color>
+    <color name="gg_node_status_active">#22C55E</color>
 </resources>

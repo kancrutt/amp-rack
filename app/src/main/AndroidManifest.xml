@@ -27,11 +27,6 @@
             android:exported="false"
             android:theme="@style/Theme.AmpRack" />
         <activity
-            android:name=".Camera"
-            android:exported="false"
-            android:label="Camera"
-            android:theme="@style/Theme.AmpRack" />
-        <activity
             android:name=".FeaturedVideos"
             android:exported="false"
             android:label="@string/title_activity_featured_videos"
@@ -46,25 +41,11 @@
             android:label="Drummer"
             android:theme="@style/Theme.AmpRack" />
         <activity
-            android:name=".Files"
-            android:exported="false"
-            android:label="@string/title_activity_files"
-            android:theme="@style/Theme.MySplash.NoActionBar" />
-        <activity
             android:name=".ConnectGuitar"
             android:exported="false"
             android:label="@string/title_activity_connect_guitar"
             android:theme="@style/Theme.AmpRack" />
 
-        <activity
-            android:name=".Purchase"
-            android:exported="false"
-            android:label="@string/title_activity_purchase"
-            android:theme="@style/Theme.AmpRack">
-            <meta-data
-                android:name="android.support.PARENT_ACTIVITY"
-                android:value="com.kancrutt.gigginggear.MainActivity" />
-        </activity>
         <activity
             android:name=".SettingsActivity"
             android:exported="false"
@@ -85,33 +66,21 @@
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- TONE3000 OAuth callback: gigginggear://tone3000/callback -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
-
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-
-                <data
-                    android:scheme="gigginggear"
-                    android:host="tone3000"
-                    android:path="/callback" />
+                <data android:scheme="gigginggear" android:host="tone3000" android:path="/callback" />
             </intent-filter>
+            <!-- Also accept com.kancrutt.gigginggear scheme as fallback for Custom Tabs -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
-
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-
-                <data
-                    android:scheme="com.kancrutt.gigginggear"
-                    android:host="tone3000"
-                    android:path="/callback" />
+                <data android:scheme="com.kancrutt.gigginggear" android:host="tone3000" android:path="/callback" />
             </intent-filter>
         </activity>
-
-        <meta-data
-            android:name="com.kancrutt.gigginggear.TONE3000_CLIENT_ID"
-            android:value="t3k_pub_TmasX816SaHi4-OVqB5BtGHGL81F3_uU" />
 
         <meta-data
             android:name="preloaded_fonts"
@@ -126,6 +95,11 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/filepaths" />
         </provider>
+
+        <!-- TONE3000 publishable client_id (device-safe). Secret key t3k_cs_... must NEVER be placed here — server-only. -->
+        <meta-data
+            android:name="com.kancrutt.gigginggear.TONE3000_CLIENT_ID"
+            android:value="t3k_pub_TmasX816SaHi4-OVqB5BtGHGL81F3_uU" />
     </application>
 
 </manifest>

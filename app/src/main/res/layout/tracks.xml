@@ -3,7 +3,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:id="@+id/tracks_master"
-    android:background="#121214"
+    android:background="@color/gg_glass_bg"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <LinearLayout
@@ -19,13 +19,16 @@
             android:id="@+id/tracks_rec_row"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="#1A1C20"
+            android:background="@drawable/glass_panel_bg"
             android:gravity="center_vertical"
             android:orientation="vertical"
             android:paddingStart="12dp"
             android:paddingEnd="12dp"
             android:paddingTop="8dp"
-            android:paddingBottom="8dp">
+            android:paddingBottom="8dp"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="8dp"
+            android:layout_marginTop="8dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -37,9 +40,10 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="GUITAR LOOPER"
-                    android:textColor="#FFAA00"
+                    android:textColor="@color/gg_accent"
                     android:textSize="11sp"
-                    android:textStyle="bold" />
+                    android:textStyle="bold"
+                    android:fontFamily="@font/plus_jakarta_sans" />
 
                 <View
                     android:layout_width="0dp"
@@ -51,8 +55,9 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Tap REC to loop guitar playing"
-                    android:textColor="#8F94A0"
-                    android:textSize="10.5sp" />
+                    android:textColor="@color/gg_glass_text_secondary"
+                    android:textSize="10.5sp"
+                    android:fontFamily="@font/plus_jakarta_sans" />
             </LinearLayout>
 
             <LinearLayout
@@ -73,8 +78,8 @@
                     android:textOn="■ STOP REC"
                     android:textSize="11sp"
                     android:textStyle="bold"
-                    android:textColor="#FF3B30"
-                    android:background="@drawable/gg_card_bg" />
+                    android:textColor="@color/gg_danger"
+                    android:background="@drawable/glass_card_bg" />
 
                 <!-- PLAY / LOOP REPLAY Button -->
                 <com.google.android.material.button.MaterialButton
@@ -89,11 +94,12 @@
                     android:insetTop="0dp"
                     android:insetBottom="0dp"
                     android:text="▶ PLAY LOOP"
-                    android:textColor="#00E676"
+                    android:textColor="@color/gg_node_status_active"
                     android:textSize="10.5sp"
                     android:textStyle="bold"
+                    android:fontFamily="@font/plus_jakarta_sans"
                     app:cornerRadius="8dp"
-                    app:strokeColor="#00E676"
+                    app:strokeColor="@color/gg_node_status_active"
                     app:strokeWidth="1dp" />
 
                 <!-- STOP Button -->
@@ -108,9 +114,10 @@
                     android:insetTop="0dp"
                     android:insetBottom="0dp"
                     android:text="STOP"
-                    android:textColor="#ECEFF1"
+                    android:textColor="@color/gg_glass_text_primary"
                     android:textSize="10.5sp"
                     android:textStyle="bold"
+                    android:fontFamily="@font/plus_jakarta_sans"
                     app:cornerRadius="8dp" />
 
                 <!-- CLEAR Button -->
@@ -124,7 +131,7 @@
                     android:insetTop="0dp"
                     android:insetBottom="0dp"
                     android:text="CLEAR"
-                    android:textColor="#FF3B30"
+                    android:textColor="@color/gg_danger"
                     android:textSize="10.5sp"
                     android:textStyle="bold" />
             </LinearLayout>
@@ -158,13 +165,14 @@
                 android:layout_height="14dp"
                 android:layout_marginEnd="6dp"
                 android:src="@drawable/ic_baseline_info_24"
-                app:tint="#8F94A0"/>
+                app:tint="@color/gg_glass_text_secondary"/>
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Long press to share file"
-                android:textColor="#8F94A0"
-                android:textSize="11sp"/>
+                android:textColor="@color/gg_glass_text_secondary"
+                android:textSize="11sp"
+                android:fontFamily="@font/plus_jakarta_sans"/>
         </LinearLayout>
 
         <LinearLayout
@@ -191,8 +199,8 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:textSize="11sp"
-                    android:textColor="#8F94A0"
-                    android:buttonTint="#FFAA00"
+                    android:textColor="@color/gg_glass_text_secondary"
+                    android:buttonTint="@color/gg_accent"
                     android:text="Loop"/>
                 <CheckBox
                     android:id="@+id/gapless"
@@ -200,8 +208,8 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:textSize="11sp"
-                    android:textColor="#8F94A0"
-                    android:buttonTint="#FFAA00"
+                    android:textColor="@color/gg_glass_text_secondary"
+                    android:buttonTint="@color/gg_accent"
                     android:tooltipText="Truncate silence for gapless playback"
                     android:text="Trim"/>
             </LinearLayout>
@@ -213,6 +221,7 @@
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
                     android:orientation="horizontal">
                     <TextView
                         android:layout_width="wrap_content"
@@ -221,23 +230,39 @@
                         android:layout_gravity="center"
                         android:textSize="9sp"
                         android:textStyle="bold"
-                        android:textColor="#8F94A0"/>
-                    <com.google.android.material.slider.Slider
+                        android:textColor="@color/gg_glass_text_secondary"
+                        android:fontFamily="@font/plus_jakarta_sans"/>
+                    <SeekBar
                         android:layout_margin="10dp"
-                        android:layout_width="match_parent"
-                        android:layout_gravity="center"
-                        android:foregroundGravity="center"
+                        android:layout_width="0dp"
+                        android:layout_gravity="center_vertical"
                         android:background="@color/fui_transparent"
                         android:layout_weight="1"
-                        app:trackColorActive="#FFAA00"
-                        app:trackColorInactive="#363942"
-                        app:thumbColor="#ECEFF1"
                         android:id="@+id/tracks_volume"
                         android:layout_height="wrap_content"/>
+            <TextView
+                android:id="@+id/tracks_volume_value"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:gravity="end"
+                android:text="0"
+                android:textSize="10sp"
+                android:textColor="@color/gg_glass_text_secondary"
+                android:fontFamily="@font/plus_jakarta_sans"/>
+                    <!-- Invisible placeholder = BPM reset button (32dp + 8dp margin) so both
+                         sliders measure exactly the same length. -->
+                    <Space
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:layout_gravity="center_vertical"
+                        android:layout_marginEnd="8dp"
+                        android:visibility="invisible"/>
                 </LinearLayout>
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
                     android:orientation="horizontal">
                     <TextView
                         android:layout_width="wrap_content"
@@ -246,27 +271,34 @@
                         android:layout_gravity="center"
                         android:textSize="9sp"
                         android:textStyle="bold"
-                        android:textColor="#8F94A0"/>
-                    <com.google.android.material.slider.Slider
+                        android:textColor="@color/gg_glass_text_secondary"
+                        android:fontFamily="@font/plus_jakarta_sans"/>
+                    <SeekBar
                         android:layout_margin="10dp"
-                        android:layout_width="match_parent"
-                        android:layout_gravity="center"
-                        android:foregroundGravity="center"
+                        android:layout_width="0dp"
+                        android:layout_gravity="center_vertical"
                         android:background="@color/fui_transparent"
                         android:layout_weight="1"
-                        app:trackColorActive="#FFAA00"
-                        app:trackColorInactive="#363942"
-                        app:thumbColor="#ECEFF1"
                         android:id="@+id/tracks_bpm"
                         android:layout_height="wrap_content"/>
+            <TextView
+                android:id="@+id/tracks_bpm_value"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:gravity="end"
+                android:text="0"
+                android:textSize="10sp"
+                android:textColor="@color/gg_glass_text_secondary"
+                android:fontFamily="@font/plus_jakarta_sans"/>
                     <ImageButton
                         android:layout_width="32dp"
                         android:layout_height="32dp"
                         android:layout_gravity="center"
                         android:layout_marginEnd="8dp"
-                        android:background="@drawable/gg_card_bg"
+            android:background="@drawable/glass_card_bg"
                         android:src="@drawable/ic_baseline_refresh_24"
-                        app:tint="#8F94A0"
+                        app:tint="@color/gg_glass_text_secondary"
                         android:contentDescription="Reset BPM"
                         android:id="@+id/tracks_reset_bpm"/>
                 </LinearLayout>
@@ -288,12 +320,13 @@
                 style="@style/Widget.Material3.Button.OutlinedButton"
                 android:id="@+id/load_file"
                 app:icon="@drawable/baseline_file_open_24"
-                app:iconTint="#FFAA00"
-                android:textColor="#FFAA00"
+                app:iconTint="@color/gg_accent"
+                android:textColor="@color/gg_accent"
                 android:textSize="12sp"
                 android:textStyle="bold"
+                android:fontFamily="@font/plus_jakarta_sans"
                 app:cornerRadius="10dp"
-                app:strokeColor="#3A3D45"
+                app:strokeColor="@color/gg_glass_border"
                 android:text="Load File"/>
 
             <Space
@@ -305,17 +338,18 @@
                 android:layout_height="wrap_content"
                 android:text="Skip Silence"
                 android:id="@+id/skip_silence_label"
-                android:textColor="#8F94A0"
+                android:textColor="@color/gg_glass_text_secondary"
                 android:textSize="11sp"
-                android:layout_marginEnd="8dp"/>
+                android:layout_marginEnd="8dp"
+                android:fontFamily="@font/plus_jakarta_sans"/>
             <ToggleButton
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:padding="0dp"
                 android:layout_margin="0dp"
                 android:textSize="11sp"
-                android:textColor="#8F94A0"
-                android:background="@drawable/gg_card_bg"
+                android:textColor="@color/gg_glass_text_secondary"
+            android:background="@drawable/glass_card_bg"
                 android:id="@+id/skip_silence"/>
 
             <TextView

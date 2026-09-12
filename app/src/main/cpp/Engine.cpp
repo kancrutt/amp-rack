@@ -2,6 +2,7 @@
 
 #include "Engine.h"
 #include "Plugin.h"
+#include "RoutingBlocks.h"
 #include "logging_macros.h"
 
 jmethodID Engine::pushAudio = nullptr;
@@ -18,7 +19,8 @@ static jobject gClassLoader;
 static jmethodID gFindClassMethod;
 
 Engine::Engine () {
-    assert(mOutputChannelCount == mInputChannelCount);
+    // NOTE: input (mono) and output (stereo) channel counts intentionally
+    // differ; onBothStreamsReady folds input to a mono DSP core and fans out.
 //    queueManager = new LockFreeQueueManager ();
     fileWriter = new FileWriter ();
     queueManager.add_function (fileWriter->disk_write);
@@ -62,6 +64,10 @@ bool Engine::setEffectOn(bool isOn) {
         if (isOn) {
             success = openStreams() == oboe::Result::OK;
             if (success) {
+                // Streams are open so mSampleRate is real now. Plugins loaded
+                // from a preset beforehand were instantiated at 0/fallback
+                // rate: re-create them at the true rate before audio starts.
+                reinitPluginsAtSampleRate();
                 /*
                 for (int i = 0 ; i < activePlugins.size() ; i ++) {
                     activePlugins.at(i)->print();
@@ -87,9 +93,11 @@ bool Engine::setEffectOn(bool isOn) {
 //                fileWriter->setFileName(externalStoragePath + "/" + std::string (buffer)) ;
 //                fileWriter->setBufferSize(mFullDuplexPass.mBufferSize);
                 int bufferSizeInFrames = mRecordingStream->getBufferSizeInFrames() ;
-                fileWriter->setBufferSize (mPlayStream->getBufferSizeInFrames()/mPlayStream->getChannelCount());
+                // Queue/file data is the MONO DSP core (<= one burst of frames),
+                // so size by frames, not frames/channels.
+                fileWriter->setBufferSize (mPlayStream->getBufferSizeInFrames());
 
-                queueManager.init (mPlayStream->getBufferSizeInFrames()/mPlayStream->getChannelCount());
+                queueManager.init (mPlayStream->getBufferSizeInFrames());
 
                 if (mFullDuplexPass.inSamples != NULL)
                     free (static_cast<void *>(mFullDuplexPass.inSamples));
@@ -97,12 +105,21 @@ bool Engine::setEffectOn(bool isOn) {
                 if (mFullDuplexPass.raw != NULL)
                     free (static_cast<void *>(mFullDuplexPass.raw));
 
-                mFullDuplexPass.inSamples = static_cast<float *>(malloc(mFullDuplexPass.mBufferSize));
-                LOGD("[engine] allocated %d bytes to raw samples", mFullDuplexPass.mBufferSize);
-                mFullDuplexPass.raw = static_cast<float *>(malloc(mFullDuplexPass.mBufferSize));
+                // mBufferSize counts FLOATS (capacityInFrames * channels), so the
+                // byte size must multiply by sizeof(float). malloc(mBufferSize)
+                // was a 4x under-allocation: every callback wrote past the heap
+                // chunk -> corrupted/distorted ("ngaco") audio.
+                if (mFullDuplexPass.mBufferSize <= 0)
+                    mFullDuplexPass.mBufferSize = 4096;
+                mFullDuplexPass.inSamples = static_cast<float *>(calloc(
+                        (size_t) mFullDuplexPass.mBufferSize, sizeof(float)));
+                LOGD("[engine] allocated %d floats to raw samples", mFullDuplexPass.mBufferSize);
+                mFullDuplexPass.raw = static_cast<float *>(calloc(
+                        (size_t) mFullDuplexPass.mBufferSize, sizeof(float)));
 //                for (int i = 0 ; i < mFullDuplexPass.mBufferSize; i ++)
 //                    mFullDuplexPass.raw [i] = 0.0f ;
-                fileWriter->setChannels(mOutputChannelCount);
+                // Recordings capture the mono DSP core from the queue.
+                fileWriter->setChannels(oboe::ChannelCount::Mono);
                 /*
                 if (mFullDuplexPass.recordingActive) {
                     fileWriter->startRecording();
@@ -392,10 +409,10 @@ void Engine::onErrorAfterClose(oboe::AudioStream *oboeStream,
          oboe::convertToText(oboeStream->getDirection()),
          oboe::convertToText(error));
 }
-
 void Engine::addPluginToRackLazy(char* library, int pluginIndex, SharedLibrary::PluginType _type) {
     SharedLibrary * sharedLibrary = new SharedLibrary (library, _type);
     sharedLibrary -> vm = vm ;
+
     if (mainActivityClassName != "")
         sharedLibrary->mainActivityClassName = mainActivityClassName ;
 
@@ -404,6 +421,15 @@ void Engine::addPluginToRackLazy(char* library, int pluginIndex, SharedLibrary::
 
     if (sharedLibrary->descriptors.size() == 0) {
         LOGE("Unable to load shared library!") ;
+        sharedLibrary->unload();
+        delete sharedLibrary;
+        return;
+    }
+
+    if (pluginIndex < 0 || pluginIndex >= (int) sharedLibrary->descriptors.size()) {
+        LOGE("addPluginToRackLazy: pluginIndex %d out of range [0,%d)", pluginIndex, (int) sharedLibrary->descriptors.size());
+        sharedLibrary->unload();
+        delete sharedLibrary;
         return;
     }
 
@@ -412,6 +438,21 @@ void Engine::addPluginToRackLazy(char* library, int pluginIndex, SharedLibrary::
     plugin->sharedLibrary = sharedLibrary;
     if (_type == SharedLibrary::LV2) {
         plugin -> load () ;
+    }
+    // Never publish half-built plugins (null handle, missing port metadata):
+    // running them crashes inside the DSP. Unwind cleanly instead.
+    if (!plugin->loadOk) {
+        LOGE("addPluginToRackLazy: %s failed to load, not adding", library);
+        for (PluginControl * c : plugin->pluginControls) {
+            if (c == nullptr) continue;
+            c->freeMemory();
+            delete c;
+        }
+        plugin->pluginControls.clear();
+        sharedLibrary->unload();
+        delete sharedLibrary;
+        delete plugin;
+        return ;
     }
     activePlugins .push_back(plugin);
     buildPluginChain();
@@ -451,10 +492,24 @@ void Engine::discoverPlugins () {
 void Engine::buildPluginChain () {
     IN
     LOGD("building chain for %d plugins", activePlugins.size());
+    // Rewriting the port/handle arrays while the audio callback reads them
+    // produces glitch bursts on live add/delete. Hold bypass across the
+    // rebuild so in-flight callbacks pass dry instead of half-torn state.
+    // The mutex below is the real guard: the callback try_locks it, so it
+    // can never observe torn arrays or a half-copied DAG plan (SIGSEGV).
+    std::lock_guard<std::mutex> chainLock(mFullDuplexPass.chainMutex);
+    bool wasBypassed = mFullDuplexPass.bypass;
+    mFullDuplexPass.bypass = true;
     mFullDuplexPass.activePlugins = 0;
     for (Plugin *p: activePlugins) {
-        if (!p->active)
+        if (p == nullptr || !p->active)
             continue;
+        // Never publish half-built plugins (null handle/descriptor): their
+        // run() would crash inside the DSP. Logged once per rebuild.
+        if (p->handle == nullptr || p->descriptor == nullptr) {
+            LOGE("buildPluginChain: skipping unloadable plugin");
+            continue;
+        }
         mFullDuplexPass.inputPorts [mFullDuplexPass.activePlugins] = p->inputPort ;
         mFullDuplexPass.outputPorts [mFullDuplexPass.activePlugins] = p->outputPort ;
         mFullDuplexPass.inputPorts2 [mFullDuplexPass.activePlugins] = p->inputPort2 ;
@@ -486,8 +541,60 @@ void Engine::buildPluginChain () {
     }
 
     rebuildDagPlan();
+    mFullDuplexPass.bypass = wasBypassed;
 
     OUT
+}
+
+void Engine::reinitPluginsAtSampleRate() {
+    IN ;
+    if (mSampleRate <= 0) {
+        LOGD("reinitPluginsAtSampleRate: no valid sample rate yet, skipping");
+        OUT ; return ;
+    }
+    bool rebuilt = false ;
+    for (size_t i = 0 ; i < activePlugins.size() ; i ++) {
+        Plugin * old = activePlugins.at(i);
+        if (old == nullptr) continue ;
+        if (old->type != SharedLibrary::LADSPA) {
+            LOGD("reinitPluginsAtSampleRate: skipping non-LADSPA plugin at slot %zu", i);
+            continue ;
+        }
+        if (old->getSampleRate() == (unsigned long) mSampleRate) continue ;
+        LOGD("reinitPluginsAtSampleRate: re-creating %s at %d Hz (was %lu)",
+             old->descriptor != nullptr ? old->descriptor->Name : "?",
+             (int) mSampleRate, old->getSampleRate());
+        // Preserve live + preset control values across re-instantiation.
+        std::vector<float> values ;
+        std::vector<float> presets ;
+        for (PluginControl * c : old->pluginControls) {
+            values.push_back(c->getValue());
+            presets.push_back(c->presetValue);
+        }
+        bool wasActive = old->active ;
+        SharedLibrary * lib = old->sharedLibrary ;
+        const LADSPA_Descriptor * desc = old->descriptor ;
+        for (PluginControl * c : old->pluginControls) {
+            c->freeMemory();
+            delete c ;
+        }
+        old->pluginControls.clear();
+        if (desc != nullptr && desc->deactivate != nullptr && old->handle != nullptr)
+            desc->deactivate(old->handle);
+        old->free();
+        delete old ;
+        Plugin * fresh = new Plugin(desc, (unsigned long) mSampleRate, SharedLibrary::LADSPA);
+        fresh->sharedLibrary = lib ;
+        fresh->active = wasActive ;
+        for (size_t k = 0 ; k < fresh->pluginControls.size() && k < values.size() ; k ++) {
+            fresh->pluginControls.at(k)->setPresetValue(presets.at(k));
+            fresh->pluginControls.at(k)->setValue(values.at(k));
+        }
+        activePlugins.at(i) = fresh ;
+        rebuilt = true ;
+    }
+    if (rebuilt) buildPluginChain();
+    OUT ;
 }
 
 void Engine::rebuildDagPlan() {
@@ -524,6 +631,7 @@ void Engine::rebuildDagPlan() {
 }
 
 void Engine::setGraphEdges(std::vector<ggsolver::Edge> edges) {
+    std::lock_guard<std::mutex> chainLock(mFullDuplexPass.chainMutex);
     mFullDuplexPass.bypass = true;
     graphEdges = edges;
     hasExplicitGraph = true;
@@ -534,32 +642,74 @@ void Engine::setGraphEdges(std::vector<ggsolver::Edge> edges) {
 void Engine::addPluginToRack (int libraryIndex, int pluginIndex) {
     IN
     LOGD("Adding plugin %d: %d", libraryIndex, pluginIndex);
-    if (libraryIndex > libraries.size()) {
-        LOGF ("index %d > libraries size %d", libraryIndex, libraries.size()) ;
+    if (libraryIndex < 0 || libraryIndex >= (int) libraries.size()) {
+        LOGF ("index %d out of range [0,%d)", libraryIndex, (int) libraries.size()) ;
+        return ;
+    }
+    if (pluginIndex < 0 || pluginIndex >= (int) libraries.at(libraryIndex)->descriptors.size()) {
+        LOGF ("pluginIndex %d out of range [0,%d)", pluginIndex, (int) libraries.at(libraryIndex)->descriptors.size()) ;
         return ;
     }
 
     Plugin * plugin = new Plugin (libraries.at(libraryIndex)->descriptors.at(pluginIndex), (long) mSampleRate);
+    if (!plugin->loadOk) {
+        LOGE("addPluginToRack: plugin failed to load, not adding");
+        delete plugin;
+        OUT
+        return ;
+    }
     activePlugins .push_back(plugin);
+    buildPluginChain();
+    OUT
+}
+
+int Engine::addRoutingBlock(bool isSplit) {
+    insertRoutingBlock((int) activePlugins.size(), isSplit);
+    return (int) activePlugins.size();
+}
+
+void Engine::insertRoutingBlock(int index, bool isSplit) {
+    IN
+    const LADSPA_Descriptor * desc = isSplit ? ggrouting::splitDescriptor()
+                                             : ggrouting::mergeDescriptor();
+    if (desc == nullptr) { OUT; return; }
+    Plugin * p = new Plugin(desc, (unsigned long) mSampleRate, SharedLibrary::LADSPA);
+    p->active = true;
+    if (index < 0 || index > (int) activePlugins.size())
+        index = (int) activePlugins.size();
+    activePlugins.insert(activePlugins.begin() + index, p);
     buildPluginChain();
     OUT
 }
 
 int Engine::deletePluginFromRack (int pIndex) {
     IN
+    if (pIndex < 0 || pIndex >= (int) activePlugins.size()) {
+        LOGE("deletePluginFromRack: invalid index %d size %zu", pIndex, activePlugins.size());
+        OUT return (int) activePlugins.size();
+    }
     Plugin * p = activePlugins.at(pIndex);
+    // Unhook first: erase + rebuild (internally locked) publishes arrays
+    // without p, and only then is p torn down. Freeing the handle while the
+    // audio thread might still run it is use-after-free (SIGSEGV).
+    activePlugins.erase( next(begin(activePlugins), pIndex));
+    buildPluginChain();
     for (PluginControl * control: p->pluginControls) {
         control->freeMemory();
+        delete control;
     }
+    p->pluginControls.clear();
 
     if (lazyLoad) {
         p->free();
-        p->sharedLibrary->unload();
+        if (p->sharedLibrary != nullptr) {
+            p->sharedLibrary->unload();
+            delete p->sharedLibrary;
+            p->sharedLibrary = nullptr;
+        }
     }
 
     delete p ;
-    activePlugins.erase( next(begin(activePlugins), pIndex));
-    buildPluginChain();
     return activePlugins.size();
     OUT
 }
@@ -582,7 +732,7 @@ void Engine::loadPlugins () {
 
 int Engine :: moveActivePluginDown (int _p) {
     IN
-    if (_p == activePlugins.size()) {
+    if (_p < 0 || _p >= (int) activePlugins.size()) {
         OUT
         return _p ;
     }
@@ -596,7 +746,7 @@ int Engine :: moveActivePluginDown (int _p) {
 
 int Engine :: moveActivePluginUp (int _p) {
     IN
-    if (_p == 0) {
+    if (_p <= 0 || _p >= (int) activePlugins.size()) {
         OUT
         return _p ;
     }
@@ -638,6 +788,23 @@ int Engine::addPlugintoRackByName (std::string pluginName) {
     return  0 ;
 }
 
+std::string Engine::getPluginLoadedFileName (int plugin) {
+    if (plugin < 0 || plugin >= (int) activePlugins.size()) return "";
+    auto * p = activePlugins.at(plugin);
+    if (p == nullptr) return "";
+    // Returns the file actually connected to the plugin's file port (engine truth),
+    // empty string if no model is connected.
+    if (p->loadedFileType <= 0) return "";
+    return p->loadedFileName;
+}
+
+bool Engine::canLoadModelFile(int plugin) {
+    if (plugin < 0 || plugin >= (int) activePlugins.size()) return false;
+    Plugin * p = activePlugins.at(plugin);
+    if (p == nullptr || p->lv2Descriptor == nullptr || p->type == SharedLibrary::LADSPA) return false;
+    return p->supportsModelFilePorts();
+}
+
 bool Engine::setPluginFilename (std::string filename, int plugin) {
     IN
     lastLoadError.clear();
@@ -662,23 +829,14 @@ bool Engine::setPluginFilename (std::string filename, int plugin) {
     return ok ;
 }
 
-bool Engine::canLoadModelFile (int plugin) {
-    if (plugin < 0 || plugin >= (int) activePlugins.size()) return false ;
-    auto * p = activePlugins.at(plugin);
-    if (p == nullptr || p->lv2Descriptor == nullptr || p->type == SharedLibrary::LADSPA) return false ;
-    return p->filePort != nullptr ;
-}
-
-std::string Engine::getPluginLoadedFileName (int plugin) {
-    if (plugin < 0 || plugin >= (int) activePlugins.size()) return "" ;
-    auto * p = activePlugins.at(plugin);
-    if (p == nullptr) return "" ;
-    return p->loadedFileName ;
-}
-
 bool Engine::setPluginBuffer (float * buffer, int buffer_size, int plugin) {
     IN
 //    LOGD("plugins in queue %d requested %d", activePlugins.size(), plugin);
+    if (plugin < 0 || plugin >= (int) activePlugins.size()) {
+        LOGE("setPluginBuffer: invalid plugin %d (size %d)", plugin, (int) activePlugins.size());
+        OUT
+        return false;
+    }
     mFullDuplexPass.bypass = true ;
 ////    activePlugins.at (plugin)->active = false ;
     activePlugins.at (plugin)->setBuffer (buffer, buffer_size);
@@ -690,6 +848,11 @@ bool Engine::setPluginBuffer (float * buffer, int buffer_size, int plugin) {
 
 bool Engine::setPluginBufferStereo (float * buffer_left, int buffer_size_left, float * buffer_right, int buffer_size_right, int plugin) {
     IN
+    if (plugin < 0 || plugin >= (int) activePlugins.size()) {
+        LOGE("setPluginBufferStereo: invalid plugin %d (size %d)", plugin, (int) activePlugins.size());
+        OUT
+        return false;
+    }
     mFullDuplexPass.bypass = true ;
     activePlugins.at (plugin)->setBufferStereo (buffer_left, buffer_size_left, buffer_right, buffer_size_right);
     mFullDuplexPass.bypass = false ;
@@ -714,7 +877,7 @@ int Engine::getRoutingMode() {
 
 std::string Engine::tuneLatency () {
     IN
-    if (! mIsEffectOn)
+    if (! mIsEffectOn || !mRecordingStream || !mPlayStream || !latencyTuner || !latencyTunerOut)
         return std::string ("Turn on audio engine first") ;
 
     mRecordingStream->setBufferSizeInFrames(mRecordingStream->getFramesPerBurst() * 2);
@@ -759,8 +922,10 @@ int Engine::pushToVideo (AudioBuffer * buffer) {
 }
 
 long Engine::getTimeStamp () {
+    if (!mRecordingStream) return 0;
     const oboe::ResultWithValue<oboe::FrameTimestamp> &frameTimeStamp = mRecordingStream->getTimestamp(
             CLOCK_MONOTONIC);
+    if (!frameTimeStamp) return 0;
     return frameTimeStamp.value().timestamp ;
 }
 
@@ -769,24 +934,25 @@ void Engine::setSampleRateDisplay (int sampleRate, bool lowLatency) {
 }
 
 double Engine::getLatency (bool input) {
+    if (!mPlayStream || !mRecordingStream) return -1.0;
     if (mPlayStream->usesAAudio())
         LOGI("using AAudio");
 
     if (input) {
         const oboe::ResultWithValue<double> &latency = mRecordingStream->calculateLatencyMillis();
-        return latency.value();
+        return latency ? latency.value() : -1.0;
     } else {
         int frames = mPlayStream->getFramesWritten() - mPlayStream->getFramesRead();
-        int bufferLatencyMillis = 1000 * frames / mPlayStream->getSampleRate();
+        int bufferLatencyMillis = mPlayStream->getSampleRate() > 0
+                ? 1000 * frames / mPlayStream->getSampleRate() : 0;
 
         const oboe::ResultWithValue<double> &latency = mPlayStream->calculateLatencyMillis();
-        LOGD("[%f: %d] %d %d %d %d", latency.value(), bufferLatencyMillis,
+        double latVal = latency ? latency.value() : -1.0;
+        LOGD("[%f: %d] %d %d %d", latVal, bufferLatencyMillis,
                 mPlayStream->getFramesPerBurst(),
-                mPlayStream->getXRunCount().value(),
                 mPlayStream->getBufferSizeInFrames(),
                 mPlayStream->getBufferCapacityInFrames());
-//        mPlayStream->setBufferSizeInFrames(mPlayStream->getFramesPerBurst());
-        return latency.value() ;// - bufferLatencyMillis;
+        return latVal ;
     }
 }
 
@@ -868,8 +1034,8 @@ int Engine::push (AudioBuffer * buffer) {
                                             "(Ljava/lang/String;)Ljava/lang/Class;");
         mainActivity = findClassWithEnv(env, mainActivityClassName.c_str());
         if (mainActivity == nullptr) {
-            LOGF ("Cannot find class %s", mainActivityClassName.c_str());
-            abort();
+            LOGE ("Cannot find class %s", mainActivityClassName.c_str());
+            return -1;
         }
 
         pushSamplesMethod = env->GetStaticMethodID(mainActivity, pushSamplesMethodName.c_str(),"([FI)V");
@@ -880,11 +1046,12 @@ int Engine::push (AudioBuffer * buffer) {
 
     float * data = buffer->data ;
     int samples = buffer -> pos ;
+    int toPush = std::min(samples, 4096);
 
-    env->SetFloatArrayRegion(pushSamples, 0, samples+1,
+    env->SetFloatArrayRegion(pushSamples, 0, toPush,
                                    data);
     env->CallStaticVoidMethod(mainActivity, pushSamplesMethod, pushSamples,
-                              samples);
+                              toPush);
 
     OUT
     return 0;

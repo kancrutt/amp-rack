@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#121214">
+    android:background="@color/gg_glass_bg">
 
     <!-- Header bar -->
     <TextView
@@ -12,10 +12,11 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="12dp"
         android:text="TUNER"
-        android:textColor="#8E8E93"
+        android:textColor="@color/gg_glass_text_secondary"
         android:textSize="14sp"
         android:textStyle="bold"
         android:letterSpacing="0.3"
+        android:fontFamily="@font/plus_jakarta_sans"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
@@ -29,7 +30,7 @@
         android:background="?attr/selectableItemBackgroundBorderless"
         android:contentDescription="Close tuner"
         android:src="@drawable/ic_baseline_close_24"
-        app:tint="#8E8E93"
+        app:tint="@color/gg_glass_text_secondary"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
@@ -50,18 +51,20 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="E2"
-            android:textColor="#FFFFFF"
+            android:textColor="@color/gg_glass_text_primary"
             android:textSize="84sp"
             android:includeFontPadding="false"
-            android:textStyle="bold" />
+            android:textStyle="bold"
+            android:fontFamily="@font/plus_jakarta_sans" />
 
         <TextView
             android:id="@+id/tuner_freq"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="82.41 Hz"
-            android:textColor="#8E8E93"
-            android:textSize="15sp" />
+            android:textColor="@color/gg_glass_text_secondary"
+            android:textSize="15sp"
+            android:fontFamily="@font/plus_jakarta_sans" />
     </LinearLayout>
 
     <!-- Meter bar -->
@@ -81,7 +84,7 @@
             android:id="@+id/tuner_marker_flat"
             android:layout_width="20dp"
             android:layout_height="4dp"
-            android:background="#FF3B30"
+            android:background="@color/gg_danger"
             android:alpha="0.5" />
 
         <View
@@ -94,14 +97,14 @@
             android:id="@+id/tuner_marker_sharp"
             android:layout_width="20dp"
             android:layout_height="4dp"
-            android:background="#FF3B30"
+            android:background="@color/gg_danger"
             android:alpha="0.5" />
 
         <View
             android:id="@+id/tuner_indicator"
             android:layout_width="4dp"
             android:layout_height="24dp"
-            android:background="#FFAA00" />
+            android:background="@color/gg_accent" />
     </LinearLayout>
 
     <!-- Flat / Sharp labels -->
@@ -121,22 +124,25 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="◀ FLAT"
-            android:textColor="#FF3B30"
+            android:textColor="@color/gg_danger"
             android:textSize="11sp"
-            android:textStyle="bold" />
+            android:textStyle="bold"
+            android:fontFamily="@font/plus_jakarta_sans" />
 
         <View
             android:layout_width="0dp"
             android:layout_height="1dp"
-            android:layout_weight="1" />
+            android:layout_weight="1"
+            android:background="@color/gg_glass_divider" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="SHARP ▶"
-            android:textColor="#FFAA00"
+            android:textColor="@color/gg_accent"
             android:textSize="11sp"
-            android:textStyle="bold" />
+            android:textStyle="bold"
+            android:fontFamily="@font/plus_jakarta_sans" />
     </LinearLayout>
 
     <TextView
@@ -145,9 +151,10 @@
         android:layout_height="wrap_content"
         android:layout_marginBottom="12dp"
         android:text="+0 cents"
-        android:textColor="#00E676"
+        android:textColor="@color/gg_node_status_active"
         android:textSize="18sp"
         android:textStyle="bold"
+        android:fontFamily="@font/plus_jakarta_sans"
         app:layout_constraintBottom_toTopOf="@id/tuner_mute"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent" />
@@ -160,11 +167,12 @@
         android:layout_marginBottom="16dp"
         android:minHeight="40dp"
         android:text="MUTE AUDIO: OFF"
-        android:textColor="#FFFFFF"
+        android:textColor="@color/gg_glass_text_primary"
         android:textSize="12sp"
         android:textStyle="bold"
+        android:fontFamily="@font/plus_jakarta_sans"
         app:cornerRadius="20dp"
-        app:strokeColor="#00E676"
+        app:strokeColor="@color/gg_accent"
         app:strokeWidth="1.5dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"

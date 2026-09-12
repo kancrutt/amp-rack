@@ -3,6 +3,7 @@
 //
 
 #include "LockFreeQueue.h"
+#include <algorithm>
 
 LockFreeQueue<AudioBuffer *, LOCK_FREE_SIZE> LockFreeQueueManager::lockFreeQueue;
 std::thread LockFreeQueueManager::fileWriteThread  ;
@@ -79,12 +80,13 @@ void LockFreeQueueManager::process (float * raw, float * data, int samplesToProc
         return;
     }
 
-    for (int i = 0 ; i < samplesToProcess ; i ++) {
+    int toProcess = std::min(samplesToProcess, buffer_size);
+    for (int i = 0 ; i < toProcess ; i ++) {
         pAudioBuffer [buffer_counter]->raw [i] = raw [i] ;
         pAudioBuffer [buffer_counter]->data [i] = data [i] ;
     }
 
-    pAudioBuffer [buffer_counter]->pos = samplesToProcess;
+    pAudioBuffer [buffer_counter]->pos = toProcess;
     lockFreeQueue.push (pAudioBuffer [buffer_counter]);
 
     buffer_counter ++ ;

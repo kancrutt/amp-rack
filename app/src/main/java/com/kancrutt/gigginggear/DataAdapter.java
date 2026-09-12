@@ -22,7 +22,7 @@ import java.util.HashMap;
 public class DataAdapter extends RecyclerView.Adapter<DataAdapter.ViewHolder> {
     String TAG = "DataAdapter";
     Context context = null;
-    int primaryColor = Color.parseColor("#FFAA00");
+    int primaryColor = Color.parseColor("#FFFFFF");
     public int totalItems = 0;
     ArrayList<Integer> plugins = new ArrayList<>();
     public ArrayList<ViewHolder> holders = new ArrayList<>();
@@ -88,7 +88,7 @@ public class DataAdapter extends RecyclerView.Adapter<DataAdapter.ViewHolder> {
             }
 
             if (holder.pluginName != null) {
-                holder.pluginName.setText(pluginName);
+                holder.pluginName.setText(PluginNaming.displayName(pluginName));
                 holder.pluginName.setTextColor(Color.parseColor("#FFFFFF"));
             }
 
@@ -154,7 +154,16 @@ public class DataAdapter extends RecyclerView.Adapter<DataAdapter.ViewHolder> {
                 holder.deleteButton.setOnClickListener(v -> {
                     int pos = holder.getAdapterPosition();
                     if (pos >= 0 && pos < plugins.size()) {
-                        AudioEngine.deletePlugin(pos);
+                        Log.d(TAG, "deleteButton: deleting slot " + pos);
+                        // Route through the central delete path so T3K meta shifts +
+                        // canvas + badges re-sync (inline editor and canvas FAB must
+                        // share the same path, otherwise the T3K badge "follows" the
+                        // stale slot index and lands on the wrong block).
+                        try { mainActivity.deletePluginAndSyncTone3000(pos); }
+                        catch (Exception e) {
+                            Log.e(TAG, "deletePluginAndSyncTone3000 failed, direct fallback", e);
+                            AudioEngine.deletePlugin(pos);
+                        }
                         deleteItem(pos);
                     }
                 });

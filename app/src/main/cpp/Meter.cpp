@@ -186,10 +186,11 @@ int Meter::updateMeterOutput (AudioBuffer * buffer) {
         }
 
         if (videoRecording) {
-            envOutput->SetFloatArrayRegion(pushVideoSamples, 0, samples+1,
+            int toPush = std::min(samples, TUNER_ARRAY_SIZE);
+            envOutput->SetFloatArrayRegion(pushVideoSamples, 0, toPush,
                                           data);
             envOutput->CallStaticVoidMethod(mainActivityOutput, pushToVideo, pushVideoSamples,
-                                            samples);
+                                            toPush);
         }
 
         // mp4 muxer test
@@ -437,9 +438,11 @@ int Meter::updateOutput (float *data, size_t frames) {
 }
 
 void Meter::process (int nframes, const float * data, bool isInput) {
+    const int maxFrames = 1024;
+    int framesToCopy = std::min(nframes, maxFrames);
     if (isInput) {
         if (bufferUsed < MAX_STATIC_BUFFER) {
-            for (int i = 0; i < nframes; i++) {
+            for (int i = 0; i < framesToCopy; i++) {
                 buffers[bufferUsed].data[i] = data[i];
 
                 if (tunerEnabled) {
@@ -453,7 +456,7 @@ void Meter::process (int nframes, const float * data, bool isInput) {
                 }
             }
 
-            buffers[bufferUsed].pos = nframes;
+            buffers[bufferUsed].pos = framesToCopy;
             buffers[bufferUsed].isInput = isInput;
 
             bufferUsed++;
@@ -467,11 +470,11 @@ void Meter::process (int nframes, const float * data, bool isInput) {
             vringbuffer_trigger_autoincrease_callback(vringbuffer);
     } else {
         if (bufferUsedOutput < MAX_STATIC_BUFFER) {
-            for (int i = 0; i < nframes; i++) {
+            for (int i = 0; i < framesToCopy; i++) {
                 buffersOutput[bufferUsedOutput].data[i] = data[i];
             }
 
-            buffersOutput[bufferUsedOutput].pos = nframes;
+            buffersOutput[bufferUsedOutput].pos = framesToCopy;
             buffersOutput[bufferUsedOutput].isInput = isInput;
 
             bufferUsedOutput++;

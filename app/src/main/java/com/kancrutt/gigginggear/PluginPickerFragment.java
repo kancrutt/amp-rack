@@ -1,31 +1,82 @@
 package com.kancrutt.gigginggear;
 
+import android.app.Dialog;
+import android.content.Intent;
+import android.graphics.Color;
+import android.net.Uri;
 import android.os.Bundle;
-import android.text.Editable;
-import android.text.TextWatcher;
+import android.os.Environment;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.ImageButton;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import androidx.browser.customtabs.CustomTabsIntent;
+
+import com.kancrutt.gigginggear.tone3000.Tone3000AuthManager;
+import com.kancrutt.gigginggear.tone3000.Tone3000Config;
+import com.kancrutt.gigginggear.tone3000.ui.Tone3000EntrySheet;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
+import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment;
-import com.google.android.material.chip.ChipGroup;
+
+import org.json.JSONObject;
+
+import java.io.File;
+import java.util.ArrayList;
+import java.util.Iterator;
 
 public class PluginPickerFragment extends BottomSheetDialogFragment {
 
     private MainActivity mainActivity;
-    private RecyclerView recyclerView;
-    private EditText searchEditText;
+    private LinearLayout catContainer;
+    private LinearLayout itemsContainer;
 
     public static PluginPickerFragment newInstance() {
         return new PluginPickerFragment();
+    }
+
+    @NonNull
+    @Override
+    public Dialog onCreateDialog(@Nullable Bundle savedInstanceState) {
+        BottomSheetDialog dialog = (BottomSheetDialog) super.onCreateDialog(savedInstanceState);
+        dialog.setCanceledOnTouchOutside(false);
+        dialog.setCancelable(false);
+        dialog.setOnShowListener(d -> {
+            BottomSheetDialog bottomSheetDialog = (BottomSheetDialog) d;
+            FrameLayout bottomSheet = bottomSheetDialog.findViewById(com.google.android.material.R.id.design_bottom_sheet);
+            if (bottomSheet != null) {
+                BottomSheetBehavior<FrameLayout> behavior = BottomSheetBehavior.from(bottomSheet);
+                behavior.setState(BottomSheetBehavior.STATE_EXPANDED);
+                behavior.setSkipCollapsed(true);
+                behavior.setHideable(false);
+                behavior.setDraggable(false);
+                // Prevent drag-to-dismiss while still allowing inner ScrollView to scroll
+                behavior.addBottomSheetCallback(new BottomSheetBehavior.BottomSheetCallback() {
+                    @Override public void onStateChanged(@NonNull View bottomSheetView, int newState) {
+                        if (newState == BottomSheetBehavior.STATE_DRAGGING) {
+                            behavior.setState(BottomSheetBehavior.STATE_EXPANDED);
+                        }
+                    }
+                    @Override public void onSlide(@NonNull View bottomSheetView, float slideOffset) {}
+                });
+                ViewGroup.LayoutParams layoutParams = bottomSheet.getLayoutParams();
+                if (layoutParams != null) {
+                    layoutParams.height = ViewGroup.LayoutParams.MATCH_PARENT;
+                    bottomSheet.setLayoutParams(layoutParams);
+                }
+            }
+        });
+        return dialog;
     }
 
     @Nullable
@@ -37,92 +88,203 @@ public class PluginPickerFragment extends BottomSheetDialogFragment {
         }
 
         ImageButton closeBtn = view.findViewById(R.id.picker_close_btn);
-        closeBtn.setOnClickListener(v -> dismiss());
+        if (closeBtn != null) closeBtn.setOnClickListener(v -> dismiss());
 
-        searchEditText = view.findViewById(R.id.picker_search);
-        searchEditText.addTextChangedListener(new TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+        View bottomClose = view.findViewById(R.id.picker_bottom_close_btn);
+        if (bottomClose != null) bottomClose.setOnClickListener(v -> dismiss());
 
-            @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count) {
-                if (mainActivity != null && mainActivity.pluginDialogAdapter != null) {
-                    mainActivity.pluginDialogAdapter.search(s.toString());
-                }
-            }
+        catContainer = view.findViewById(R.id.picker_cat_container);
+        itemsContainer = view.findViewById(R.id.picker_items_container);
 
-            @Override
-            public void afterTextChanged(Editable s) {}
-        });
-
-        ChipGroup chipGroup = view.findViewById(R.id.picker_category_chips);
-        chipGroup.setOnCheckedChangeListener((group, checkedId) -> {
-            if (mainActivity == null || mainActivity.pluginDialogAdapter == null) return;
-            if (checkedId == R.id.chip_cat_all) {
-                mainActivity.pluginDialogAdapter.filterByCategory("All");
-            } else if (checkedId == R.id.chip_cat_amps) {
-                mainActivity.pluginDialogAdapter.filterByCategory("AMP/CAB");
-            } else if (checkedId == R.id.chip_cat_overdrive) {
-                mainActivity.pluginDialogAdapter.filterByCategory("OVERDRIVE");
-            } else if (checkedId == R.id.chip_cat_distortion) {
-                mainActivity.pluginDialogAdapter.filterByCategory("DISTORTION");
-            } else if (checkedId == R.id.chip_cat_modulation) {
-                mainActivity.pluginDialogAdapter.filterByCategory("MODULATION");
-            } else if (checkedId == R.id.chip_cat_delay) {
-                mainActivity.pluginDialogAdapter.filterByCategory("DELAY");
-            } else if (checkedId == R.id.chip_cat_reverb) {
-                mainActivity.pluginDialogAdapter.filterByCategory("REVERB");
-            } else if (checkedId == R.id.chip_cat_utility) {
-                mainActivity.pluginDialogAdapter.filterByCategory("UTILITY");
-            }
-        });
-
-        recyclerView = view.findViewById(R.id.picker_recycler_view);
-        recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
-        if (mainActivity != null && mainActivity.pluginDialogAdapter != null) {
-            recyclerView.setAdapter(mainActivity.pluginDialogAdapter);
-        }
+        setupCategories();
 
         return view;
     }
 
-    @Override
-    public void onStart() {
-        super.onStart();
-        if (getDialog() != null && getDialog().getWindow() != null) {
-            // WRAP_CONTENT height lets BottomSheetBehavior size the sheet to its
-            // content, capped at its max height (90% of screen). MATCH_PARENT here
-            // made the sheet overflow in landscape (short viewport) before content
-            // was visible — only the title bar showed.
-            getDialog().getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+    private void setupCategories() {
+        if (catContainer == null) return;
+        catContainer.removeAllViews();
+
+        // TONE3000 entry — full-logo context at top of category column (spec §5/6)
+        View t3kView = getLayoutInflater().inflate(R.layout.item_model_category_row, catContainer, false);
+        ImageView t3kIcon = t3kView.findViewById(R.id.item_cat_icon);
+        TextView t3kTitle = t3kView.findViewById(R.id.item_cat_title);
+        t3kTitle.setText("TONE3000");
+        t3kTitle.setTextColor(Color.parseColor("#FFFFFF"));
+        if (t3kIcon != null) {
+            t3kIcon.setImageResource(R.drawable.ic_cat_amp);
+            t3kIcon.setColorFilter(Color.parseColor("#FFFFFF"), android.graphics.PorterDuff.Mode.SRC_IN);
         }
-        // Force the sheet fully expanded (never collapsed to peek height, which
-        // shows only the title bar) and pin it expanded so landscape can't leave
-        // it half-open.
-        if (getDialog() != null) {
-            View sheet = getDialog().findViewById(com.google.android.material.R.id.design_bottom_sheet);
-            if (sheet != null) {
-                BottomSheetBehavior<View> behavior = BottomSheetBehavior.from(sheet);
-                behavior.setState(BottomSheetBehavior.STATE_EXPANDED);
-                behavior.setSkipCollapsed(true);
+        t3kView.setBackgroundResource(R.drawable.glass_card_bg);
+        t3kView.setOnClickListener(v -> {
+            if (getActivity() == null) return;
+            if (!Tone3000Config.isConfigured(getActivity())) {
+                Toast.makeText(getActivity(), "TONE3000 not configured — missing client_id", Toast.LENGTH_LONG).show();
+                return;
+            }
+            dismiss();
+            try {
+                Tone3000EntrySheet sheet = Tone3000EntrySheet.newInstance();
+                sheet.show(getParentFragmentManager(), "t3k_entry");
+            } catch (Exception e) {
+                try {
+                    Tone3000AuthManager.AuthStart s = Tone3000AuthManager.get(getActivity()).startSelectFlow(getActivity());
+                    CustomTabsIntent cti = new CustomTabsIntent.Builder().setShowTitle(true).build();
+                    cti.launchUrl(getActivity(), Uri.parse(s.authorizeUrl));
+                } catch (Exception ex) { Toast.makeText(getActivity(), "TONE3000 failed: " + ex.getMessage(), Toast.LENGTH_LONG).show(); }
+            }
+        });
+        catContainer.addView(t3kView);
+        // thin divider
+        View div = new View(getContext());
+        div.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Math.round(1 * getResources().getDisplayMetrics().density)));
+        div.setBackgroundColor(Color.parseColor("#1E232A"));
+        catContainer.addView(div);
+
+        final CategoryHelper.Category[] categories = {
+                CategoryHelper.Category.AMP,
+                CategoryHelper.Category.CABINET,
+                CategoryHelper.Category.DISTORTION,
+                CategoryHelper.Category.DYNAMICS,
+                CategoryHelper.Category.MODULATION,
+                CategoryHelper.Category.DELAY,
+                CategoryHelper.Category.REVERB,
+                CategoryHelper.Category.EQ,
+                CategoryHelper.Category.PITCH,
+                CategoryHelper.Category.WAH,
+                CategoryHelper.Category.UTILITY,
+                CategoryHelper.Category.GATE,
+                CategoryHelper.Category.SPLIT
+        };
+
+        final String[] catLabels = {
+                "Amp / Head", "Cabinet", "Overdrive / Dist", "Compressor",
+                "Modulation", "Delay", "Reverb", "EQ", "Pitch / Synth",
+                "Wah", "Volume / Utility", "Noise Gate", "Routing / Utility"
+        };
+
+        for (int i = 0; i < categories.length; i++) {
+            final int catIdx = i;
+            final CategoryHelper.Category cat = categories[i];
+            View catView = getLayoutInflater().inflate(R.layout.item_model_category_row, catContainer, false);
+            ImageView icon = catView.findViewById(R.id.item_cat_icon);
+            TextView title = catView.findViewById(R.id.item_cat_title);
+
+            title.setText(catLabels[i]);
+            int catColor = CategoryHelper.getColor(cat.name());
+            icon.setImageResource(CategoryHelper.getIconRes(cat.name()));
+            icon.setColorFilter(catColor, android.graphics.PorterDuff.Mode.SRC_IN);
+
+            boolean isInitial = (i == 0);
+            catView.setBackgroundResource(isInitial ? R.drawable.glass_category_selected_bg : R.drawable.glass_card_bg);
+
+            catView.setOnClickListener(v -> {
+                for (int c = 0; c < catContainer.getChildCount(); c++) {
+                    catContainer.getChildAt(c).setBackgroundResource(R.drawable.glass_card_bg);
+                }
+                catView.setBackgroundResource(R.drawable.glass_category_selected_bg);
+                loadItemsForCategory(cat);
+            });
+
+            catContainer.addView(catView);
+        }
+
+        // Initially load first category (AMP)
+        loadItemsForCategory(categories[0]);
+    }
+
+    private void loadItemsForCategory(CategoryHelper.Category cat) {
+        if (itemsContainer == null || mainActivity == null) return;
+        itemsContainer.removeAllViews();
+
+        if (cat == CategoryHelper.Category.SPLIT || cat == CategoryHelper.Category.MERGE) {
+            // Routing utilities
+            addRoutingRow("SPLIT (Parallel Branch)", "Split signal into 2 parallel paths", R.drawable.ic_routing_split, true);
+            addRoutingRow("MERGE (Sum to Mono)", "Combine parallel branches into 1 path", R.drawable.ic_routing_merge, false);
+            return;
+        }
+
+        // Scan available LADSPA & LV2 plugins
+        JSONObject[] sources = {mainActivity.availablePlugins, mainActivity.availablePluginsLV2};
+        ArrayList<String> loadedPluginNames = new ArrayList<>();
+
+        for (JSONObject source : sources) {
+            if (source == null) continue;
+            Iterator<String> keys = source.keys();
+            while (keys.hasNext()) {
+                String k = keys.next();
+                JSONObject obj = source.optJSONObject(k);
+                if (obj == null) continue;
+                String pName = obj.optString("name", "");
+                if (pName.isEmpty() || loadedPluginNames.contains(pName)) continue;
+
+                CategoryHelper.Category pCat = CategoryHelper.getCategory(pName);
+                if (pCat == cat) {
+                    loadedPluginNames.add(pName);
+                    String desc = obj.optString("desc", obj.optString("description", "Built-in Effect"));
+                    if (desc.length() > 40) desc = desc.substring(0, 37) + "…";
+
+                    View row = getLayoutInflater().inflate(R.layout.item_model_browser_row, itemsContainer, false);
+                    TextView t = row.findViewById(R.id.item_model_title);
+                    TextView b = row.findViewById(R.id.item_model_brand);
+                    ImageView thumb = row.findViewById(R.id.item_model_thumb);
+                    ImageView star = row.findViewById(R.id.item_model_star);
+                    star.setVisibility(View.GONE);
+
+                    t.setText(PluginNaming.displayName(pName));
+                    b.setText(desc);
+                    thumb.setImageResource(CategoryHelper.getIconRes(pName));
+                    thumb.setColorFilter(CategoryHelper.getColor(pName), android.graphics.PorterDuff.Mode.SRC_IN);
+
+                    row.setOnClickListener(v -> {
+                        mainActivity.addPluginByName(pName);
+                        dismiss();
+                    });
+                    itemsContainer.addView(row);
+                }
             }
         }
-        // Cap the plugin list height so the sheet never overflows, and the list
-        // is always internally scrollable. Reserve room for handle+header+search
-        // (~210dp); leave the list at least 120dp tall.
-        View view = getView();
-        if (view != null) {
-            RecyclerView rv = view.findViewById(R.id.picker_recycler_view);
-            if (rv != null) {
-                int screenH = getResources().getDisplayMetrics().heightPixels;
-                float density = getResources().getDisplayMetrics().density;
-                int reserved = Math.round(210 * density);
-                int listH = Math.max(Math.round(120 * density),
-                        Math.round(0.78f * screenH) - reserved);
-                ViewGroup.LayoutParams lp = rv.getLayoutParams();
-                lp.height = listH;
-                rv.setLayoutParams(lp);
+
+        // Fallback for file-based amps if plugin scan is empty
+        if (loadedPluginNames.isEmpty() && (cat == CategoryHelper.Category.AMP || cat == CategoryHelper.Category.CABINET)) {
+            String[] sampleAmps = {"Neural Amp Modeler", "Convolution Reverb", "AIDA-X"};
+            for (String sa : sampleAmps) {
+                View row = getLayoutInflater().inflate(R.layout.item_model_browser_row, itemsContainer, false);
+                TextView t = row.findViewById(R.id.item_model_title);
+                TextView b = row.findViewById(R.id.item_model_brand);
+                ImageView thumb = row.findViewById(R.id.item_model_thumb);
+                row.findViewById(R.id.item_model_star).setVisibility(View.GONE);
+
+                t.setText(sa);
+                b.setText(cat.name() + " Loader");
+                thumb.setImageResource(CategoryHelper.getIconRes(cat.name()));
+                thumb.setColorFilter(CategoryHelper.getColor(cat.name()), android.graphics.PorterDuff.Mode.SRC_IN);
+
+                row.setOnClickListener(v -> {
+                    mainActivity.addPluginByName(sa);
+                    dismiss();
+                });
+                itemsContainer.addView(row);
             }
         }
+    }
+
+    private void addRoutingRow(String title, String desc, int iconRes, boolean isSplit) {
+        View row = getLayoutInflater().inflate(R.layout.item_model_browser_row, itemsContainer, false);
+        TextView t = row.findViewById(R.id.item_model_title);
+        TextView b = row.findViewById(R.id.item_model_brand);
+        ImageView thumb = row.findViewById(R.id.item_model_thumb);
+        row.findViewById(R.id.item_model_star).setVisibility(View.GONE);
+
+        t.setText(title);
+        b.setText(desc);
+        thumb.setImageResource(iconRes);
+        thumb.setColorFilter(Color.parseColor("#FFFFFF"), android.graphics.PorterDuff.Mode.SRC_IN);
+
+        row.setOnClickListener(v -> {
+            if (mainActivity != null) mainActivity.addRoutingBlock(isSplit);
+            dismiss();
+        });
+        itemsContainer.addView(row);
     }
 }

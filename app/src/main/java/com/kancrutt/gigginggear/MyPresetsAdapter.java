@@ -1,6 +1,6 @@
 package com.kancrutt.gigginggear;
 
-import android.app.AlertDialog;
+import androidx.appcompat.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.util.Log;
@@ -37,6 +37,8 @@ public class MyPresetsAdapter extends RecyclerView.Adapter<MyPresetsAdapter.View
     ProgressBar progressBar , loadProgress;
     LinearProgressIndicator quickPatchProgress ;
     boolean quick = false ;
+    /** Factory/library panels are read-only: hide the delete affordance there. */
+    boolean allowDelete = true ;
     MyPresetsAdapter myPresetsAdapter ;
     String sortBy = "timestamp";
     String uid = null;
@@ -53,7 +55,12 @@ public class MyPresetsAdapter extends RecyclerView.Adapter<MyPresetsAdapter.View
     void addPreset (Map preset) {
         if (preset == null)
             return;
-
+        String name = preset.get("name") != null ? preset.get("name").toString() : "";
+        for (Map p : presets) {
+            if (name.equals(p.get("name") != null ? p.get("name").toString() : "")) {
+                return;
+            }
+        }
         presets.add(preset);
         allPresets.add(preset);
         notifyDataSetChanged();
@@ -76,6 +83,25 @@ public class MyPresetsAdapter extends RecyclerView.Adapter<MyPresetsAdapter.View
         presets.remove(i);
         allPresets.remove(i);
         notifyItemRemoved(i);
+    }
+
+    /** Remove one entry from allPresets by stable id (fallback: name). Index-based
+     *  removal is wrong here because presets/allPresets diverge under search filter. */
+    void removeFromAllById (String id, String name) {
+        if (allPresets == null || allPresets.isEmpty()) return;
+        for (int i = 0; i < allPresets.size(); i++) {
+            Map m = allPresets.get(i);
+            if (m == null) continue;
+            Object mid = m.get("id");
+            Object mname = m.get("name");
+            boolean match = false;
+            if (id != null && mid != null && id.equals(mid.toString())) match = true;
+            else if (name != null && mname != null && name.equals(mname.toString()) && (id == null || mid == null)) match = true;
+            if (match) {
+                allPresets.remove(i);
+                return;
+            }
+        }
     }
 
     void setMainActivity (MainActivity _mainActivity) {
@@ -102,71 +128,56 @@ public class MyPresetsAdapter extends RecyclerView.Adapter<MyPresetsAdapter.View
     }
 
     /**
-     * Derive tag pills ([NAM][CAB][DELAY]) from a schema-v1 preset's plugins,
-     * falling back to the preset's own "tags" list.
+     * Derive indicator pills from a schema-v1 preset's plugins using the SAME
+     * category engine as the signal-chain canvas (CategoryHelper) — so a preset
+     * with a NAM/AIDA block shows AMP, a Convolution/IR block shows CAB, etc.
+     * Order-stable, deduped, color-coded per category. The preset's own free-form
+     * "tags" (user keywords) are appended as neutral pills.
      */
-    ArrayList<String> tagsFor (Map preset) {
-        ArrayList<String> tags = new ArrayList<>();
-        Object tagsObj = preset.get("tags");
-        if (tagsObj instanceof java.util.List) {
-            java.util.List<?> list = (java.util.List<?>) tagsObj;
-            for (Object t : list) {
-                if (t != null && !t.toString().trim().isEmpty())
-                    tags.add(t.toString().trim().toUpperCase(Locale.ROOT));
-            }
-            if (!tags.isEmpty())
-                return tags;
-        }
-
+    ArrayList<Object[]> tagSpecsFor (Map preset) {
+        // {label, color} pairs
+        java.util.LinkedHashMap<String, Integer> specs = new java.util.LinkedHashMap<>();
         Object pluginsObj = preset.get("plugins");
         if (pluginsObj instanceof java.util.List) {
             for (Object o : (java.util.List<?>) pluginsObj) {
                 if (!(o instanceof Map))
                     continue;
-                Map<?, ?> p = (Map<?, ?>) o;
-                String name = value((Map) p, "name", "library");
+                String name = value((Map) o, "name", "library");
                 if (name == null)
                     continue;
-                String lower = name.toLowerCase(Locale.ROOT);
-                if (lower.contains("nam") || lower.contains("neural") || hasNamFile(p)) {
-                    if (!tags.contains("NAM")) tags.add("NAM");
-                } else if (lower.contains("cab") || lower.contains("impulse") || lower.contains("ir ")) {
-                    if (!tags.contains("CAB")) tags.add("CAB");
-                } else if (lower.contains("delay") || lower.contains("reverb") || lower.contains("echo")) {
-                    if (!tags.contains("DELAY")) tags.add("DELAY");
-                }
+                CategoryHelper.Category cat = CategoryHelper.getCategory(name);
+                if (cat == CategoryHelper.Category.UNKNOWN || cat == CategoryHelper.Category.UTILITY)
+                    continue;
+                specs.putIfAbsent(cat.code, cat.color);
             }
         }
-
-        if (tags.isEmpty())
-            tags.add("RIG");
-
-        return tags;
-    }
-
-    boolean hasNamFile (Map plugin) {
-        Object fpObj = plugin.get("file_ports");
-        if (!(fpObj instanceof java.util.List))
-            return false;
-        for (Object o : (java.util.List<?>) fpObj) {
-            if (!(o instanceof Map))
-                continue;
-            Object rel = ((Map<?, ?>) o).get("relative_path");
-            Object fn = ((Map<?, ?>) o).get("file_name");
-            if (rel != null && rel.toString().toLowerCase(Locale.ROOT).endsWith(".nam"))
-                return true;
-            if (fn != null && fn.toString().toLowerCase(Locale.ROOT).endsWith(".nam"))
-                return true;
+        Object tagsObj = preset.get("tags");
+        if (tagsObj instanceof java.util.List) {
+            for (Object t : (java.util.List<?>) tagsObj) {
+                if (t != null && !t.toString().trim().isEmpty())
+                    specs.putIfAbsent(t.toString().trim().toUpperCase(Locale.ROOT),
+                            CategoryHelper.COLOR_DEFAULT);
+            }
         }
-        return false;
+        if (specs.isEmpty())
+            specs.put("RIG", CategoryHelper.COLOR_DEFAULT);
+        ArrayList<Object[]> out = new ArrayList<>();
+        for (Map.Entry<String, Integer> e : specs.entrySet())
+            out.add(new Object[]{e.getKey(), e.getValue()});
+        return out;
     }
 
-    void addTagPill (LinearLayout tagsRow, String text) {
+    void addTagPill (LinearLayout tagsRow, String text, int color) {
         TextView pill = new TextView(context);
         pill.setText(text);
         pill.setTextSize(10);
-        pill.setTextColor(0xFFE8A33D);
-        pill.setBackgroundResource(R.drawable.gg_pill_bg);
+        pill.setTypeface(android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.BOLD));
+        pill.setTextColor(color);
+        android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+        bg.setColor(0x14FFFFFF);
+        bg.setStroke(1, (color & 0x00FFFFFF) | 0x66000000);
+        bg.setCornerRadius(20 * context.getResources().getDisplayMetrics().density);
+        pill.setBackground(bg);
         pill.setPadding(12, 4, 12, 4);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -222,9 +233,8 @@ public class MyPresetsAdapter extends RecyclerView.Adapter<MyPresetsAdapter.View
         holder.desc.setVisibility(presetDesc != null && !presetDesc.trim().isEmpty() ? View.VISIBLE : View.GONE);
 
         holder.tags.removeAllViews();
-        ArrayList<String> tags = tagsFor(preset);
-        for (String t : tags)
-            addTagPill(holder.tags, t);
+        for (Object[] spec : tagSpecsFor(preset))
+            addTagPill(holder.tags, (String) spec[0], (Integer) spec[1]);
 
         String meta = metaText(preset);
         holder.meta.setText(meta);
@@ -237,7 +247,7 @@ public class MyPresetsAdapter extends RecyclerView.Adapter<MyPresetsAdapter.View
             holder.delete.setVisibility(View.GONE);
             holder.favorite.setVisibility(View.GONE);
         } else if (isSchemaV1) {
-            holder.delete.setVisibility(View.VISIBLE);
+            holder.delete.setVisibility(allowDelete ? View.VISIBLE : View.GONE);
             holder.favorite.setVisibility(View.GONE);
         } else {
             holder.delete.setVisibility(isLocal ? View.VISIBLE : View.GONE);
@@ -260,7 +270,14 @@ public class MyPresetsAdapter extends RecyclerView.Adapter<MyPresetsAdapter.View
             if (mainActivity.patchNo != null)
                 mainActivity.patchNo.setText(quick ? String.valueOf(position) : "-");
 
-            mainActivity.syncTopBarPresetInfo(position + 1);
+            // Single-writer path: refreshes label (orange prefix), nav cursor AND
+            // the persisted cold-start label. Falls back to label-only sync.
+            try {
+                if (mainActivity.rack != null) mainActivity.rack.onPresetLoadedFromList(position, fPresetName);
+                else mainActivity.syncTopBarPresetInfo(position + 1);
+            } catch (Exception e) {
+                try { mainActivity.syncTopBarPresetInfo(position + 1); } catch (Exception ignore) {}
+            }
             MainActivity.toast("Loaded preset " + fPresetName);
         };
         holder.quickLoad.setOnClickListener(loadListener);
@@ -295,37 +312,59 @@ public class MyPresetsAdapter extends RecyclerView.Adapter<MyPresetsAdapter.View
         });
 
         holder.delete.setOnClickListener(v -> {
-            int pos = holder.getAdapterPosition();
-            if (pos < 0 || pos >= presets.size()) return;
-            Map<String, Object> target = presets.get(pos);
-            String targetName = value(target, "name", "Untitled");
+            // Capture everything at click time: re-querying getAdapterPosition()
+            // inside the dialog callback can return NO_POSITION (silent no-op —
+            // the "delete does nothing" symptom).
+            final int clickPos = holder.getAdapterPosition();
+            if (clickPos < 0 || clickPos >= presets.size()) return;
+            final Map<String, Object> clickTarget = presets.get(clickPos);
+            if (clickTarget == null) return;
+            final String targetName = value(clickTarget, "name", "Untitled");
+            final String clickId;
+            if (clickTarget.containsKey("id") && clickTarget.get("id") != null) {
+                clickId = clickTarget.get("id").toString();
+            } else if (clickTarget.containsKey("name") && clickTarget.get("name") != null) {
+                clickId = clickTarget.get("name").toString();
+            } else {
+                clickId = null;
+            }
 
-            AlertDialog.Builder builder = new AlertDialog.Builder(mainActivity);
+            AlertDialog.Builder builder = MainActivity.dialogBuilder(mainActivity);
             builder.setTitle("Delete this preset?");
             builder.setMessage("Delete \"" + targetName + "\"? This cannot be undone.");
             builder.setPositiveButton("Delete", (dialog, which) -> {
-                int currentPos = holder.getAdapterPosition();
-                if (currentPos < 0 || currentPos >= presets.size()) return;
-                Map<String, Object> itemToDelete = presets.get(currentPos);
-                if (itemToDelete != null) {
-                    String idStr = null;
-                    if (itemToDelete.containsKey("id") && itemToDelete.get("id") != null) {
-                        idStr = itemToDelete.get("id").toString();
-                    } else if (itemToDelete.containsKey("name") && itemToDelete.get("name") != null) {
-                        idStr = itemToDelete.get("name").toString();
+                boolean fileDeleted = false;
+                if (clickId != null && localPresetManager != null) {
+                    try {
+                        fileDeleted = localPresetManager.deletePreset(clickId);
+                    } catch (Exception e) {
+                        Log.e(TAG, "delete failed", e);
                     }
-                    if (idStr != null && localPresetManager != null) {
-                        try {
-                            localPresetManager.deletePreset(idStr);
-                        } catch (Exception e) {
-                            Log.e(TAG, "delete failed", e);
-                        }
+                    if (!fileDeleted) {
+                        Log.w(TAG, "deletePreset returned false for id=" + clickId);
                     }
                 }
-                presets.remove(currentPos);
-                if (currentPos < allPresets.size()) allPresets.remove(currentPos);
-                notifyItemRemoved(currentPos);
+                // Remove the visible row by identity first, fall back to click pos.
+                int visiblePos = presets.indexOf(clickTarget);
+                if (visiblePos < 0) {
+                    visiblePos = (clickPos >= 0 && clickPos < presets.size()) ? clickPos : -1;
+                }
+                if (visiblePos >= 0) {
+                    presets.remove(visiblePos);
+                }
+                // allPresets may be ordered/filtered differently: match by id/name,
+                // never by visible index (that deleted the wrong row under search).
+                removeFromAllById(clickId, targetName);
+                notifyDataSetChanged();
                 if (onListChanged != null) onListChanged.run();
+                // Reload every list from disk so quick-patch nav, picker and the
+                // other panel drop the deleted preset immediately (no tab-switch
+                // needed to see the update).
+                try {
+                    if (mainActivity != null) mainActivity.refreshPresetLists();
+                } catch (Exception e) {
+                    Log.w(TAG, "post-delete refresh failed", e);
+                }
                 MainActivity.toast("Deleted " + targetName);
             });
             builder.setNegativeButton("Cancel", null);

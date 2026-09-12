@@ -8,10 +8,10 @@
     android:clickable="true"
     android:focusable="true"
     android:foreground="?android:attr/selectableItemBackground"
-    app:cardBackgroundColor="#18181B"
+    app:cardBackgroundColor="@color/gg_glass_bg"
     app:cardCornerRadius="8dp"
     app:cardElevation="2dp"
-    app:strokeColor="#333338"
+    app:strokeColor="@color/gg_glass_border"
     app:strokeWidth="1.5dp">
 
     <LinearLayout
@@ -26,14 +26,14 @@
             android:layout_height="36dp"
             android:contentDescription="Add Block"
             android:src="@android:drawable/ic_input_add"
-            app:tint="#FFAA00" />
+            app:tint="@color/gg_accent" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
             android:text="ADD BLOCK"
-            android:textColor="#FFAA00"
+            android:textColor="@color/gg_accent"
             android:textSize="12sp"
             android:textStyle="bold" />
     </LinearLayout>

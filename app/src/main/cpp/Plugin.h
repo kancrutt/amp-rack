@@ -8,6 +8,7 @@
 #include <fstream>
 #include "logging_macros.h"
 #include <vector>
+#include <unordered_map>
 
 #include "android/asset_manager.h"
 #include "android/asset_manager_jni.h"
@@ -24,6 +25,7 @@ class Plugin {
     LADSPA_Data ** portControls ;
     unsigned long sampleRate ;
 public:
+    static void setParameterMetadata(const nlohmann::json& metadata);
     URID urid = URID ();
     LV2_URID_Map * ampMap = nullptr;
     std::vector<const LV2_Feature*> features;
@@ -59,15 +61,16 @@ public:
     std::string lv2_name ;
     LADSPA_Data run_adding_gain = 1 ;
     std::vector <PluginControl *> pluginControls ;
-    const LADSPA_Descriptor * descriptor ;
-    const LV2_Descriptor * lv2Descriptor;
-    SharedLibrary * sharedLibrary;
+    const LADSPA_Descriptor * descriptor = nullptr;
+    const LV2_Descriptor * lv2Descriptor = nullptr;
+    SharedLibrary * sharedLibrary = nullptr;
+    unsigned long getSampleRate() const { return sampleRate; }
     int inputPort = -1;
     int inputPort2 = -1;
     int outputPort = -1;
     int outputPort2 = -1;
     LADSPA_Data dummy_output_control_port = 0; // from th pulseaudio ladspa sink module
-    LADSPA_Handle *handle ;
+    LADSPA_Handle *handle = nullptr;
     Plugin(const LADSPA_Descriptor * descriptor, unsigned long _sampleRate, SharedLibrary::PluginType _type = SharedLibrary::LADSPA);
     void print();
 
@@ -83,6 +86,14 @@ public:
 
     bool setFileName(std::string filename);
     static std::string lastLoadError;
+    // False when construction/loading did not complete (null descriptor,
+    // null handle, missing port metadata). Engine must not publish such
+    // plugins: running them crashes inside the DSP (vibe-class bugs).
+    bool loadOk = false;
+    // Ports 99/100 model-file hack: only the aidadsp loaders implement it.
+    // No bundled plugin declares ports >= 90, so touching 99/100 anywhere
+    // else is an out-of-bounds heap write (-> SIGSEGV in the audio thread).
+    bool supportsModelFilePorts() const;
     std::string loadedFileName ;
     float loadedFileNameSize = 0.0f ;
     int loadedFileType = -1 ;
@@ -91,8 +102,8 @@ public:
     void lv2FeaturesURID();
 
     // have to begin somewhere
-    LV2_Worker_Interface * lv2WorkerInterface ;
-    LV2_State_Interface  * lv2StateInterface ;
+    LV2_Worker_Interface * lv2WorkerInterface = nullptr;
+    LV2_State_Interface  * lv2StateInterface = nullptr;
 
     void lv2ConnectWorkers();
 

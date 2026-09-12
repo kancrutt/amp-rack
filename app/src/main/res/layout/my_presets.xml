@@ -6,6 +6,21 @@
     android:layout_height="match_parent"
     android:background="@color/gg_bg">
 
+    <TextView
+        android:id="@+id/presets_panel_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        android:text=""
+        android:fontFamily="@font/plus_jakarta_sans"
+        android:textSize="11sp"
+        android:textStyle="bold"
+        android:textColor="@color/gg_glass_text_secondary"
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="2dp"/>
+
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -29,6 +44,7 @@
     </LinearLayout>
 
     <LinearLayout
+        android:id="@+id/search_row"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_margin="10dp"
@@ -55,6 +71,7 @@
             android:textOn=""/>
 
         <Button
+            android:id="@+id/sort_button"
             android:layout_width="50dp"
             android:background="@color/fui_transparent"
             android:layout_height="wrap_content"
@@ -80,7 +97,7 @@
         android:padding="32dp"
         android:visibility="gone"
         android:text="No presets yet.\nTap the save icon on the Board (top bar) to create one."
-        android:textColor="#8F94A0"
+        android:textColor="@color/gg_glass_text_secondary"
         android:textSize="13sp"/>
 
     <LinearLayout

@@ -2,6 +2,9 @@
 #define __PLUGIN_CONTROL_H
 
 #include <cstdlib>
+#include <cmath>
+#include <vector>
+#include <string>
 #include "logging_macros.h"
 #include "ladspa.h"
 #include "lv2.h"
@@ -21,24 +24,8 @@ class PluginControl {
         FLOAT = 0,
         INT = 1,
         TOGGLE = 2,
-        /*
-        ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-        ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⠂⠀⠀⠀⢀⣠⠔⠈⠀⠀⠀⠀⠀⠀⠀
-        ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⠎⠀⠀⠀⣠⡶⠛⠁⠀⠀⠀⢀⣠⠄⠀⠀⠀
-        ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⡾⠁⠀⢀⣴⡿⠋⠀⠀⢀⣠⣴⠿⠋⠁⠀⠀⠀⠀
-        ⠀⠀⠀⠀⠀⠀⠀⠀⢀⣴⠟⠀⢀⣴⡿⠋⠀⢀⣠⣾⡿⠋⠁⠀⠀⠀⠀⠀⠀⠀
-        ⠀⠀⠀⠀⠀⠀⠀⣠⣾⠏⢀⣴⡿⠋⠀⣠⣶⣿⠟⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-        ⠀⠀⠀⠀⠀⠀⣴⡿⠁⣴⡿⠋⢀⣴⣾⡿⠋⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-        ⠀⠀⠀⠀⢀⣼⠋⢠⣾⠟⠁⣴⣿⠟⠋⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-        ⠀⠀⠀⠀⡾⠁⣴⡿⠁⣠⣾⠟⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-        ⠀⢠⣶⣀⡅⠘⠋⢰⣾⡿⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-        ⠀⣿⣿⣿⣷⣾⣇⣈⣁⣠⣦⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-        ⠀⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-        ⠀⣿⣿⣿⣿⣿⣿⣿⣭⣥⣴⡆⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-        ⠀⣿⣿⢿⣿⣿⣿⣿⣿⣿⠟⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-        ⠀⠉⠀⠀⠀⠉⠉⠉⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-         */
-        ATOM = 3
+        ATOM = 3,
+        ENUMERATION = 4
     };
 
 public:
@@ -49,6 +36,12 @@ public:
     LADSPA_Data default_value = 1; // 1 == no change in signal
 
     bool isLogarithmic = false;
+    bool isEnumeration = false;
+    bool isInteger = false;
+    std::string unit; // canonical unit: "dB","Hz","ms","s","%","BPM","coef","cent","st","oct","", etc.
+    // LV2/LADSPA enumeration scale points: parallel vectors of (value -> label)
+    std::vector<float> enumValues;
+    std::vector<std::string> enumLabels;
 
     /* value in the plugin */
     LADSPA_Data val;
@@ -58,6 +51,16 @@ public:
     std::string lv2_name ;
     bool name_allocated = false ;
     LV2_Atom_Sequence * lv2AtomSequence ;
+
+    // Metadata overlay (from parameter_metadata.json) - populated at construction
+    struct PortMeta {
+        float rdfDefault = NAN;
+        std::vector<float> enumValues;
+        std::vector<std::string> enumLabels;
+        std::string declaredUnit;
+        bool hasRdfDefault = false;
+    };
+    PortMeta meta;
 
     LADSPA_Data control_rounding(LADSPA_Data _val);
 
@@ -73,17 +76,19 @@ public:
 
     LADSPA_Data getValue();
 
-    PluginControl(const LADSPA_Descriptor *descriptor, int _port);
-    PluginControl(const LV2_Descriptor *descriptor, nlohmann::json j);
+    PluginControl(const LADSPA_Descriptor *descriptor, int _port, unsigned long _sampleRate = 48000, const PortMeta* _meta = nullptr);
+    PluginControl(const LV2_Descriptor *descriptor, nlohmann::json j, const PortMeta* _meta = nullptr);
 
     void print();
 
-//    unsigned long ctrl;
     const char *name;
 
     void freeMemory();
 
     void setPresetValue(float value);
+
+    // Parse unit from port name (LADSPA declared units in parentheses)
+    static std::string parseDeclaredUnit(const char* portName);
 };
 
 

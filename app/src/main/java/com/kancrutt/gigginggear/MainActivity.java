@@ -31,7 +31,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import android.Manifest;
 import android.app.Activity;
 import android.app.ActivityManager;
-import android.app.AlertDialog;
+import androidx.appcompat.app.AlertDialog;
 import android.app.Dialog;
 import android.app.Notification;
 import android.app.NotificationChannel;
@@ -68,10 +68,7 @@ import android.graphics.PointF;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
 import android.graphics.RectF;
-import android.graphics.SurfaceTexture;
 import android.hardware.SensorManager;
-import android.hardware.camera2.CameraCharacteristics;
-import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.AudioAttributes;
 import android.media.AudioDeviceInfo;
 import android.media.AudioFormat;
@@ -98,6 +95,8 @@ import android.os.ParcelUuid;
 import android.provider.MediaStore;
 import android.text.Editable;
 import android.text.TextWatcher;
+import com.kancrutt.gigginggear.metadata.ParameterMetadata;
+import com.kancrutt.gigginggear.metadata.ParameterFormatter;
 import android.util.ArraySet;
 import android.util.Log;
 import android.util.Size;
@@ -108,7 +107,6 @@ import android.view.SubMenu;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
-import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
@@ -143,7 +141,17 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import com.kancrutt.gigginggear.tone3000.Tone3000AuthManager;
+import com.kancrutt.gigginggear.tone3000.Tone3000Config;
+import com.kancrutt.gigginggear.tone3000.model.ApiException;
+import com.kancrutt.gigginggear.tone3000.model.ModelDto;
+import com.kancrutt.gigginggear.tone3000.model.ToneDto;
+import com.kancrutt.gigginggear.tone3000.ui.Tone3000EntrySheet;
+import com.kancrutt.gigginggear.tone3000.ui.Tone3000ToneDetailSheet;
+import com.kancrutt.gigginggear.util.LabelFormatter;
+
 import java.io.BufferedReader;
+import java.io.BufferedOutputStream;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -151,6 +159,8 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
@@ -173,7 +183,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-public class MainActivity extends AppCompatActivity implements ActivityCompat.OnRequestPermissionsResultCallback, TextureView.SurfaceTextureListener, androidx.preference.PreferenceFragmentCompat.OnPreferenceStartFragmentCallback {
+public class MainActivity extends AppCompatActivity implements ActivityCompat.OnRequestPermissionsResultCallback, androidx.preference.PreferenceFragmentCompat.OnPreferenceStartFragmentCallback {
     MidiOutputPort midiOutputPort;
     MyReceiver midiReciever;
     private CompanionDeviceManager deviceManager;
@@ -266,7 +276,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     public static TextView sampleRateLabel ;
     public static ImageView latencyWarnLogo ;
     public static LinearLayout srLayout; ;
-    SurfaceTexture surfaceTexture;
     public boolean headphoneWarning = true;
     public boolean experimentalBuild = false;
     static Context context;
@@ -278,10 +287,10 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     static FileOutputStream fileOutputStream = null ;
     static DataOutputStream dataOutputStream = null ;
     static MainActivity mainActivity;
+    private ParameterMetadata parameterMetadata;
     BluetoothDevice deviceToPair  ;
     boolean videoRecording = false ;
     static boolean tabletMode = false ;
-    Camera2 camera2 ;
     Dialog midiAddDialog = null ;
     ToggleButton triggerMidiButton = null ;
     ConstraintLayout midiLayout = null ;
@@ -310,7 +319,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     Button hidePanel;
     TextView midiDisplay ;
     SwitchMaterial onOff = null ;
-    AudioEncoder audioEncoder ;
     String exportFormat = "1";
     TextView patchName, patchNo, patchDesc ;
     ToggleButton triggerRecordToggle ;
@@ -321,7 +329,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     static boolean darkMode = false ;
     boolean safeMode = false;
     static boolean introShown = false ;
-    public Camera camera ;
     ToggleButton record;
     boolean triggerRecord = false ;
     public Handler handler;
@@ -341,11 +348,24 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     RecyclerView recyclerView;
     SignalChainCanvasView signalChainCanvas;
     DataAdapter dataAdapter;
+
+    private final Map<String, float[]> savedNodePositions = new HashMap<>();
+
+    public void storeNodePositions(Map<String, float[]> positions) {
+        savedNodePositions.clear();
+        if (positions != null) savedNodePositions.putAll(positions);
+    }
+
+    public Map<String, float[]> getSavedNodePositions() {
+        return new HashMap<>(savedNodePositions);
+    }
     AlertDialog pluginDialog;
     ImageView pluginDialogWallpaper;
     AudioManager audioManager;
     TextView tuner ;
     boolean running = false ;
+    // Engine auto-starts (no power button by design): attempted once per process.
+    boolean autoStartDone = false ;
     long bootFinish = 0 ;
     static boolean showIntro = false ;
     static public JSONObject pluginCategories, pluginCreators;
@@ -378,13 +398,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     static boolean useTheme = true;
     String theme = "TubeAmp";
     String customTheme = null ;
-    static SkinEngine skinEngine = null;
-
-    // TONE3000 slot metadata (restored from lastworks build 2026-09-11 22:50).
-    Map<Integer, JSONObject> t3kBlockMeta = new HashMap<>();
-    Map<Integer, String> t3kModelPath = new HashMap<>();
-    Map<Integer, String> pendingT3kLoad = new HashMap<>();
-    Map<Integer, String> pendingT3kFile = new HashMap<>();
 
     int primaryColor = com.google.android.material.R.color.design_default_color_primary;
     private static final int AUDIO_EFFECT_REQUEST = 0;
@@ -420,7 +433,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     ArrayList<String> lv2Plugins = new ArrayList<String>();
     public AudioEngineManager audioEngineManager;
     public LocalPresetManager localPresetManager;
-    public NavigationManager navigationManager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -536,10 +548,8 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         hashCommands.add (this, "pluginsCrashTest");
         hashCommands.add (this, "resetMIDI");
         hashCommands.add (this, "printMidi");
-        hashCommands.add (this, "cameraPreview");
         hashCommands.add(this, "saveActivePreset");
         hashCommands.add(this, "printActivePreset");
-        hashCommands.add(this, "proDialog");
         hashCommands.add(this, "testLV2");
         hashCommands.add(this, "printDebugLog");
         hashCommands.add(this, "printActiveChain");
@@ -632,17 +642,12 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         if (theme.equals("Material") || lowMemoryMode) {
             useTheme = false;
         } else {
-            skinEngine = new SkinEngine(this);
             /*
             if (customTheme != null) {
                 theme = customTheme;
-                skinEngine.custom = true ;
             }
 
              */
-
-            skinEngine.setTheme(theme);
-
         }
 
         int nightModeFlags =
@@ -664,7 +669,8 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         availablePlugins = ConnectGuitar.loadJSONFromAssetFile(this, "all_plugins.json");
         availablePluginsLV2 = ConnectGuitar.loadJSONFromAssetFile(this, "lv2_plugins.json");
         ampModels = ConnectGuitar.loadJSONFromAssetFile(this, "amps.json");
-        knobsLayout = ConnectGuitar.loadJSONFromAssetFile(this, "knobs.json");
+         knobsLayout = ConnectGuitar.loadJSONFromAssetFile(this, "knobs.json");
+         parameterMetadata = ParameterMetadata.loadFromAsset(this);
 
         Iterator<String> keys = availablePluginsLV2.keys();
 
@@ -729,11 +735,22 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 //        AudioEngine.showProgress(null);
 //        AudioEngine.showProgress(context);
 
-        AudioEngine.create();
+         AudioEngine.create();
 
-        AudioEngine.setLibraryPath(getApplicationInfo().nativeLibraryDir);
-        AudioEngine.setLazyLoad(lazyLoad);
-        // load included plugins
+         AudioEngine.setLibraryPath(getApplicationInfo().nativeLibraryDir);
+         AudioEngine.setLazyLoad(lazyLoad);
+         try {
+             JSONObject metadataJson = loadJSONFromAsset("parameter_metadata.json");
+             if (metadataJson != null) {
+                 AudioEngine.setParameterMetadata(metadataJson.toString());
+                 Log.i(TAG, "parameter metadata installed into native engine");
+             } else {
+                 Log.w(TAG, "parameter metadata missing; native engine will use source defaults");
+             }
+         } catch (Throwable t) {
+             Log.e(TAG, "parameter metadata install failed; continuing with fallback", t);
+         }
+         // load included plugins
         loadPlugins();
 
         if (savedInstanceState == null) {
@@ -846,6 +863,12 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
             @Override
             public boolean onNavigationItemSelected(@NonNull MenuItem item) {
+                // Reselection guard: re-tapping the active tab must not re-commit
+                // show/hide transactions (same-ms duplicate trigger source).
+                try {
+                    if (item.getItemId() == R.id.page_rack && rack != null && rack.isAdded() && !rack.isHidden()
+                            && (settingsHost == null || settingsHost.isHidden())) return true;
+                } catch (Exception ignored) {}
                 // Drop any open settings sub-screen before switching tabs
                 if (getSupportFragmentManager().getBackStackEntryCount() > 0) {
                     try { getSupportFragmentManager().popBackStackImmediate(); } catch (Exception ignored) {}
@@ -868,7 +891,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                         if (tracks != null) ftRack.hide(tracks);
                         if (drums != null) ftRack.hide(drums);
                         if (settingsHost != null) ftRack.hide(settingsHost);
-                        ftRack.commit();
+                        ftRack.commitNow();
                         return true;
                          /*
                         getSupportFragmentManager()
@@ -889,7 +912,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                         if (quickPatch != null) ftPreset.hide(quickPatch);
                         if (drums != null) ftPreset.hide(drums);
                         if (settingsHost != null) ftPreset.hide(settingsHost);
-                        ftPreset.commit();
+                        ftPreset.commitNow();
                         return true;
 
                     case R.id.page_tuner:
@@ -900,7 +923,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                         if (tracks != null) ftTuner.hide(tracks);
                         if (drums != null) ftTuner.hide(drums);
                         if (settingsHost != null) ftTuner.hide(settingsHost);
-                        ftTuner.commit();
+                        ftTuner.commitNow();
                         showTunerOverlay();
                         return true;
                     case R.id.page_drums:
@@ -911,7 +934,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                         if (quickPatch != null) ftDrums.hide(quickPatch);
                         if (tracks != null) ftDrums.hide(tracks);
                         if (settingsHost != null) ftDrums.hide(settingsHost);
-                        ftDrums.commit();
+                        ftDrums.commitNow();
                         return true;
                     case R.id.page_settings:
                         androidx.fragment.app.FragmentTransaction ftSettings = getSupportFragmentManager().beginTransaction();
@@ -921,7 +944,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                         if (quickPatch != null) ftSettings.hide(quickPatch);
                         if (tracks != null) ftSettings.hide(tracks);
                         if (drums != null) ftSettings.hide(drums);
-                        ftSettings.commit();
+                        ftSettings.commitNow();
                         return true;
                         /*
                         if (presets.loginNotice == null)
@@ -1052,9 +1075,450 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             proVersion = true ;
         }
 
+        // TONE3000: handle OAuth callback if launched via deep-link (survives recreation)
+        handleTone3000Callback(getIntent());
+
 //        register_bt_callback();
 //        proVersion = false;
 //        defaultSharedPreferences.edit().putBoolean("pro", false).apply();
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleTone3000Callback(intent);
+    }
+
+    // ---- TONE3000 callback handling (deep-link) ----
+    private void handleTone3000Callback(Intent intent) {
+        if (intent == null || intent.getData() == null) return;
+        android.net.Uri data = intent.getData();
+        if (data == null) return;
+        String scheme = data.getScheme();
+        String host = data.getHost();
+        // Accept both gigginggear:// and com.kancrutt.gigginggear://
+        boolean isT3k = data.toString().contains("tone3000/callback") || ("gigginggear".equals(scheme) && "tone3000".equals(host)) || ("com.kancrutt.gigginggear".equals(scheme) && "tone3000".equals(host));
+        if (!isT3k) return;
+        Log.i(TAG, "TONE3000 callback: " + data);
+        try {
+            Tone3000AuthManager auth = Tone3000AuthManager.get(this);
+            Tone3000AuthManager.CallbackResult cb = auth.handleCallback(data);
+            if (cb.canceled) {
+                if (cb.code != null) {
+                    // user signed in but canceled tone selection — still exchange to get token for future browsing
+                    exchangeTone3000Code(cb.code, null);
+                } else {
+                    toast("TONE3000 selection canceled");
+                }
+                return;
+            }
+            if (cb.error != null) {
+                toast("TONE3000 error: " + cb.error);
+                return;
+            }
+            exchangeTone3000Code(cb.code, cb.toneId);
+        } catch (ApiException e) {
+            Log.e(TAG, "TONE3000 callback failed", e);
+            if ("state_mismatch".equals(e.errorCode)) toast("TONE3000 security check failed — please try again");
+            else if ("missing_code".equals(e.errorCode)) toast("TONE3000 callback missing code");
+            else toast("TONE3000 error: " + e.getMessage());
+        } catch (Exception e) {
+            Log.e(TAG, "TONE3000 callback exception", e);
+            toast("TONE3000 callback failed: " + e.getMessage());
+        }
+    }
+
+    private void exchangeTone3000Code(String code, @Nullable String toneId) {
+        // show quick progress
+        android.app.ProgressDialog pd = new android.app.ProgressDialog(this);
+        pd.setMessage("Connecting to TONE3000…");
+        pd.setIndeterminate(true);
+        pd.setCancelable(false);
+        pd.show();
+        new Thread(() -> {
+            try {
+                Tone3000AuthManager.get(this).exchangeCode(this, code);
+                runOnUiThread(() -> {
+                    try { pd.dismiss(); } catch (Exception ignore) {}
+                    if (toneId != null && !toneId.isEmpty()) {
+                        // Fetch tone + show detail sheet (model selector)
+                        Tone3000ToneDetailSheet sheet = Tone3000ToneDetailSheet.newInstance(toneId);
+                        sheet.show(getSupportFragmentManager(), "t3k_detail");
+                    } else {
+                        // No tone selected (canceled or bare auth) — stay authenticated, let user Browse again
+                        toast("TONE3000 connected — tap + to browse tones");
+                    }
+                });
+            } catch (ApiException e) {
+                runOnUiThread(() -> {
+                    try { pd.dismiss(); } catch (Exception ignore) {}
+                    Log.e(TAG, "TONE3000 token exchange failed", e);
+                    if (e.httpCode == 400) toast("TONE3000 auth expired — please try again");
+                    else toast("TONE3000 auth failed: " + e.getMessage());
+                });
+            } catch (Exception e) {
+                runOnUiThread(() -> {
+                    try { pd.dismiss(); } catch (Exception ignore) {}
+                    toast("TONE3000 auth failed: " + e.getMessage());
+                });
+            }
+        }).start();
+    }
+
+    /**
+     * Load a downloaded TONE3000 model file into the signal chain.
+     * Routes NAM -> existing NAM loader, IR -> existing IR/Cab loader.
+     * Creates/updates effect block, persists TONE3000 origin metadata.
+     * @return true if routed successfully, false if format unsupported
+     */
+    public boolean loadTone3000Model(File modelFile, ModelDto model, ToneDto tone) {
+        if (modelFile == null || !modelFile.exists()) {
+            toast("Model file missing");
+            return false;
+        }
+        String fmt = tone.format != null ? tone.format.toLowerCase() : "nam";
+        boolean isNam = fmt.contains("nam") || fmt.contains("aida") || model.isNam();
+        boolean isIr = fmt.contains("ir") || fmt.contains("wav") || model.isIr();
+        // Determine target plugin: for NAM use active NAM block or auto-add; for IR use cab/IR
+        try {
+            // Strategy: if user has a selected block (inline editor), use that slot; else add new
+            int targetSlot = -1;
+            if (dataAdapter != null) {
+                int sel = dataAdapter.getSelectedPosition();
+                int total = AudioEngine.getActivePlugins();
+                if (sel >= 0 && sel < total) {
+                    // Verify selected plugin can load the requested format
+                    boolean canUse = false;
+                    if (isNam && canLoadNamModel(sel)) canUse = true;
+                    if (isIr && canLoadIrModel(sel)) canUse = true;
+                    if (canUse) targetSlot = sel;
+                }
+            }
+            if (targetSlot < 0) {
+                // Add appropriate loader block — A2 directly to RT-Neural (A1-only NAM crashes on A2 JSON)
+                boolean isA2Direct = model != null && "2".equals(model.architectureVersion);
+                // NOTE: loader names must match the bundled registries EXACTLY
+                // (all_plugins.json / lv2_plugins.json). "RT-Neural Generic" and
+                // "Convolution Reverb" do NOT exist there — the rt-neural .so is
+                // registered as "AIDA-X".
+                // NG (nam.so) is the only architecturally-plausible A2 loader;
+                // it clean-fails via the port guard until its atom-port load
+                // path is wired, then AIDA-X/NAM are tried.
+                String loaderName = isIr ? "Simple IR Loader" : (isA2Direct ? "Neural Amp Modeler NG" : "Neural Amp Modeler");
+                // addPluginByName never throws and silently ignores unknown names,
+                // so a slot is only valid when the chain actually grew. Never fall
+                // through to a stale slot — that would write the model into an
+                // unrelated block.
+                if (isIr) {
+                    String[] irCandidates = {"Simple IR Loader", "Impulse Loader", "Neural Amp Modeler"};
+                    for (String cand : irCandidates) {
+                        try {
+                            int before = AudioEngine.getActivePlugins();
+                            addPluginByName(cand);
+                            if (AudioEngine.getActivePlugins() > before) {
+                                targetSlot = AudioEngine.getActivePlugins() - 1;
+                                break;
+                            }
+                        } catch (Exception ignore) {}
+                    }
+                } else {
+                    int before = AudioEngine.getActivePlugins();
+                    addPluginByName(loaderName);
+                    if (AudioEngine.getActivePlugins() > before)
+                        targetSlot = AudioEngine.getActivePlugins() - 1;
+                }
+            }
+            if (targetSlot < 0 || targetSlot >= AudioEngine.getActivePlugins()) {
+                toast("No slot available for model");
+                return false;
+            }
+            if (isNam && !canLoadNamModel(targetSlot)) {
+                // loader added but not recognized — still try to set filename (native will error clearly)
+                Log.w(TAG, "target slot not NAM-capable but trying anyway: " + targetSlot);
+            }
+            if (isIr && isNam) {
+                // ambiguous — treat as NAM per spec (determine from actual API metadata, not assumption)
+                Log.d(TAG, "format ambiguous nam/ir, using nam path for " + tone.title);
+                isIr = false;
+            }
+            // Validate file exists and is non-empty before handing to native
+            if (modelFile.length() == 0) { toast("Downloaded file is empty"); return false; }
+            String destPath = modelFile.getAbsolutePath();
+            // Log architecture for debugging A2
+            try { Log.i(TAG, "TONE3000 load: tone=" + tone.title + " arch=" + model.architectureVersion + " file=" + destPath + " size=" + modelFile.length()); } catch (Exception ignore) {}
+            // Quick inspect first bytes of .nam to detect A2 vs A1 (A2 has "architecture":"A2" or snapshot)
+            if (model.architectureVersion != null && model.architectureVersion.equals("2")) {
+                try {
+                    String head = new String(java.nio.file.Files.readAllBytes(modelFile.toPath()), java.nio.charset.StandardCharsets.UTF_8);
+                    if (head.length() > 800) head = head.substring(0, 800);
+                    Log.d(TAG, "TONE3000 A2 head: " + head.replace("\n"," "));
+                } catch (Exception ignore) {}
+            }
+            // Use existing storage pipeline: file already in externalFilesDir/TONE3000 — hand directly to native
+            String err = AudioEngine.setPluginFilename(destPath, targetSlot);
+            if (err != null) {
+                Log.w(TAG, "TONE3000 setPluginFilename failed (first try " + AudioEngine.getActivePluginName(targetSlot) + "): " + err + " arch=" + model.architectureVersion);
+                // For NAM A2, try fallback loaders: RT-Neural Generic often supports A2 when NAM doesn't
+                boolean isA2 = "2".equals(model.architectureVersion);
+                if (isNam && isA2) {
+                    String[] fallbackLoaders = new String[]{"Neural Amp Modeler NG", "AIDA-X", "Neural Amp Modeler"};
+                    for (String fb : fallbackLoaders) {
+                        try {
+                            String curName = AudioEngine.getActivePluginName(targetSlot);
+                            if (fb.equals(curName)) continue;
+                            Log.i(TAG, "TONE3000 A2 fallback: trying loader " + fb);
+                            // Trial-at-end strategy: append the fallback AFTER the
+                            // current chain and only touch targetSlot on success.
+                            // (Delete-then-add per candidate eats innocent blocks
+                            // when an add fails, because slots shift down.)
+                            int before = AudioEngine.getActivePlugins();
+                            addPluginByName(fb);
+                            if (AudioEngine.getActivePlugins() != before + 1) {
+                                Log.w(TAG, "TONE3000 A2 fallback: add failed for " + fb + ", trying next");
+                                continue;
+                            }
+                            int trial = AudioEngine.getActivePlugins() - 1;
+                            if (!canLoadNamModel(trial)) {
+                                safeDeletePlugin(trial);
+                                continue;
+                            }
+                            String err2 = AudioEngine.setPluginFilename(destPath, trial);
+                            if (err2 == null) {
+                                // Success: drop the old slot (trial is last, so it
+                                // shifts down to trial-1 == new last), then move it
+                                // into place to keep visual mapping correct.
+                                if (!safeDeletePlugin(targetSlot)) {
+                                    safeDeletePlugin(trial);
+                                    continue;
+                                }
+                                int last = AudioEngine.getActivePlugins() - 1;
+                                try {
+                                    AudioEngine.movePlugin(last, targetSlot);
+                                } catch (Throwable t) {
+                                    Log.w(TAG, "movePlugin failed after fallback add", t);
+                                }
+                                Log.i(TAG, "TONE3000 A2 fallback succeeded with " + fb + " at slot " + targetSlot);
+                                err = null;
+                                break;
+                            } else {
+                                Log.w(TAG, "TONE3000 fallback " + fb + " failed: " + err2);
+                                safeDeletePlugin(trial);
+                            }
+                        } catch (Exception fe) { Log.w(TAG, "fallback " + fb + " exception", fe); }
+                    }
+                }
+                if (err != null) {
+                    // Unsupported format handling
+                    if (err.toLowerCase().contains("unsupported") || err.toLowerCase().contains("format") || err.toLowerCase().contains("nam")) {
+                        // For A2, show specific guidance
+                        if ("2".equals(model.architectureVersion)) {
+                            toast("NAM A2 not supported by this loader — try updating the app or use A1 model");
+                        } else {
+                            toast("Unsupported format: " + fmt);
+                        }
+                        // clean up slot if we just added it
+                        try { AudioEngine.deletePlugin(targetSlot); shiftT3kMetaOnDelete(targetSlot); } catch (Exception ignore) {}
+                        if (signalChainCanvas != null) {
+                            signalChainCanvas.clearT3kBadges();
+                            signalChainCanvas.post(() -> {
+                                signalChainCanvas.loadFromActivePlugins(true);
+                                signalChainCanvas.postDelayed(() -> signalChainCanvas.reapplyT3kBadgesFromMeta(t3kBlockMeta), 120);
+                            });
+                        }
+                        return false;
+                    }
+                    toast("Model load failed: " + err);
+                    return false;
+                }
+            }
+            // Persist TONE3000 origin metadata into the preset autosave path
+            // Attach to the active plugin's logical preset item for next save
+            try {
+                // We stash metadata in SharedPreferences keyed by slot for preset serializer to pick up
+                // Simpler: write a sidecar json next to the model file and teach serializer to read it
+                File metaFile = new File(modelFile.getParentFile(), modelFile.getName() + ".t3k.json");
+                JSONObject meta = new JSONObject();
+                meta.put("tone3000ToneId", String.valueOf(tone.id));
+                meta.put("tone3000ModelId", String.valueOf(model.id));
+                meta.put("tone3000Creator", tone.userUsername != null ? tone.userUsername : "");
+                meta.put("tone3000ToneTitle", tone.title);
+                meta.put("tone3000Format", tone.format);
+                meta.put("tone3000GearType", tone.gear);
+                meta.put("tone3000SourceUrl", model.modelUrl);
+                try (FileOutputStream fos = new FileOutputStream(metaFile)) { fos.write(meta.toString(2).getBytes(java.nio.charset.StandardCharsets.UTF_8)); }
+                // Also keep in-memory map for this session so adapter can show T3K badge
+                t3kBlockMeta.put(targetSlot, meta);
+                t3kModelPath.put(targetSlot, destPath);
+            } catch (Exception e) { Log.w(TAG, "failed to persist t3k meta", e); }
+
+            // Update signal chain visual — mark as T3K origin
+            final int badgeSlot = targetSlot;
+            if (signalChainCanvas != null) {
+                signalChainCanvas.post(() -> {
+                    signalChainCanvas.loadFromActivePlugins();
+                    signalChainCanvas.postDelayed(() -> {
+                        try { signalChainCanvas.setT3kBadge(badgeSlot, true); } catch (Exception ignore) {}
+                        signalChainCanvas.invalidate();
+                    }, 120);
+                });
+            }
+            if (dataAdapter != null) dataAdapter.notifyDataSetChanged();
+            // ENGINE VERIFICATION — read back from native to confirm the model file is really
+            // connected to the plugin (not just a UI state). This proves the source engine loaded it.
+            try {
+                String loaded = AudioEngine.getPluginLoadedFileName(targetSlot);
+                boolean engineConfirmed = loaded != null && !loaded.isEmpty() && (loaded.equals(destPath) || loaded.endsWith(modelFile.getName()));
+                boolean active = AudioEngine.getActivePluginEnabled(targetSlot);
+                if (engineConfirmed) {
+                    Log.i(TAG, "TONE3000 ENGINE VERIFIED: slot=" + targetSlot + " file=" + loaded + " active=" + active
+                            + " arch=" + model.architectureVersion + " format=" + fmt);
+                    toast("Loaded TONE3000: " + tone.title + " → " + model.name + (active ? "" : " (bypassed)"));
+                } else {
+                    // Engine did not actually attach the file — surface it instead of faking success
+                    Log.e(TAG, "TONE3000 ENGINE VERIFY FAILED: expected=" + destPath + " got=" + loaded);
+                    toast("Model attached but engine read-back failed — check log");
+                }
+            } catch (Throwable ve) {
+                Log.w(TAG, "engine verification unavailable, assuming loaded", ve);
+                toast("Loaded TONE3000: " + tone.title + " → " + model.name);
+            }
+            // Persist preset snapshot will include metadata on next save (see captureWithT3k)
+            return true;
+        } catch (Exception e) {
+            Log.e(TAG, "loadTone3000Model failed", e);
+            toast("Failed to load model: " + e.getMessage());
+            return false;
+        }
+    }
+
+    // In-memory T3K block metadata for current session (slot -> json)
+    private final java.util.Map<Integer, JSONObject> t3kBlockMeta = new java.util.HashMap<>();
+    // model path per slot for preset persistence
+    private final java.util.Map<Integer, String> t3kModelPath = new java.util.HashMap<>();
+    // Pending T3K from preset load (populated in loadSchemaV1Preset, consumed in loadPreset post)
+    private final java.util.Map<Integer, JSONObject> pendingT3kLoad = new java.util.HashMap<>();
+    private final java.util.Map<Integer, String> pendingT3kFile = new java.util.HashMap<>();
+
+    @Nullable
+    JSONObject getTone3000MetaForSlot(int slot) {
+        JSONObject v = t3kBlockMeta.get(slot);
+        if (v != null) return v;
+        // fallback: try to read sidecar .t3k.json next to model file if present
+        String p = t3kModelPath.get(slot);
+        if (p != null) {
+            try {
+                java.io.File meta = new java.io.File(new java.io.File(p).getParentFile(), new java.io.File(p).getName() + ".t3k.json");
+                if (meta.exists()) {
+                    String s = new String(java.nio.file.Files.readAllBytes(meta.toPath()), java.nio.charset.StandardCharsets.UTF_8);
+                    return new JSONObject(s);
+                }
+            } catch (Exception ignore) {}
+        }
+        return null;
+    }
+
+    @Nullable
+    String getTone3000ModelPathForSlot(int slot) { return t3kModelPath.get(slot); }
+
+    /** Called when preset load finds a missing TONE3000 file. */
+    void handleMissingTone3000Model(LocalPresetManager.PluginItem item, int slot) {
+        String toneId = item.tone3000ToneId;
+        String title = item.tone3000ToneTitle != null ? item.tone3000ToneTitle : (item.name != null ? item.name : "TONE3000 model");
+        new AlertDialog.Builder(this)
+            .setTitle("TONE3000 model missing")
+            .setMessage("TONE3000 model is not downloaded on this device.\n\n" + title + (item.tone3000Creator != null ? " — @" + item.tone3000Creator : "") + "\n\nDownload again or choose a replacement.")
+            .setPositiveButton("Download again", (d, w) -> {
+                if (toneId != null && !toneId.isEmpty()) {
+                    // Re-auth if needed, then open detail sheet to re-download
+                    Tone3000ToneDetailSheet sheet = Tone3000ToneDetailSheet.newInstance(toneId);
+                    sheet.show(getSupportFragmentManager(), "t3k_detail_rereload");
+                } else {
+                    // No tone id — just open browse
+                    Tone3000EntrySheet.newInstance().show(getSupportFragmentManager(), "t3k_entry");
+                }
+            })
+            .setNeutralButton("Choose replacement", (d, w) -> {
+                Tone3000EntrySheet.newInstance().show(getSupportFragmentManager(), "t3k_entry");
+            })
+            .setNegativeButton("Cancel", null)
+            .show();
+    }
+
+    boolean isTone3000Slot(int slot) {
+        return getTone3000MetaForSlot(slot) != null;
+    }
+    java.util.Set<Integer> getTone3000SlotIds() { return new java.util.HashSet<>(t3kBlockMeta.keySet()); }
+
+    /** Delete plugin and keep T3K maps in sync (shifts indices after deletion). */
+    /** Shift T3K metadata maps down by one for every slot > deletedSlot, and
+     *  remove the entry for the deleted slot. Called after AudioEngine.deletePlugin. */
+    private void shiftT3kMetaOnDelete(int deletedSlot) {
+        java.util.Map<Integer, JSONObject> newMeta = new java.util.HashMap<>();
+        java.util.Map<Integer, String> newPath = new java.util.HashMap<>();
+        for (java.util.Map.Entry<Integer, JSONObject> e : t3kBlockMeta.entrySet()) {
+            int k = e.getKey();
+            if (k == deletedSlot) continue;
+            int nk = k > deletedSlot ? k - 1 : k;
+            newMeta.put(nk, e.getValue());
+        }
+        for (java.util.Map.Entry<Integer, String> e : t3kModelPath.entrySet()) {
+            int k = e.getKey();
+            if (k == deletedSlot) continue;
+            int nk = k > deletedSlot ? k - 1 : k;
+            newPath.put(nk, e.getValue());
+        }
+        t3kBlockMeta.clear(); t3kBlockMeta.putAll(newMeta);
+        t3kModelPath.clear(); t3kModelPath.putAll(newPath);
+    }
+
+    /** Shift T3K metadata maps after a movePlugin(from, to) call.
+     *  movePlugin removes the plugin at `from` and re-inserts it at `to`, shifting
+     *  every slot in [min, max] (exclusive of `from`) by one. */
+    private void shiftT3kMetaOnMove(int from, int to) {
+        if (from == to || from < 0 || to < 0) return;
+        int lo = Math.min(from, to), hi = Math.max(from, to);
+        java.util.Map<Integer, JSONObject> newMeta = new java.util.HashMap<>();
+        java.util.Map<Integer, String> newPath = new java.util.HashMap<>();
+        for (java.util.Map.Entry<Integer, JSONObject> e : t3kBlockMeta.entrySet()) {
+            int k = e.getKey();
+            if (k == from) { newMeta.put(to, e.getValue()); continue; }
+            if (k >= lo && k <= hi) k += (to > from ? -1 : 1);
+            newMeta.put(k, e.getValue());
+        }
+        for (java.util.Map.Entry<Integer, String> e : t3kModelPath.entrySet()) {
+            int k = e.getKey();
+            if (k == from) { newPath.put(to, e.getValue()); continue; }
+            if (k >= lo && k <= hi) k += (to > from ? -1 : 1);
+            newPath.put(k, e.getValue());
+        }
+        t3kBlockMeta.clear(); t3kBlockMeta.putAll(newMeta);
+        t3kModelPath.clear(); t3kModelPath.putAll(newPath);
+    }
+
+    /** Delete a plugin slot and keep T3K metadata + canvas badges in sync.
+     *  Centralized delete entry point — ALL delete paths MUST go through here so
+     *  t3kBlockMeta stays aligned with engine slots and canvas badges re-render. */
+    void deletePluginAndSyncTone3000(int slot) {
+        int total = AudioEngine.getActivePlugins();
+        if (slot < 0 || slot >= total) {
+            Log.w(TAG, "deletePluginAndSyncTone3000: stale slot " + slot + " of " + total + ", skipping");
+            return;
+        }
+        try { AudioEngine.deletePlugin(slot); } catch (Exception e) { Log.e(TAG, "deletePlugin failed", e); return; }
+        shiftT3kMetaOnDelete(slot);
+        if (signalChainCanvas != null) {
+            signalChainCanvas.clearT3kBadges();
+            signalChainCanvas.post(() -> {
+                // force=true: ensure slotToPluginId map is rebuilt — the single-flight
+                // dedup would skip this if another caller triggered the same engine state,
+                // leaving stale nodes + stale badge map on screen.
+                signalChainCanvas.loadFromActivePlugins(true);
+                signalChainCanvas.postDelayed(() -> {
+                    signalChainCanvas.reapplyT3kBadgesFromMeta(t3kBlockMeta);
+                }, 120);
+            });
+        }
     }
 
     void showMediaPlayerDialog() {
@@ -1309,8 +1773,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             RecyclerView recyclerView1 = (RecyclerView) linearLayoutPluginDialog.getChildAt(2);
             if (recyclerView1 != null) {
                 recyclerView1.setLayoutManager(new LinearLayoutManager(this));
-                if (useTheme && skinEngine != null)
-                    skinEngine.view(linearLayoutPluginDialog, "wallpaper", "bg", SkinEngine.Resize.Width, 1);
                 pluginDialogAdapter = new PluginDialogAdapter();
                 pluginDialogAdapter.setMainActivity(context, this);
                 recyclerView1.setAdapter(pluginDialogAdapter);
@@ -1376,9 +1838,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             fab.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View view) {
-    //                addPluginMenu.show();
-                    PluginPickerFragment picker = PluginPickerFragment.newInstance();
-                    picker.show(getSupportFragmentManager(), "plugin_picker");
+                    showPluginPickerDialog();
                 }
             });
         }
@@ -1511,7 +1971,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     @Override
     protected void onResume() {
         super.onResume();
-//        SkinEngine.setColorScheme(this, defaultSharedPreferences.getString("color_scheme", "AmpRack"));
         applyWallpaper(context, getWindow(), getResources(), findViewById(R.id.wallpaper), getWindowManager().getDefaultDisplay().getWidth(), getWindowManager().getDefaultDisplay().getHeight()); //finally
 //        recreate();
         Log.d(TAG, "lifecycle: resumed");
@@ -1554,6 +2013,26 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         }
 
          */
+
+        // Auto-start the audio engine: no power button by design. The grant
+        // callback (onRequestPermissionsResult) starts it when permission
+        // arrives later; deny leaves the engine off for this session.
+        if (!autoStartDone) {
+            autoStartDone = true;
+            try {
+                if (!running) {
+                    if (isRecordPermissionGranted()) {
+                        Log.d(TAG, "onResume: auto-starting audio engine");
+                        toggleEffect(false);
+                    } else {
+                        Log.d(TAG, "onResume: requesting record permission for auto-start");
+                        requestRecordPermission();
+                    }
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "onResume: auto-start failed", e);
+            }
+        }
     }
 
     @Override
@@ -1672,9 +2151,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             record.setChecked(false);
 
         nag ++ ;
-        if (nag == 3 && ! proVersion) {
-            startActivity(new Intent(this, com.kancrutt.gigginggear.Purchase.class));
-        }
     }
 
     private boolean isRecordPermissionGranted() {
@@ -2202,17 +2678,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
         if (PERMISSION_REQUEST_CODE_CAMERA == requestCode &&
                 grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-            Thread initCamera = new Thread(new Runnable() {
-                public void run() {
-                    runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() {
-                            createTextureView();
-                        }
-                    });
-                }
-            });
-//            initCamera.start();
             mainActivity.rack.toggleVideo.setChecked(false);
 //            mainActivity.rack.toggleVideo.setChecked(true);
         }
@@ -2289,11 +2754,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         }
     }
 
-    public void proDialog() {
-        Intent intent = new Intent(this, com.kancrutt.gigginggear.Purchase.class);
-        startActivity(intent);
-    }
-
     AlertDialog createPluginDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(context);
         LayoutInflater inflater = getLayoutInflater();
@@ -2301,8 +2761,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         linearLayoutPluginDialog = (ConstraintLayout) inflater.inflate(R.layout.load_plugin_dialog, null);
         /*
         if (useTheme) {
-            Log.d(TAG, "createPluginDialog: skinning background");
-            skinEngine.view(linearLayoutPluginDialog, "wallpaper", "bg", SkinEngine.Resize.Width, 1);
         }
 
          */
@@ -2491,6 +2949,44 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 //                .show();
     }
 
+    /**
+     * Insert a SPLIT or MERGE routing block at the end of the chain.
+     *
+     * These are structured routing utilities (not audio effects): a SPLIT forks the
+     * signal into two parallel branches, a MERGE recombines them into one. This is
+     * the PRIMARY way to build parallel routing — far less error-prone on a
+     * touchscreen than dragging a wire between two small port dots. The port-drag
+     * wire system remains available as a secondary/advanced interaction.
+     *
+     * Data model: both map onto the existing GraphSolver DAG as ordinary nodes with
+     * fixed port counts (SPLIT = 1-in/2-out, MERGE = 2-in/1-out). No solver changes.
+     */
+    public void addRoutingBlock(boolean isSplit) {
+        try {
+            int n = AudioEngine.addRoutingBlock(isSplit);
+            if (n <= 0) {
+                toast("Could not add routing block");
+                return;
+            }
+            if (dataAdapter != null) {
+                // Routing blocks have no plugin library ID; use a sentinel so the
+                // rack list stays index-aligned with the engine's activePlugins.
+                dataAdapter.addItem(isSplit ? ROUTING_ID_SPLIT : ROUTING_ID_MERGE, n - 1);
+            }
+            if (signalChainCanvas != null) {
+                signalChainCanvas.post(() -> signalChainCanvas.loadFromActivePlugins());
+            }
+            toast(isSplit ? "SPLIT added — chain branches into two paths"
+                          : "MERGE added — branches recombine here");
+        } catch (Throwable t) {
+            Log.e(TAG, "addRoutingBlock failed", t);
+            toast("Error adding routing block");
+        }
+    }
+
+    static final int ROUTING_ID_SPLIT = 900100;
+    static final int ROUTING_ID_MERGE = 900200;
+
     void loadPlugins() {
         if (AudioEngine.getTotalPlugins() != 0)
             return;
@@ -2678,6 +3174,169 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         return preset;
     }
 
+    /**
+     * Canonical snapshot of the live rig (engine + canvas) as a schema-v1 Preset.
+     * Single source of truth for ALL save paths (top-bar quick save, Presets FAB):
+     * plugins with control values, engine-read-back model file ports, TONE3000
+     * origin meta, graph edges and canvas node positions. Per-plugin isolation:
+     * one bad native read must not blank the whole save.
+     */
+    LocalPresetManager.Preset buildPresetFromChain(String name, String desc) {
+        LocalPresetManager.Preset p = new LocalPresetManager.Preset();
+        p.name = name;
+        p.description = desc != null ? desc : "";
+        p.author = "GigginGear Stage";
+        p.favorite = false;
+        p.masterInputVolume = 1.0f;
+        p.masterOutputVolume = 1.0f;
+        java.util.List<LocalPresetManager.PluginItem> plugins = new java.util.ArrayList<>();
+        int total = 0;
+        try {
+            total = AudioEngine.getActivePlugins();
+        } catch (Exception e) {
+            Log.w(TAG, "buildPresetFromChain: getActivePlugins failed", e);
+        }
+        for (int i = 0; i < total; i++) {
+            try {
+                LocalPresetManager.PluginItem item = new LocalPresetManager.PluginItem();
+                item.name = AudioEngine.getActivePluginName(i);
+                try { item.uniqueId = AudioEngine.getActivePluginID(i); } catch (Exception ignore) { item.uniqueId = 0; }
+                try { item.enabled = AudioEngine.getActivePluginEnabled(i); } catch (Exception ignore) { item.enabled = true; }
+                float[] values = null;
+                try { values = AudioEngine.getActivePluginValues(i); } catch (Exception ignore) {}
+                java.util.List<LocalPresetManager.ControlItem> controls = new java.util.ArrayList<>();
+                if (values != null) {
+                    for (int k = 0; k < values.length; k++) {
+                        LocalPresetManager.ControlItem ci = new LocalPresetManager.ControlItem();
+                        try { ci.name = AudioEngine.getControlName(i, k); } catch (Exception ignore) { ci.name = "Control " + k; }
+                        if (ci.name == null) ci.name = "Control " + k;
+                        ci.value = values[k];
+                        controls.add(ci);
+                    }
+                }
+                item.controls = controls;
+                // Model file actually connected in the engine (NAM/IR) — read back
+                // natively so a swapped model survives save/load without UI holders
+                // (holders are null for off-screen plugins).
+                java.util.List<LocalPresetManager.FilePortItem> fps = new java.util.ArrayList<>();
+                try {
+                    String loadedFile = AudioEngine.getPluginLoadedFileName(i);
+                    if (loadedFile != null && !loadedFile.isEmpty()) {
+                        LocalPresetManager.FilePortItem fpi = new LocalPresetManager.FilePortItem();
+                        fpi.portIndex = 0;
+                        fpi.portName = "Model File";
+                        try { fpi.fileName = new java.io.File(loadedFile).getName(); }
+                        catch (Exception ignore) { fpi.fileName = loadedFile; }
+                        fpi.relativePath = loadedFile;
+                        fps.add(fpi);
+                    }
+                } catch (Exception ignore) {}
+                // Fallback: TONE3000 session path when engine read-back is empty.
+                // STRICTLY gated on the slot having T3K origin meta this session —
+                // an unmapped slot (fresh/foreign preset) must stay empty or the
+                // stale path of an unrelated model leaks into this preset.
+                if (fps.isEmpty() && getTone3000MetaForSlot(i) != null) {
+                    try {
+                        String modelPath = getTone3000ModelPathForSlot(i);
+                        if (modelPath != null && !modelPath.isEmpty()) {
+                            LocalPresetManager.FilePortItem fpi = new LocalPresetManager.FilePortItem();
+                            fpi.portIndex = 0;
+                            fpi.portName = "Model File";
+                            try { fpi.fileName = new java.io.File(modelPath).getName(); }
+                            catch (Exception ignore) { fpi.fileName = modelPath; }
+                            fpi.relativePath = modelPath;
+                            fps.add(fpi);
+                        }
+                    } catch (Exception ignore) {}
+                }
+                item.filePorts = fps;
+                // TONE3000 origin metadata so badges + missing-file check restore.
+                try {
+                    JSONObject meta = getTone3000MetaForSlot(i);
+                    if (meta != null) {
+                        item.tone3000ToneId = meta.optString("tone3000ToneId", null);
+                        item.tone3000ModelId = meta.optString("tone3000ModelId", null);
+                        item.tone3000Creator = meta.optString("tone3000Creator", null);
+                        item.tone3000ToneTitle = meta.optString("tone3000ToneTitle", null);
+                        item.tone3000Format = meta.optString("tone3000Format", null);
+                        item.tone3000GearType = meta.optString("tone3000GearType", null);
+                        item.tone3000SourceUrl = meta.optString("tone3000SourceUrl", null);
+                        if (item.tone3000ToneId != null && item.tone3000ToneId.isEmpty()) item.tone3000ToneId = null;
+                        if (item.tone3000ModelId != null && item.tone3000ModelId.isEmpty()) item.tone3000ModelId = null;
+                        if (item.tone3000Creator != null && item.tone3000Creator.isEmpty()) item.tone3000Creator = null;
+                        if (item.tone3000ToneTitle != null && item.tone3000ToneTitle.isEmpty()) item.tone3000ToneTitle = null;
+                        if (item.tone3000Format != null && item.tone3000Format.isEmpty()) item.tone3000Format = null;
+                        if (item.tone3000GearType != null && item.tone3000GearType.isEmpty()) item.tone3000GearType = null;
+                        if (item.tone3000SourceUrl != null && item.tone3000SourceUrl.isEmpty()) item.tone3000SourceUrl = null;
+                    }
+                } catch (Exception ignore) {}
+                plugins.add(item);
+            } catch (Exception e) {
+                Log.w(TAG, "buildPresetFromChain: skipping plugin " + i, e);
+            }
+        }
+        p.plugins = plugins;
+
+        try {
+            int[] graphEdges = AudioEngine.getGraphEdges();
+            if (graphEdges != null && graphEdges.length > 0) {
+                p.graph = graphEdges;
+            }
+        } catch (Exception ignored) {}
+
+        try {
+            if (signalChainCanvas != null) {
+                for (SignalChainCanvasView.Node n : signalChainCanvas.getNodes()) {
+                    if (n != null) {
+                        p.nodePositions.put(String.valueOf(n.id), new float[]{n.x, n.y});
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+
+        return p;
+    }
+
+    /** Reload every visible preset list after a save/delete so top-bar nav,
+     *  picker, quick patch and the Presets tab all see the same data. */
+    void refreshPresetLists() {
+        try {
+            if (quickPatch != null && quickPatch.myPresetsAdapter != null) {
+                quickPatch.load();
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "refreshPresetLists: quickPatch reload failed", e);
+        }
+        try {
+            if (presets != null && presets.fragmentStateAdapter != null
+                    && presets.fragmentStateAdapter.getMyPresets() != null) {
+                presets.fragmentStateAdapter.getMyPresets().load();
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "refreshPresetLists: presets tab reload failed", e);
+        }
+    }
+
+    /** Index of a local preset id inside the quick-patch list (-1 if absent). */
+    int findQuickPresetIndexById(String id) {
+        try {
+            if (id != null && quickPatch != null && quickPatch.myPresetsAdapter != null
+                    && quickPatch.myPresetsAdapter.allPresets != null) {
+                java.util.List list = quickPatch.myPresetsAdapter.allPresets;
+                for (int i = 0; i < list.size(); i++) {
+                    Object o = list.get(i);
+                    if (o instanceof java.util.Map) {
+                        Object mid = ((java.util.Map<?, ?>) o).get("id");
+                        if (id.equals(mid != null ? mid.toString() : null)) return i;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "findQuickPresetIndexById failed", e);
+        }
+        return -1;
+    }
+
 
     /*  The problem with this is that we can only get viewholders which are visible on screen.
         See #19 https://github.com/djshaji/amp-rack/issues/19
@@ -2762,8 +3421,19 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     public void saveActivePreset() {
         saveGlobalMidi();
         SharedPreferences sharedPreferences = getPreferences(MODE_PRIVATE);
-        String preset;
-        preset = presetToString();
+        String preset = null;
+        // Canonical snapshot (engine-read-back model files, T3K meta, graph,
+        // node positions). The legacy presetToString() read model files off
+        // RecyclerView holders — null on the hidden list — so cold start
+        // restored the right plugins with the WRONG (empty) models.
+        try {
+            LocalPresetManager.Preset snap = buildPresetFromChain("Active Preset", "");
+            if (snap != null) preset = LocalPresetManager.presetToJson(snap).toString();
+        } catch (Exception e) {
+            Log.w(TAG, "saveActivePreset: canonical snapshot failed, legacy fallback", e);
+            preset = null;
+        }
+        if (preset == null) preset = presetToString();
         if (preset == null)
             Log.d(TAG, "saveActivePreset: preset is null");
         else {
@@ -2794,7 +3464,21 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
         if (preset != null) {
             Log.d(TAG, "loadActivePreset: " + preset);
-            loadPreset(preset);
+            // saveActivePreset now stores a schema-v1 snapshot ("plugins").
+            // Route it through the Map loader (model files, T3K meta,
+            // positions); legacy strings fall through to the String loader.
+            boolean routed = false;
+            try {
+                java.util.Map<?, ?> snapMap =
+                        new com.google.gson.Gson().fromJson(preset, java.util.HashMap.class);
+                if (snapMap != null && snapMap.containsKey("plugins")) {
+                    loadPreset((Map) snapMap);
+                    routed = true;
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "loadActivePreset: snapshot parse failed, legacy load", e);
+            }
+            if (!routed) loadPreset(preset);
         } else {
             Log.d(TAG, "loadActivePreset: active preset is null or empty");
         }
@@ -2813,9 +3497,15 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         populateInlineParameterEditor(position, pluginName);
     }
 
+    public static final int PARAM_EDITOR_CLEAR = -1;
+
     public void populateInlineParameterEditor(int position, String pluginName) {
-        if (position < 0) return;
-        if (dataAdapter != null) {
+        if (position == PARAM_EDITOR_CLEAR) {
+            runOnUiThread(() -> clearInlineParameterEditor());
+            return;
+        }
+        if (position < 0 && position != -100 && position != -200) return;
+        if (dataAdapter != null && position >= 0) {
             dataAdapter.setSelectedPosition(position);
         }
         runOnUiThread(() -> {
@@ -2825,9 +3515,138 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             MaterialButton enabledBtn = findViewById(R.id.detail_enabled_btn);
             TextView modelName = findViewById(R.id.detail_model_name);
             MaterialButton browseBtn = findViewById(R.id.detail_model_browse_btn);
+            // Use ConstraintLayout params to allow conditional centering or side‑by‑side layout
+            androidx.constraintlayout.widget.ConstraintLayout.LayoutParams btnLp = new androidx.constraintlayout.widget.ConstraintLayout.LayoutParams(
+                    androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.WRAP_CONTENT,
+                    androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.WRAP_CONTENT);
+            // Default: center horizontally and vertically within the parent
+            btnLp.startToStart = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
+            btnLp.endToEnd = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
+            btnLp.topToTop = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
+            btnLp.bottomToBottom = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
+            browseBtn.setLayoutParams(btnLp);
             ImageView gearRender = findViewById(R.id.detail_gear_render);
+            com.google.android.material.switchmaterial.SwitchMaterial enabledSwitch = findViewById(R.id.detail_enabled_switch);
+            TextView enabledLabelView = findViewById(R.id.detail_enabled_label);
+            View ledView = findViewById(R.id.detail_led);
+            LinearLayout levelContainer = findViewById(R.id.container_level_knobs);
+            LinearLayout toneContainer = findViewById(R.id.container_tone_knobs);
 
-            if (title != null) title.setText(pluginName != null ? pluginName : "Plugin Parameters");
+            if (position == -100 || position == -200) {
+                // Global physical I/O anchors. They do not have bypass switches or models.
+                if (title != null) title.setText(position == -100 ? "INPUT" : "OUTPUT");
+                if (subtitle != null) subtitle.setText("GLOBAL STAGE");
+                if (badge != null) badge.setVisibility(View.GONE);
+                if (enabledSwitch != null) enabledSwitch.setVisibility(View.GONE);
+                if (enabledLabelView != null) enabledLabelView.setVisibility(View.GONE);
+                if (ledView != null) ledView.setVisibility(View.GONE);
+                
+                if (modelName != null && modelName.getParent() instanceof View) {
+                    ((View) modelName.getParent()).setVisibility(View.GONE);
+                }
+                if (browseBtn != null) browseBtn.setVisibility(View.GONE);
+                if (gearRender != null) gearRender.setVisibility(View.GONE);
+
+                TextView gearInfoType = findViewById(R.id.detail_gear_info_type);
+                TextView gearInfoDesc = findViewById(R.id.detail_gear_info_desc);
+                if (gearInfoType != null) {
+                    gearInfoType.setText(position == -100 ? "PHYSICAL INPUT" : "PHYSICAL OUTPUT");
+                    gearInfoType.setTextColor(CategoryHelper.getColor(position == -100 ? "input" : "output"));
+                }
+                if (gearInfoDesc != null) {
+                    gearInfoDesc.setText(position == -100 ? "Adjust the global incoming trim level before the signal hits the first block in your chain." : "Adjust the global output level sent to the hardware stream.");
+                }
+
+                if (levelContainer != null) levelContainer.removeAllViews();
+                if (toneContainer != null) toneContainer.removeAllViews();
+                
+                // Build the global trim knob
+                float density = getResources().getDisplayMetrics().density;
+                LinearLayout knobCell = new LinearLayout(this);
+                knobCell.setOrientation(LinearLayout.VERTICAL);
+                knobCell.setGravity(Gravity.CENTER);
+                int marginPx = Math.round(16 * density);
+                LinearLayout.LayoutParams cellLp = new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                cellLp.setMargins(marginPx, 0, marginPx, 0);
+                knobCell.setLayoutParams(cellLp);
+                
+                android.graphics.Typeface jakartaFont = null;
+                try {
+                    jakartaFont = androidx.core.content.res.ResourcesCompat.getFont(this, R.font.plus_jakarta_sans);
+                } catch (Throwable ignored) {}
+                
+                float labelSizePx = 11.5f * density;
+                TextView labelView = new TextView(this);
+                labelView.setText(position == -100 ? "INPUT TRIM" : "MAIN OUT");
+                labelView.setTextColor(Color.parseColor("#8F94A0"));
+                labelView.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, labelSizePx);
+                labelView.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
+                labelView.setGravity(Gravity.CENTER);
+                if (jakartaFont != null) labelView.setTypeface(jakartaFont, android.graphics.Typeface.BOLD);
+                
+                int knobDimPx = Math.round(52 * density); // knob_size_large
+                RotarySeekbar rKnob = new RotarySeekbar(this);
+                rKnob.setShowKnob(true);
+                rKnob.setMinValue(0f);
+                rKnob.setMaxValue(position == -100 ? 200f : 100f);
+                // Currently AudioEngine doesn't have an input/output getter, we track state or initialize to 100
+                float initGain;
+                try {
+                    initGain = (position == -100 ? AudioEngine.getInputVolume() : AudioEngine.getOutputVolume()) * 100f;
+                } catch (Exception ignored) { initGain = 100f; }
+                rKnob.setValue(initGain);
+                rKnob.mKnobColor = CategoryHelper.getColor(position == -100 ? "input" : "output");
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(knobDimPx, knobDimPx);
+                lp.gravity = Gravity.CENTER;
+                rKnob.setLayoutParams(lp);
+                
+                float valSizePx = 12.5f * density;
+                TextView valView = new TextView(this);
+                valView.setText(String.format(java.util.Locale.US, "%.0f%%", initGain));
+                valView.setTextColor(Color.parseColor("#FFFFFF"));
+                valView.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, valSizePx);
+                valView.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
+                valView.setPadding(Math.round(4 * density), Math.round(2 * density), Math.round(4 * density), Math.round(2 * density));
+                valView.setClickable(true);
+                valView.setFocusable(true);
+                if (jakartaFont != null) valView.setTypeface(jakartaFont, android.graphics.Typeface.BOLD);
+
+                rKnob.setOnValueChangedListener((source, value) -> {
+                    if (position == -100) {
+                        try { AudioEngine.setInputVolume(value / 100f); } catch (Exception ignored) {}
+                    } else {
+                        try { AudioEngine.setOutputVolume(value / 100f); } catch (Exception ignored) {}
+                    }
+                    valView.setText(String.format(java.util.Locale.US, "%.0f%%", value));
+                });
+
+                View.OnClickListener manualInputClick = v -> {
+                    showManualValueInputDialog(position == -100 ? "Input Trim" : "Main Out", rKnob.getValue(), 0f, position == -100 ? 200f : 100f, "%", newVal -> {
+                        rKnob.setValue(newVal);
+                        if (position == -100) {
+                            try { AudioEngine.setInputVolume(newVal / 100f); } catch (Exception ignored) {}
+                        } else {
+                            try { AudioEngine.setOutputVolume(newVal / 100f); } catch (Exception ignored) {}
+                        }
+                        valView.setText(String.format(java.util.Locale.US, "%.0f%%", newVal));
+                    });
+                };
+                valView.setOnClickListener(manualInputClick);
+                labelView.setOnClickListener(manualInputClick);
+                rKnob.setOnKnobClickListener(k -> manualInputClick.onClick(k));
+
+                knobCell.addView(labelView);
+                knobCell.addView(rKnob);
+                knobCell.addView(valView);
+                
+                if (levelContainer != null) levelContainer.addView(knobCell);
+                if (toneContainer != null) addEmptyPanelHint(toneContainer, "GLOBAL CONTROL");
+                
+                return;
+            }
+
+            if (title != null) title.setText(pluginName != null ? PluginNaming.displayName(pluginName) : "Plugin Parameters");
 
             boolean isAmp = dataAdapter != null && dataAdapter.isAmpBlock(pluginName);
             boolean isCab = false;
@@ -2842,7 +3661,9 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 if (isCab) {
                     subtitle.setText("CAB · SPEAKER CABINET 4x12");
                 } else if (isAmp) {
-                    subtitle.setText("AMP · NEURAL AMP (NAM)");
+                    // Only real model loaders may claim NAM; anything else is
+                    // just an amp (C* AmpVTS etc. have no file ports).
+                    subtitle.setText(canLoadNamModel(position) ? "AMP · NEURAL AMP (NAM)" : "AMP");
                 } else {
                     subtitle.setText("EFFECT · STOMPBOX");
                 }
@@ -2856,7 +3677,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             TextView gearInfoDesc = findViewById(R.id.detail_gear_info_desc);
             if (gearInfoType != null) {
                 gearInfoType.setText(pluginName != null && !pluginName.isEmpty()
-                        ? pluginName : "EFFECT");
+                        ? PluginNaming.displayName(pluginName) : "EFFECT");
                 gearInfoType.setTextColor(CategoryHelper.getColor(pluginName));
             }
             if (gearInfoDesc != null) {
@@ -2872,18 +3693,125 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 badge.setTextColor(CategoryHelper.getColor(pluginName));
             }
 
-            if (modelName != null) {
-                modelName.setText(pluginName != null ? pluginName : "Standard Model");
-            }
+            if (modelName != null) try {
+                if (modelName.getParent() instanceof View) {
+                    ((View) modelName.getParent()).setVisibility(View.VISIBLE);
+                }
+                // TONE3000: show tone title + T3K mark if origin is T3K
+                JSONObject t3kMeta = getTone3000MetaForSlot(position);
+                if (t3kMeta != null) {
+                    String tTitle = t3kMeta.optString("tone3000ToneTitle", null);
+                    String creator = t3kMeta.optString("tone3000Creator", null);
+                    String gear = t3kMeta.optString("tone3000GearType", null);
+                    String fmt = t3kMeta.optString("tone3000Format", null);
+                    // Use T3K mark per spec §16 compact mark in block, but detail shows full context
+                    String display = (tTitle != null && !tTitle.isEmpty() ? tTitle : pluginName);
+                    if (creator != null && !creator.isEmpty()) display += "  ·  @" + creator;
+                    modelName.setText(display);
+                    if (badge != null) { badge.setText("T3K"); badge.setTextColor(Color.parseColor("#FF8A00")); }
+                    if (subtitle != null) {
+                        String sub = "TONE3000";
+                        if (gear != null) sub += " · " + gear.toUpperCase();
+                        if (fmt != null) sub += " · " + fmt.toUpperCase();
+                        subtitle.setText(sub);
+                        subtitle.setTextColor(Color.parseColor("#FF8A00"));
+                    }
+                    if (gearInfoType != null) gearInfoType.setText(tTitle != null ? tTitle : pluginName);
+                    if (gearInfoDesc != null) {
+                        String desc = t3kMeta.optString("tone3000ToneTitle", "");
+                        if (creator != null) desc += (desc.isEmpty() ? "" : " — ") + "@" + creator;
+                        gearInfoDesc.setText(desc);
+                    }
+                } else {
+                    modelName.setText(pluginName != null && !pluginName.isEmpty() ? PluginNaming.displayName(pluginName) : "Standard Model");
+                }
+            } catch (Exception e) { android.util.Log.w(TAG, "T3K detail bind failed", e); try { modelName.setText(pluginName != null ? PluginNaming.displayName(pluginName) : "Standard Model"); } catch (Exception ignore) {} }
 
-            if (browseBtn != null) {
-                browseBtn.setOnClickListener(v -> showModelPickerDialog(position));
+            // "Browse Models" opens the GENERIC replace-plugin browser
+            // (showModelPickerDialog): pre-selected to this block's category but
+            // free to pick any category — every block needs it, including FX.
+            // ONLY the TONE3000-specific entries are AMP/CAB-gated: the injected
+            // "Browse TONE3000 →" link below, and the T3K row inside the dialog
+            // (loadModelsIntoContainer shows it only under AMP/CAB tabs).
+            final boolean allowT3k = isAmp || isCab || isTone3000Slot(position);
+            if (browseBtn != null) try {
+                browseBtn.setVisibility(View.VISIBLE);
+                JSONObject t3kMeta2 = getTone3000MetaForSlot(position);
+                if (t3kMeta2 != null) {
+                    browseBtn.setText("TONE3000 Details");
+                    browseBtn.setOnClickListener(v -> {
+                        String tid = t3kMeta2.optString("tone3000ToneId", null);
+                        if (tid != null && !tid.isEmpty()) {
+                            try { Tone3000ToneDetailSheet sheet = Tone3000ToneDetailSheet.newInstance(tid); sheet.show(getSupportFragmentManager(), "t3k_detail_tap"); } catch (Exception e) { showModelPickerDialog(position); }
+                        } else {
+                            showModelPickerDialog(position);
+                        }
+                    });
+                } else {
+                    browseBtn.setText("Browse");
+                    browseBtn.setOnClickListener(v -> showModelPickerDialog(position));
+                }
+                if (t3kMeta2 != null) {
+                    browseBtn.setText("Tone3K");
+                    browseBtn.setOnClickListener(v -> {
+                        String tid = t3kMeta2.optString("tone3000ToneId", null);
+                        if (tid != null && !tid.isEmpty()) {
+                            try { Tone3000ToneDetailSheet sheet = Tone3000ToneDetailSheet.newInstance(tid); sheet.show(getSupportFragmentManager(), "t3k_detail_tap"); } catch (Exception e) { showModelPickerDialog(position); }
+                        } else {
+                            showModelPickerDialog(position);
+                        }
+                    });
+                }
+            } catch (Exception e) { android.util.Log.w(TAG, "browseBtn bind failed", e); }
+            // Secondary "Browse TONE3000 →" link: AMP/CAB non-T3K blocks only.
+            // Always scrub a stale link first (detail panel views are recycled).
+            try {
+            if (browseBtn != null && browseBtn.getParent() instanceof ViewGroup) {
+                ViewGroup parent = (ViewGroup) browseBtn.getParent();
+                android.view.View stale = parent.findViewWithTag("t3k_browse_link");
+                if (stale != null) parent.removeView(stale);
+                if (allowT3k && getTone3000MetaForSlot(position) == null) {
+                    TextView t3kLink = new TextView(this);
+                    t3kLink.setTag("t3k_browse_link");
+                    t3kLink.setId(View.generateViewId());
+                    t3kLink.setText("Tone3K");
+                    t3kLink.setTextColor(Color.parseColor("#FF8A00"));
+                    t3kLink.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11f);
+                    t3kLink.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+                    t3kLink.setPadding(Math.round(8 * getResources().getDisplayMetrics().density), Math.round(6 * getResources().getDisplayMetrics().density), Math.round(8 * getResources().getDisplayMetrics().density), Math.round(6 * getResources().getDisplayMetrics().density));
+                    t3kLink.setClickable(true);
+                    t3kLink.setFocusable(true);
+                    t3kLink.setOnClickListener(v -> {
+                        try { Tone3000EntrySheet sheet = Tone3000EntrySheet.newInstance(); sheet.show(getSupportFragmentManager(), "t3k_entry"); } catch (Exception e) { android.util.Log.w(TAG, "t3k entry launch failed", e); }
+                    });
+                    // Set constraints: align start to end of browseBtn, end to parent, vertically centered
+                    androidx.constraintlayout.widget.ConstraintLayout.LayoutParams linkLp = new androidx.constraintlayout.widget.ConstraintLayout.LayoutParams(
+                            androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.WRAP_CONTENT,
+                            androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.WRAP_CONTENT);
+                    linkLp.startToEnd = browseBtn.getId();
+                    linkLp.endToEnd = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
+                    linkLp.topToTop = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
+                    linkLp.bottomToBottom = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
+                    t3kLink.setLayoutParams(linkLp);
+                    parent.addView(t3kLink);
+                    // Adjust browseBtn to be left of the t3kLink when the link is present
+                    androidx.constraintlayout.widget.ConstraintLayout.LayoutParams btnLpAdj = (androidx.constraintlayout.widget.ConstraintLayout.LayoutParams) browseBtn.getLayoutParams();
+                    btnLpAdj.endToEnd = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.UNSET;
+                    btnLpAdj.endToStart = t3kLink.getId();
+                    btnLpAdj.startToStart = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
+                    btnLpAdj.topToTop = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
+                    btnLpAdj.bottomToBottom = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
+                    browseBtn.setLayoutParams(btnLpAdj);
+                }
+            } } catch (Exception e) { android.util.Log.w(TAG, "t3k link injection failed", e); }
+
+            if (gearRender != null) {
+                gearRender.setVisibility(View.VISIBLE);
+                gearRender.setImageResource(CategoryHelper.getIconRes(pluginName));
+                gearRender.setColorFilter(CategoryHelper.getColor(pluginName), android.graphics.PorterDuff.Mode.SRC_IN);
             }
 
             boolean isActive = AudioEngine.getActivePluginEnabled(position);
-            com.google.android.material.switchmaterial.SwitchMaterial enabledSwitch = findViewById(R.id.detail_enabled_switch);
-            TextView enabledLabelView = findViewById(R.id.detail_enabled_label);
-            View ledView = findViewById(R.id.detail_led);
 
             final int colorActiveGreen = Color.parseColor("#00E676");
             final int colorInactiveGrey = Color.parseColor("#8F94A0");
@@ -2952,8 +3880,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             // Populate dynamic parameter panels with 3D Rotary Hero Knobs & readable dB readouts
             LinearLayout levelPanel = findViewById(R.id.panel_level);
             LinearLayout tonePanel = findViewById(R.id.panel_tone);
-            LinearLayout levelContainer = findViewById(R.id.container_level_knobs);
-            LinearLayout toneContainer = findViewById(R.id.container_tone_knobs);
             LinearLayout rightCol = findViewById(R.id.parameter_right_column);
             if (rightCol != null) {
                 rightCol.setVisibility(View.VISIBLE);
@@ -2966,110 +3892,569 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 ArrayList<LinearLayout> levelCells = new ArrayList<>();
                 ArrayList<LinearLayout> toneCells = new ArrayList<>();
 
-                int numControls = AudioEngine.getPluginControls(position);
-                int knobDimPx = getResources().getDimensionPixelSize(
-                        numControls > 4 ? R.dimen.knob_size_small : R.dimen.knob_size_large);
-                float labelSizePx = getResources().getDimension(R.dimen.knob_label_size);
-                float valSizePx = getResources().getDimension(R.dimen.knob_val_size);
-                int panelPadPx = getResources().getDimensionPixelSize(R.dimen.param_panel_padding);
+                 float density = getResources().getDisplayMetrics().density;
+                 int numControls = AudioEngine.getPluginControls(position);
+                 int activePluginId = AudioEngine.getActivePluginID(position);
+                int knobDimPx = Math.round(52 * density); // Standard level knob size
+                float labelSizePx = 10f * density;
+                float valSizePx = 11f * density;
 
-                float density = getResources().getDisplayMetrics().density;
+                android.graphics.Typeface jakartaFont = null;
+                try {
+                    jakartaFont = androidx.core.content.res.ResourcesCompat.getFont(this, R.font.plus_jakarta_sans);
+                } catch (Throwable ignored) {}
 
                 for (int i = 0; i < numControls; i++) {
                     String rawName = AudioEngine.getControlName(position, i);
-                    String cName = prettyControlName(rawName);
-                    if (cName == null || cName.toLowerCase().contains("bypass")) continue;
+                    // Zero-Trust label: main name for UI, enum hint for helper/picker.
+                    // LADSPA embeds enums in the port name ("Modulation depth
+                    // (0=none, 1=AM, 2=RM)") — the parens never reach the UI.
+                    com.kancrutt.gigginggear.util.LabelFormatter.ControlLabel parsed =
+                            com.kancrutt.gigginggear.util.LabelFormatter.parseControlLabel(rawName);
+                     String cName = parsed.getMain();
+                     if (cName == null || cName.isEmpty()) continue;
+                     final String cHint = parsed.getHint();
+                     ParameterMetadata.PortMeta metadata = null;
+                     int nativePortIndex = AudioEngine.getControlPortIndex(position, i);
+                      if (parameterMetadata != null && nativePortIndex >= 0) {
+                          String activeUri = "";
+                          try { activeUri = AudioEngine.getActivePluginUri(position); } catch (Throwable ignored) {}
+                          metadata = (activeUri != null && !activeUri.isEmpty())
+                                  ? parameterMetadata.getLv2Port(activeUri, rawName)
+                                  : parameterMetadata.getLadspaPort(String.valueOf(activePluginId), nativePortIndex);
+                      }
+                     if (metadata == null) {
+                         Log.d(TAG, "parameter metadata missing plugin=" + activePluginId + " port=" + nativePortIndex + " name=" + cName);
+                     }
 
                     float val = AudioEngine.getActivePluginValue(position, i);
-
-                    LinearLayout knobCell = new LinearLayout(this);
-                    knobCell.setOrientation(LinearLayout.VERTICAL);
-                    knobCell.setGravity(Gravity.CENTER);
-                    knobCell.setPadding(Math.round(2 * density), 0, Math.round(2 * density), 0);
-
-                    android.graphics.Typeface jakartaFont = null;
-                    try {
-                        jakartaFont = androidx.core.content.res.ResourcesCompat.getFont(this, R.font.plus_jakarta_sans);
-                    } catch (Throwable ignored) {}
-
-                    TextView labelView = new TextView(this);
-                    labelView.setText(cName.toUpperCase());
-                    labelView.setTextColor(Color.parseColor("#8F94A0"));
-                    labelView.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, labelSizePx);
-                    labelView.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
-                    labelView.setSingleLine(false);
-                    labelView.setMaxLines(2);
-                    labelView.setEllipsize(android.text.TextUtils.TruncateAt.END);
-                    labelView.setGravity(Gravity.CENTER);
-                    if (jakartaFont != null) {
-                        labelView.setTypeface(jakartaFont, android.graphics.Typeface.BOLD);
-                    }
-
-                    float minVal = -12f;
-                    float maxVal = 12f;
+                    float minVal = 0f;
+                    float maxVal = 1f;
+                    int ctrlType = 0; // 0 FLOAT, 1 INT, 2 TOGGLE, 3 ATOM, 4 ENUM
+                    boolean isLog = false;
+                    boolean isIntegerParam = false; // discrete integer steps (native isInteger flag / INT type)
+                     String nativeUnit = null;
                     try {
                         float[] bounds = AudioEngine.getPluginControlValues(position, i);
                         if (bounds != null && bounds.length >= 3 && bounds[2] > bounds[1]) {
                             minVal = bounds[1];
                             maxVal = bounds[2];
+                            if (bounds.length > 3) ctrlType = (int) bounds[3];
+                            if (bounds.length > 4) isLog = bounds[4] > 0.5f;
+                            if (bounds.length > 6) isIntegerParam = bounds[6] > 0.5f;
                         }
                     } catch (Throwable ignored) {}
-
-                    RotarySeekbar rKnob = new RotarySeekbar(this);
-                    rKnob.setShowKnob(true);
-                    rKnob.setMinValue(minVal);
-                    rKnob.setMaxValue(maxVal);
-                    rKnob.setValue(val);
-                    rKnob.mKnobColor = CategoryHelper.getColor(pluginName);
-                    LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(knobDimPx, knobDimPx);
-                    lp.gravity = Gravity.CENTER;
-                    rKnob.setLayoutParams(lp);
-
-                    String unit = detectControlUnit(cName);
-                    TextView valView = new TextView(this);
-                    valView.setText(formatParamValue(val, unit));
-                    valView.setTextColor(Color.parseColor("#FFFFFF"));
-                    valView.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, valSizePx);
-                    valView.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
-                    if (jakartaFont != null) {
-                        valView.setTypeface(jakartaFont, android.graphics.Typeface.BOLD);
+                    try { nativeUnit = AudioEngine.getControlUnit(position, i); } catch (Throwable ignored) {}
+                    try { int t = AudioEngine.getControlType(position, i); ctrlType = t; } catch (Throwable ignored) {}
+                    try { isLog = AudioEngine.getControlIsLogarithmic(position, i); } catch (Throwable ignored) {}
+                    if (ctrlType == 1) isIntegerParam = true; // INT type => discrete integer steps
+                    // LADSPA enum-in-name: "(0=none, 1=AM, 2=RM)" + INT range 0..N
+                    // renders as a proper picker row, never as slider text.
+                    String[] hintEnumLabels = null;
+                    if (isIntegerParam && cHint != null) {
+                        try { hintEnumLabels = com.kancrutt.gigginggear.util.LabelFormatter.parseEnumHint(cHint, minVal, maxVal); } catch (Throwable ignored) {}
                     }
-                    valView.setPadding(Math.round(4 * density), Math.round(2 * density), Math.round(4 * density), Math.round(2 * density));
-                    valView.setClickable(true);
-                    valView.setFocusable(true);
+                     final String[] fHintEnumLabels = hintEnumLabels;
+                     final int TYPE_TOGGLE = 2;
+                     final int TYPE_ENUM = 4;
 
-                    int finalI = i;
-                    String unitFinal = unit;
-                    final float fMin = minVal;
-                    final float fMax = maxVal;
-                    final String fCName = cName;
+                     // Metadata wins when non-empty; otherwise fall back to native.
+                     // An empty metadata unit must never shadow native "pc".
+                     // Unitless stays "" — a 0..1 range alone never implies %.
+                     String unit = ParameterFormatter.resolveUnit(
+                             metadata != null ? metadata.unit : null, nativeUnit);
+                     // Native bounds/current value are the DSP contract. Build
+                     // an effective formatter profile from them even when the
+                     // optional generated profile has no matching LV2 entry.
+                     ParameterMetadata.ControlType effectiveControl = metadata != null
+                             ? metadata.controlType
+                             : (ctrlType == TYPE_TOGGLE ? ParameterMetadata.ControlType.TOGGLE
+                             : ctrlType == TYPE_ENUM ? ParameterMetadata.ControlType.ENUM_PICKER
+                             : isIntegerParam ? ParameterMetadata.ControlType.INTEGER_STEPPER
+                             : isLog ? ParameterMetadata.ControlType.LOG_KNOB
+                             : ParameterMetadata.ControlType.KNOB);
+                     ParameterMetadata.PluginType effectivePlugin = metadata != null
+                             ? metadata.pluginType
+                             : (effectiveControl == ParameterMetadata.ControlType.TOGGLE
+                             ? ParameterMetadata.PluginType.BOOLEAN
+                             : effectiveControl == ParameterMetadata.ControlType.ENUM_PICKER
+                             ? ParameterMetadata.PluginType.ENUM : isIntegerParam
+                             ? ParameterMetadata.PluginType.INT : ParameterMetadata.PluginType.FLOAT);
+                     final ParameterMetadata.PortMeta parameterMeta = new ParameterMetadata.PortMeta(
+                             cName, "port_" + nativePortIndex, nativePortIndex, val,
+                             minVal, maxVal, unit == null ? "" : unit, effectiveControl,
+                             effectivePlugin, isLog, isIntegerParam,
+                             ctrlType == TYPE_TOGGLE,
+                             metadata == null ? null : metadata.enumValues,
+                             metadata == null ? null : metadata.enumLabels);
+                    // Boolean / Toggle: show On/Off, never 0-1% or -100% (fixes Aida Enabled 0-1)
+                     if (ctrlType == TYPE_TOGGLE || (metadata != null && metadata.controlType == ParameterMetadata.ControlType.TOGGLE)) {
+                        // Render as Switch row — proportional & safe padding, aligned
+                        LinearLayout toggleRow = new LinearLayout(this);
+                        toggleRow.setOrientation(LinearLayout.HORIZONTAL);
+                        toggleRow.setGravity(Gravity.CENTER_VERTICAL);
+                        toggleRow.setPadding(Math.round(12 * density), Math.round(12 * density), Math.round(12 * density), Math.round(12 * density));
+                        toggleRow.setBackgroundResource(R.drawable.glass_card_bg);
+                        LinearLayout.LayoutParams toggleLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                        toggleLp.setMargins(0, Math.round(4 * density), 0, Math.round(4 * density));
+                        toggleRow.setLayoutParams(toggleLp);
+                        toggleRow.setMinimumHeight(Math.round(48 * density));
 
-                    rKnob.setOnValueChangedListener((source, value) -> {
-                        AudioEngine.setPluginControl(position, finalI, value);
-                        valView.setText(formatParamValue(value, unitFinal));
-                    });
+                        TextView tLabel = new TextView(this);
+                        tLabel.setText(cName);
+                        tLabel.setTextColor(Color.parseColor("#E6E6E6"));
+                        tLabel.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 11f * density);
+                        if (jakartaFont != null) tLabel.setTypeface(jakartaFont, android.graphics.Typeface.BOLD);
+                        tLabel.setMaxLines(2);
+                        tLabel.setMinLines(1);
+                        tLabel.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                        tLabel.setSingleLine(false);
+                        tLabel.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+                        LinearLayout.LayoutParams tLp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+                        tLp.setMarginEnd(Math.round(12 * density));
+                        tLp.gravity = Gravity.CENTER_VERTICAL;
+                        tLabel.setLayoutParams(tLp);
 
-                    // Tap on value label or control name to input value manually
-                    View.OnClickListener manualInputClick = v -> {
-                        showManualValueInputDialog(fCName, rKnob.getValue(), fMin, fMax, unitFinal, newVal -> {
-                            AudioEngine.setPluginControl(position, finalI, newVal);
-                            rKnob.setValue(newVal);
-                            valView.setText(formatParamValue(newVal, unitFinal));
+                        com.google.android.material.switchmaterial.SwitchMaterial sw = new com.google.android.material.switchmaterial.SwitchMaterial(this);
+                        sw.setChecked(val > 0.5f);
+                        sw.setThumbTintList(ColorStateList.valueOf(val > 0.5f ? Color.parseColor("#00E676") : Color.parseColor("#6A6E78")));
+                        sw.setTrackTintList(ColorStateList.valueOf(val > 0.5f ? Color.parseColor("#2A3D2E") : Color.parseColor("#25272C")));
+                        LinearLayout.LayoutParams swLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                        swLp.gravity = Gravity.CENTER_VERTICAL;
+                        sw.setLayoutParams(swLp);
+                        TextView status = new TextView(this);
+                        status.setText(val > 0.5f ? "ON" : "OFF");
+                        status.setTextColor(val > 0.5f ? Color.parseColor("#00E676") : Color.parseColor("#8F94A0"));
+                        status.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 10f * density);
+                        if (jakartaFont != null) status.setTypeface(jakartaFont, android.graphics.Typeface.BOLD);
+                        status.setGravity(Gravity.CENTER_VERTICAL | Gravity.END);
+                        status.setMinWidth(Math.round(36 * density));
+                        LinearLayout.LayoutParams statusLp = new LinearLayout.LayoutParams(Math.round(48 * density), ViewGroup.LayoutParams.WRAP_CONTENT);
+                        statusLp.setMarginStart(Math.round(8 * density));
+                        statusLp.gravity = Gravity.CENTER_VERTICAL;
+                        status.setLayoutParams(statusLp);
+
+                        int finalI2 = i;
+                        sw.setOnCheckedChangeListener((btn, checked) -> {
+                            AudioEngine.setPluginControl(position, finalI2, checked ? 1f : 0f);
+                            status.setText(checked ? "ON" : "OFF");
+                            status.setTextColor(checked ? Color.parseColor("#00E676") : Color.parseColor("#8F94A0"));
+                            sw.setThumbTintList(ColorStateList.valueOf(checked ? Color.parseColor("#00E676") : Color.parseColor("#6A6E78")));
+                            sw.setTrackTintList(ColorStateList.valueOf(checked ? Color.parseColor("#2A3D2E") : Color.parseColor("#25272C")));
                         });
-                    };
-                    valView.setOnClickListener(manualInputClick);
-                    labelView.setOnClickListener(manualInputClick);
-                    rKnob.setOnKnobClickListener(k -> manualInputClick.onClick(k));
+                        toggleRow.addView(tLabel);
+                        toggleRow.addView(sw);
+                        toggleRow.addView(status);
+                        toneCells.add(toggleRow);
+                        continue;
+                    }
+                    // Enumeration: render as a discrete picker row backed by native scalePoint labels.
+                    // LADSPA has no scale-points, so an INT control carrying an enum hint
+                    // ("0=none, 1=AM, 2=RM") takes the same path with hint-derived labels.
+                    if (ctrlType == TYPE_ENUM || (metadata != null && metadata.controlType == ParameterMetadata.ControlType.ENUM_PICKER) || fHintEnumLabels != null) {
+                        unit = ""; // enumeration has no unit
+                        String[] enumLabels = metadata != null && metadata.enumLabels != null ? metadata.enumLabels : fHintEnumLabels;
+                        float[] enumValues = metadata != null ? metadata.enumValues : null;
+                        try {
+                            String[] nativeLabels = AudioEngine.getControlEnumLabels(position, i);
+                            if (nativeLabels != null && nativeLabels.length > 0) enumLabels = nativeLabels;
+                        } catch (Throwable ignored) {}
+                        final boolean enumHasLabels = enumLabels != null && enumLabels.length > 0;
 
-                    knobCell.addView(labelView);
-                    knobCell.addView(rKnob);
-                    knobCell.addView(valView);
+                        LinearLayout enumRow = new LinearLayout(this);
+                        enumRow.setOrientation(LinearLayout.HORIZONTAL);
+                        enumRow.setGravity(Gravity.CENTER_VERTICAL);
+                        enumRow.setPadding(Math.round(12 * density), Math.round(12 * density), Math.round(12 * density), Math.round(12 * density));
+                        enumRow.setBackgroundResource(R.drawable.glass_card_bg);
+                        LinearLayout.LayoutParams eRowLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                        eRowLp.setMargins(0, Math.round(4 * density), 0, Math.round(4 * density));
+                        enumRow.setLayoutParams(eRowLp);
+                        enumRow.setMinimumHeight(Math.round(48 * density));
 
-                    String lowName = cName.toLowerCase();
-                    if (lowName.contains("input") || lowName.contains("output") || lowName.contains("level") || lowName.contains("gain") || lowName.contains("volume")) {
+                        TextView enumName = new TextView(this);
+                        enumName.setText(cName);
+                        enumName.setTextColor(Color.parseColor("#E6E6E6"));
+                        enumName.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 11f * density);
+                        if (jakartaFont != null) enumName.setTypeface(jakartaFont, android.graphics.Typeface.BOLD);
+                        LinearLayout.LayoutParams eNameLp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 0.44f);
+                        eNameLp.setMarginEnd(Math.round(12 * density));
+                        eNameLp.gravity = Gravity.CENTER_VERTICAL;
+                        enumName.setLayoutParams(eNameLp);
+                        enumName.setMaxLines(2);
+                        enumName.setMinLines(1);
+                        enumName.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                        enumName.setSingleLine(false);
+                        enumName.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+
+                        TextView enumValue = new TextView(this);
+                        // Labeled enums may start above zero (LADSPA 1-based, LV2
+                        // scale-points): index labels by (value - min), never raw.
+                        int labelIdx0 = enumValues != null ? nearestEnumIndex(val, enumValues) : (int) Math.round(val - minVal);
+                        enumValue.setText(enumHasLabels && labelIdx0 >= 0 && labelIdx0 < enumLabels.length ? enumLabels[labelIdx0] : String.valueOf((int) val));
+                        enumValue.setTextColor(Color.parseColor("#A1A1AA"));
+                        enumValue.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 10.5f * density);
+                        if (jakartaFont != null) enumValue.setTypeface(jakartaFont, android.graphics.Typeface.BOLD);
+                        enumValue.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+                        enumValue.setMaxLines(2);
+                        enumValue.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                        LinearLayout.LayoutParams eValLp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 0.40f);
+                        eValLp.setMarginEnd(Math.round(12 * density));
+                        eValLp.gravity = Gravity.CENTER_VERTICAL;
+                        enumValue.setLayoutParams(eValLp);
+
+                        ImageView enumMore = new ImageView(this);
+                        enumMore.setImageResource(R.drawable.ic_more_vert);
+                        enumMore.setColorFilter(Color.parseColor("#71717A"), android.graphics.PorterDuff.Mode.SRC_IN);
+                        LinearLayout.LayoutParams eMoreLp = new LinearLayout.LayoutParams(Math.round(20 * density), Math.round(20 * density));
+                        eMoreLp.setMargins(Math.round(4 * density), 0, Math.round(4 * density), 0);
+                        eMoreLp.gravity = Gravity.CENTER_VERTICAL;
+                        enumMore.setLayoutParams(eMoreLp);
+
+                        int finalIEnum = i;
+                        String[] labelsFinal = enumLabels;
+                        float[] valuesFinal = enumValues;
+                        final boolean hasLabelsFinal = enumHasLabels;
+                        // Map native scale-point label index back to native integer value.
+                        // If we have labels, options are 0..labels.length-1 (snap current to range).
+                        final float fEnumMinVal = minVal;
+                        final float fEnumMaxVal = maxVal;
+                        int optionCount = hasLabelsFinal ? labelsFinal.length : Math.max(1, (int) (fEnumMaxVal - fEnumMinVal + 1));
+                        // Clamp initial selection into valid range
+                        int initialIdx;
+                        if (hasLabelsFinal) {
+                            initialIdx = valuesFinal != null ? nearestEnumIndex(val, valuesFinal) : Math.max(0, Math.min(labelsFinal.length - 1, (int) Math.round(val - fEnumMinVal)));
+                        } else {
+                            initialIdx = Math.max(0, Math.min(optionCount - 1, (int) Math.round(val - fEnumMinVal)));
+                        }
+                        enumValue.setText(hasLabelsFinal ? labelsFinal[initialIdx] : String.valueOf(initialIdx));
+
+                        View.OnClickListener enumClick = v -> {
+                            if (hasLabelsFinal) {
+                                com.google.android.material.dialog.MaterialAlertDialogBuilder b = new com.google.android.material.dialog.MaterialAlertDialogBuilder(this);
+                                b.setTitle(cName);
+                                 int cur = valuesFinal != null ? nearestEnumIndex(AudioEngine.getActivePluginValue(position, finalIEnum), valuesFinal) : Math.max(0, Math.min(labelsFinal.length - 1, (int) Math.round(AudioEngine.getActivePluginValue(position, finalIEnum) - fEnumMinVal)));
+                                 b.setSingleChoiceItems(labelsFinal, cur, (dialog, which) -> {
+                                     float newVal = valuesFinal != null ? valuesFinal[which] : fEnumMinVal + (float) which;
+                                    AudioEngine.setPluginControl(position, finalIEnum, newVal);
+                                    enumValue.setText(labelsFinal[which]);
+                                    dialog.dismiss();
+                                });
+                                b.setNegativeButton("CANCEL", null);
+                                b.show();
+                            } else {
+                                // No labels — cycle integer steps via +/- in dialog
+                                String[] opts = new String[optionCount];
+                                for (int k = 0; k < optionCount; k++) opts[k] = String.valueOf(k);
+                                com.google.android.material.dialog.MaterialAlertDialogBuilder b = new com.google.android.material.dialog.MaterialAlertDialogBuilder(this);
+                                b.setTitle(cName);
+                                final int finalOptionCount = optionCount;
+                                int cur = Math.max(0, Math.min(finalOptionCount - 1, (int) Math.round(AudioEngine.getActivePluginValue(position, finalIEnum) - fEnumMinVal)));
+                                b.setSingleChoiceItems(opts, cur, (dialog, which) -> {
+                                    float newVal = fEnumMinVal + (float) which;
+                                    AudioEngine.setPluginControl(position, finalIEnum, newVal);
+                                    enumValue.setText(opts[which]);
+                                    dialog.dismiss();
+                                });
+                                b.setNegativeButton("CANCEL", null);
+                                b.show();
+                            }
+                        };
+                        enumRow.setOnClickListener(enumClick);
+                        enumName.setOnClickListener(enumClick);
+                        enumValue.setOnClickListener(enumClick);
+                        enumMore.setOnClickListener(enumClick);
+
+                        enumRow.addView(enumName);
+                        enumRow.addView(enumValue);
+                        enumRow.addView(enumMore);
+                        toneCells.add(enumRow);
+                        continue;
+                    }
+
+                    boolean isLevelControl = metadata != null && ("dB".equals(metadata.unit) || "coef".equals(metadata.unit));
+                    // Override: if log freq, not level knob even if contains gain? Keep level for true gain
+                    final int pluginColor = CategoryHelper.getColor(pluginName);
+                    final boolean fIsLog = isLog;
+                    final boolean fIsInt = isIntegerParam;
+
+                    if (isLevelControl) {
+                        // Level controls use Rotary Knobs in LEVEL panel — safe spacing, centered
+                        LinearLayout knobCell = new LinearLayout(this);
+                        knobCell.setOrientation(LinearLayout.VERTICAL);
+                        knobCell.setGravity(Gravity.CENTER);
+                        knobCell.setPadding(Math.round(10 * density), Math.round(4 * density), Math.round(10 * density), Math.round(4 * density));
+                        LinearLayout.LayoutParams knobCellLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                        knobCellLp.setMargins(Math.round(4 * density), 0, Math.round(4 * density), 0);
+                        knobCell.setLayoutParams(knobCellLp);
+
+                        TextView labelView = new TextView(this);
+                        labelView.setText(cName.toUpperCase());
+                        if (cHint != null && !cHint.isEmpty()) {
+                            labelView.setContentDescription(cName + " (" + cHint + ")");
+                        }
+                        labelView.setTextColor(Color.parseColor("#A1A1AA"));
+                        labelView.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, labelSizePx);
+                        labelView.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
+                        labelView.setGravity(Gravity.CENTER);
+                        labelView.setMaxLines(2);
+                        labelView.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                        labelView.setPadding(0, 0, 0, Math.round(2 * density));
+                        if (jakartaFont != null) labelView.setTypeface(jakartaFont, android.graphics.Typeface.BOLD);
+
+                        RotarySeekbar rKnob = new RotarySeekbar(this);
+                        rKnob.setShowKnob(true);
+                        rKnob.setMinValue(minVal);
+                        rKnob.setMaxValue(maxVal);
+                        rKnob.setLogarithmic(fIsLog);
+                        if (fIsInt && maxVal > minVal) {
+                            // INT range 0..N has N intervals (0..1 => 1 step, NOT 2:
+                            // the old Math.max(2, ...) invented a phantom 0.5).
+                            int steps = Math.max(1, Math.round(maxVal - minVal));
+                            rKnob.setNumSteps(steps);
+                        } else if ("%".equals(unit) && maxVal > minVal) {
+                            // Percentage knob: exactly 100 steps (1% per step) so it steps 0%, 1%, 2% ... 100% cleanly
+                            rKnob.setNumSteps(100);
+                        } else {
+                            // Continuous knob: fine-grained so setValue() never
+                            // visibly snaps (RotarySeekbar snaps to 1/numSteps).
+                            rKnob.setNumSteps(1000);
+                        }
+                        rKnob.setValue(val);
+                        rKnob.mKnobColor = pluginColor;
+                        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(knobDimPx, knobDimPx);
+                        lp.gravity = Gravity.CENTER;
+                        rKnob.setLayoutParams(lp);
+
+                        TextView valView = new TextView(this);
+                        valView.setText(ParameterFormatter.rawToDisplay(val, parameterMeta).text);
+                        valView.setTextColor(Color.parseColor("#E6E6E6"));
+                        valView.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, valSizePx);
+                        valView.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
+                        if (jakartaFont != null) valView.setTypeface(jakartaFont, android.graphics.Typeface.BOLD);
+                        valView.setPadding(Math.round(4 * density), Math.round(2 * density), Math.round(4 * density), Math.round(2 * density));
+
+                        int finalI = i;
+                        String unitFinal = unit;
+                        final float fMin = minVal;
+                        final float fMax = maxVal;
+                        final String fCName = cName;
+                        final String fHint = cHint;
+
+                        rKnob.setOnValueChangedListener((source, value) -> {
+                            if (fIsInt) {
+                                value = Math.round(value);
+                            }
+                            value = Math.max(fMin, Math.min(fMax, value));
+                            AudioEngine.setPluginControl(position, finalI, value);
+                            valView.setText(ParameterFormatter.rawToDisplay(value, parameterMeta).text);
+                        });
+
+                        View.OnClickListener manualInputClick = v -> {
+                            showManualValueInputDialog(fCName, rKnob.getValue(), fMin, fMax, unitFinal, fHint, newVal -> {
+                                // Mirror the slider branch: INT params commit integers,
+                                // otherwise a typed "1" lands as 1.0-proof float drift.
+                                if (fIsInt) newVal = Math.round(newVal);
+                                newVal = Math.max(fMin, Math.min(fMax, newVal));
+                                AudioEngine.setPluginControl(position, finalI, newVal);
+                                rKnob.setValue(newVal);
+                                valView.setText(ParameterFormatter.rawToDisplay(newVal, parameterMeta).text);
+                            });
+                        };
+                        valView.setOnClickListener(manualInputClick);
+                        labelView.setOnClickListener(manualInputClick);
+                        rKnob.setOnKnobClickListener(k -> manualInputClick.onClick(k));
+
+                        knobCell.addView(labelView);
+                        knobCell.addView(rKnob);
+                        knobCell.addView(valView);
                         levelCells.add(knobCell);
                     } else {
-                        toneCells.add(knobCell);
+                        // Tone / FX controls: proportional layout — safe padding, no mepet/cut, aligned with slider
+                        LinearLayout sliderRow = new LinearLayout(this);
+                        sliderRow.setOrientation(LinearLayout.HORIZONTAL);
+                        sliderRow.setGravity(Gravity.CENTER_VERTICAL);
+                        sliderRow.setPadding(Math.round(12 * density), Math.round(12 * density), Math.round(12 * density), Math.round(12 * density));
+                        sliderRow.setBackgroundResource(R.drawable.glass_card_bg);
+                        LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                        rowLp.setMargins(0, Math.round(4 * density), 0, Math.round(4 * density));
+                        sliderRow.setLayoutParams(rowLp);
+                        sliderRow.setMinimumHeight(Math.round(48 * density));
+
+                        TextView nameLabel = new TextView(this);
+                        nameLabel.setText(cName);
+                        if (cHint != null && !cHint.isEmpty()) {
+                            // Enum detail lives here (tooltip) + manual dialog message —
+                            // never baked into the visible label text.
+                            nameLabel.setContentDescription(cName + " (" + cHint + ")");
+                        }
+                        nameLabel.setTextColor(Color.parseColor("#E6E6E6"));
+                        nameLabel.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 11f * density);
+                        if (jakartaFont != null) nameLabel.setTypeface(jakartaFont, android.graphics.Typeface.BOLD);
+                        LinearLayout.LayoutParams nameLp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 0.44f);
+                        nameLp.setMarginEnd(Math.round(12 * density));
+                        nameLp.gravity = Gravity.CENTER_VERTICAL;
+                        nameLabel.setLayoutParams(nameLp);
+                        nameLabel.setMaxLines(2);
+                        nameLabel.setMinLines(1);
+                        nameLabel.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                        nameLabel.setSingleLine(false);
+                        nameLabel.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+
+                        final int progressMax = 10000;
+                        SeekBar seekBar = new SeekBar(this);
+                        // Track: rounded bg layer + rounded progress fill. The progress fill widens
+                        // with the level but keeps rounded corners on both ends (no sharp clip edge).
+                        float trackRadiusPx = 7 * density;
+                        android.graphics.drawable.GradientDrawable bgShape = new android.graphics.drawable.GradientDrawable();
+                        bgShape.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+                        bgShape.setCornerRadius(trackRadiusPx);
+                        bgShape.setColor(Color.parseColor("#2E323B"));
+                        RoundedProgressDrawable progressFill = new RoundedProgressDrawable(pluginColor, trackRadiusPx);
+                        android.graphics.drawable.LayerDrawable trackDrawable = new android.graphics.drawable.LayerDrawable(new android.graphics.drawable.Drawable[]{bgShape, progressFill});
+                        trackDrawable.setId(0, android.R.id.background);
+                        trackDrawable.setId(1, android.R.id.progress);
+                        seekBar.setProgressDrawable(trackDrawable);
+                        seekBar.setThumb(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+                        seekBar.setPadding(0, 0, 0, 0);
+                        seekBar.setMax(progressMax);
+                        float clampedVal = Math.max(minVal, Math.min(val, maxVal));
+                        float valueRange = maxVal > minVal ? maxVal - minVal : 1f;
+                        // Logarithmic: project linear progress <-> value via log domain
+                        if (fIsLog) {
+                            float p01 = logValueToProgress(clampedVal, minVal, maxVal);
+                            seekBar.setProgress(Math.round(p01 * progressMax));
+                        } else {
+                            seekBar.setProgress(Math.round((clampedVal - minVal) / valueRange * progressMax));
+                        }
+                        LinearLayout.LayoutParams sliderLp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+                        sliderLp.setMarginStart(Math.round(4 * density));
+                        sliderLp.setMarginEnd(Math.round(8 * density));
+                        sliderLp.gravity = Gravity.CENTER_VERTICAL;
+                        seekBar.setLayoutParams(sliderLp);
+
+                        TextView valReadout = new TextView(this);
+                                valReadout.setText(ParameterFormatter.rawToDisplay(clampedVal, parameterMeta).text);
+                        valReadout.setTextColor(Color.parseColor("#E6E6E6"));
+                        valReadout.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 10.5f * density);
+                        valReadout.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+                        if (jakartaFont != null) valReadout.setTypeface(jakartaFont, android.graphics.Typeface.BOLD);
+                        valReadout.setSingleLine(true);
+                        valReadout.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                        LinearLayout.LayoutParams valLp = new LinearLayout.LayoutParams(Math.round(54 * density), ViewGroup.LayoutParams.WRAP_CONTENT);
+                        valLp.gravity = Gravity.CENTER_VERTICAL;
+                        valReadout.setLayoutParams(valLp);
+
+                        ImageView moreBtn = new ImageView(this);
+                        moreBtn.setImageResource(R.drawable.ic_more_vert);
+                        moreBtn.setColorFilter(Color.parseColor("#71717A"), android.graphics.PorterDuff.Mode.SRC_IN);
+                        LinearLayout.LayoutParams moreLp = new LinearLayout.LayoutParams(Math.round(20 * density), Math.round(20 * density));
+                        moreLp.setMargins(Math.round(4 * density), 0, Math.round(4 * density), 0);
+                        moreLp.gravity = Gravity.CENTER_VERTICAL;
+                        moreBtn.setLayoutParams(moreLp);
+
+                        int finalI = i;
+                        String unitFinal = unit;
+                        final float fMin = minVal;
+                        final float fMax = maxVal;
+                        final String fCName = cName;
+                        final String fHint = cHint;
+                        final float fValueRange = valueRange;
+                        final boolean fbIsLog = fIsLog;
+                        final boolean fbIsInt = isIntegerParam;
+                        final int tracePluginId = activePluginId;
+                        final int tracePort = nativePortIndex;
+                        final int[] lastAcceptedProgress = {seekBar.getProgress()};
+                        final float[] lastAcceptedRaw = {clampedVal};
+                        final boolean[] updatingControl = {false};
+
+                        seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                            @Override
+                            public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
+                                if (!fromUser || updatingControl[0]) return;
+                                float value = Float.NaN;
+                                try {
+                                    if (progress < 0 || progress > progressMax) {
+                                        throw new IllegalArgumentException("progress outside bounds: " + progress);
+                                    }
+                                    if (!(Float.isFinite(fMin) && Float.isFinite(fMax)) || fMax <= fMin) {
+                                        throw new IllegalArgumentException("invalid range " + fMin + ".." + fMax);
+                                    }
+                                    float p01 = progress / (float) progressMax;
+                                    value = fbIsLog ? logProgressToValue(p01, fMin, fMax)
+                                            : fMin + p01 * (fMax - fMin);
+                                    if (!Float.isFinite(value)) throw new IllegalArgumentException("non-finite converted value");
+                                    if (fbIsInt) value = Math.round(value);
+                                    value = Math.max(fMin, Math.min(fMax, value));
+                                    Log.i(TAG, "PARAM_TRACE ui_edit plugin=" + position + " pluginId=" + tracePluginId
+                                            + " control=" + finalI + " port=" + tracePort + " name=" + fCName
+                                            + " progress=" + progress + "/" + progressMax + " raw=" + value
+                                            + " min=" + fMin + " max=" + fMax + " unit=" + unitFinal
+                                            + " metadataNull=" + (parameterMeta == null)
+                                            + " enumValues=" + java.util.Arrays.toString(parameterMeta == null ? null : parameterMeta.enumValues)
+                                            + " enumLabels=" + java.util.Arrays.toString(parameterMeta == null ? null : parameterMeta.enumLabels));
+                                    AudioEngine.setPluginControl(position, finalI, value);
+                                    float accepted = AudioEngine.getActivePluginValue(position, finalI);
+                                    if (!Float.isFinite(accepted)) throw new IllegalStateException("native returned non-finite value");
+                                    int acceptedProgress = fbIsLog
+                                            ? Math.round(logValueToProgress(accepted, fMin, fMax) * progressMax)
+                                            : Math.round((accepted - fMin) / (fMax - fMin) * progressMax);
+                                    acceptedProgress = Math.max(0, Math.min(progressMax, acceptedProgress));
+                                    lastAcceptedRaw[0] = accepted;
+                                    lastAcceptedProgress[0] = acceptedProgress;
+                                    valReadout.setText(ParameterFormatter.rawToDisplay(accepted, parameterMeta).text);
+                                    updatingControl[0] = true;
+                                    sb.setProgress(acceptedProgress);
+                                    updatingControl[0] = false;
+                                    Log.i(TAG, "PARAM_TRACE native_readback plugin=" + position + " control=" + finalI
+                                            + " raw=" + accepted + " display=" + valReadout.getText()
+                                            + " unit=" + unitFinal);
+                                } catch (Throwable t) {
+                                    updatingControl[0] = true;
+                                    sb.setProgress(lastAcceptedProgress[0]);
+                                    updatingControl[0] = false;
+                                    try { valReadout.setText(ParameterFormatter.rawToDisplay(lastAcceptedRaw[0], parameterMeta).text); } catch (Throwable ignored) { }
+                                    String context = "PARAM_TRACE slider_exception plugin=" + position + " pluginId=" + tracePluginId
+                                            + " control=" + finalI + " port=" + tracePort + " name=" + fCName
+                                            + " progress=" + progress + "/" + progressMax + " raw=" + value
+                                            + " min=" + fMin + " max=" + fMax + " unit=" + unitFinal
+                                            + " metadataNull=" + (parameterMeta == null)
+                                            + " enumValues=" + java.util.Arrays.toString(parameterMeta == null ? null : parameterMeta.enumValues)
+                                            + " enumLabels=" + java.util.Arrays.toString(parameterMeta == null ? null : parameterMeta.enumLabels);
+                                    Log.e(TAG, context, t);
+                                }
+                            }
+                            @Override public void onStartTrackingTouch(SeekBar sb) {}
+                            @Override public void onStopTrackingTouch(SeekBar sb) {}
+                        });
+
+                        View.OnClickListener manualInputClick = v -> {
+                            float p01cur = seekBar.getProgress() / (float) progressMax;
+                            float currentVal = fbIsLog ? logProgressToValue(p01cur, fMin, fMax)
+                                                      : fMin + p01cur * fValueRange;
+                            showManualValueInputDialog(fCName, currentVal, fMin, fMax, unitFinal, fHint, newVal -> {
+                                float rawVal = newVal;
+                                if (fbIsInt) rawVal = Math.round(rawVal);
+                                rawVal = Math.max(fMin, Math.min(fMax, rawVal));
+                                AudioEngine.setPluginControl(position, finalI, rawVal);
+                                int newProgress;
+                                if (fbIsLog) {
+                                    newProgress = Math.round(logValueToProgress(rawVal, fMin, fMax) * progressMax);
+                                } else {
+                                    newProgress = Math.round((rawVal - fMin) / fValueRange * progressMax);
+                                }
+                                seekBar.setProgress(Math.max(0, Math.min(progressMax, newProgress)));
+                                    valReadout.setText(ParameterFormatter.rawToDisplay(rawVal, parameterMeta).text);
+                            });
+                        };
+                        valReadout.setOnClickListener(manualInputClick);
+                        nameLabel.setOnClickListener(manualInputClick);
+                        moreBtn.setOnClickListener(manualInputClick);
+
+                        sliderRow.addView(nameLabel);
+                        sliderRow.addView(seekBar);
+                        sliderRow.addView(valReadout);
+                        sliderRow.addView(moreBtn);
+                        toneCells.add(sliderRow);
                     }
                 }
 
@@ -3078,19 +4463,14 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     levelContainer.addView(cell);
                 }
 
-                // Populate TONE container — single horizontal scrollable row.
-                // Center-justified when content fits; START when it overflows so the
-                // first knob is never clipped (HSV layout_gravity="center" clips leading
-                // content and makes it unreachable by scrolling).
-                toneContainer.setOrientation(LinearLayout.HORIZONTAL);
-                toneContainer.setGravity(Gravity.CENTER_VERTICAL);
+                // Populate CONTROLS container as a vertical list of sleek slider rows
+                toneContainer.setOrientation(LinearLayout.VERTICAL);
+                toneContainer.setGravity(Gravity.NO_GRAVITY);
                 for (LinearLayout cell : toneCells) {
                     toneContainer.addView(cell);
                 }
-                applyScrollGravity(toneContainer);
-                applyScrollGravity(levelContainer);
 
-                // Dynamically adjust panel visibility so we don't force empty "LEVEL" boxes
+                // Dynamically adjust panel visibility
                 boolean hasLevel = levelCells.size() > 0;
                 boolean hasTone = toneCells.size() > 0;
 
@@ -3103,6 +4483,38 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 }
             }
         });
+    }
+
+    private void clearInlineParameterEditor() {
+        TextView title = findViewById(R.id.detail_plugin_title);
+        TextView subtitle = findViewById(R.id.detail_plugin_subtitle);
+        TextView badge = findViewById(R.id.detail_badge_pill);
+        TextView modelName = findViewById(R.id.detail_model_name);
+        MaterialButton browseBtn = findViewById(R.id.detail_model_browse_btn);
+        ImageView gearRender = findViewById(R.id.detail_gear_render);
+        com.google.android.material.switchmaterial.SwitchMaterial enabledSwitch = findViewById(R.id.detail_enabled_switch);
+        TextView enabledLabelView = findViewById(R.id.detail_enabled_label);
+        View ledView = findViewById(R.id.detail_led);
+        LinearLayout levelContainer = findViewById(R.id.container_level_knobs);
+        LinearLayout toneContainer = findViewById(R.id.container_tone_knobs);
+        TextView gearInfoType = findViewById(R.id.detail_gear_info_type);
+        TextView gearInfoDesc = findViewById(R.id.detail_gear_info_desc);
+
+        if (title != null) title.setText("No Plugin Selected");
+        if (subtitle != null) subtitle.setText("Select a block from the canvas");
+        if (badge != null) badge.setVisibility(View.GONE);
+        if (modelName != null) modelName.setText("");
+        if (browseBtn != null) browseBtn.setVisibility(View.GONE);
+        if (gearRender != null) gearRender.setImageResource(0);
+        if (enabledSwitch != null) enabledSwitch.setVisibility(View.GONE);
+        if (enabledLabelView != null) enabledLabelView.setVisibility(View.GONE);
+        if (ledView != null) ledView.setVisibility(View.GONE);
+        if (gearInfoType != null) gearInfoType.setText("");
+        if (gearInfoDesc != null) gearInfoDesc.setText("");
+        if (levelContainer != null) levelContainer.removeAllViews();
+        if (toneContainer != null) toneContainer.removeAllViews();
+        addEmptyPanelHint(toneContainer, "SELECT A BLOCK");
+        if (dataAdapter != null) dataAdapter.setSelectedPosition(-1);
     }
 
     /**
@@ -3154,61 +4566,75 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     }
 
     static String prettyControlName(String cName) {
-        if (cName == null) return null;
-        String n = cName.trim();
-        if (n.isEmpty()) return n;
-        // Port-name cleanup: INPUT00 -> Input, OUTPUT00 -> Output, etc.
-        String low = n.toLowerCase();
-        if (low.matches("^(in|input)\\d*$")) return "Input";
-        if (low.matches("^(out|output)\\d*$")) return "Output";
-        if (low.matches("^g?ain\\d*$")) return "Gain";
-        // Title-case remaining: DELAY -> Delay, FEEDBACK -> Feedback, MIX -> Mix
-        StringBuilder sb = new StringBuilder();
-        boolean nextUpper = true;
-        for (char ch : n.toCharArray()) {
-            if (ch == '_' || ch == ' ' || ch == '-') {
-                nextUpper = true;
-                sb.append(' ');
-            } else if (nextUpper) {
-                sb.append(Character.toUpperCase(ch));
-                nextUpper = false;
-            } else {
-                sb.append(Character.toLowerCase(ch));
-            }
-        }
-        String result = sb.toString().trim();
-        if (result.length() > 22) result = result.substring(0, 22);
-        return result;
+        // Single choke point: enum hints ("(0=none, 1=AM)") are stripped here,
+        // so EVERY caller (toggles, enums, knobs, sliders, MIDI) gets the clean
+        // main label. Handles camelCase/snake_case/concatenated words globally.
+        return com.kancrutt.gigginggear.util.LabelFormatter.parseControlLabel(cName).getMain();
     }
 
-    static String detectControlUnit(String cName) {
-        if (cName == null) return "dB";
-        String n = cName.toLowerCase();
-        if (n.contains("hz") || n.contains("freq") || n.contains("cutoff") || n.contains("tone") || n.contains("resonance")
-                || n.contains("rate") || n.contains("speed") || n.contains("pitch") || n.contains("depth"))
-            return "Hz";
-        if (n.contains("ms") || n.contains("time") || n.contains("delay") || n.contains("duration") || n.contains("period")
-                || n.contains("attack") || n.contains("release") || n.contains("hold"))
-            return "ms";
-        if (n.contains("mix") || n.contains("blend") || n.contains("wet") || n.contains("dry") || n.contains("ratio")
-                || n.contains("feedback") || n.contains("send") || n.contains("balance") || n.contains("spread"))
-            return "%";
-        if (n.contains("decimate") || n.contains("bend") || n.contains("type") || n.contains("model")
-                || n.contains("shape") || n.contains("style") || n.contains("select"))
-            return "";
-        return "dB";
+    /**
+     * Progress fill for the plugin-control SeekBar. Unlike ClipDrawable (which cuts the
+     * leading edge with a straight vertical line), this draws a rounded rect whose width
+     * tracks the progress level, so both ends of the filled segment stay smoothly rounded.
+     */
+    static class RoundedProgressDrawable extends android.graphics.drawable.Drawable {
+        private final android.graphics.Paint paint = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        private final float radiusPx;
+        RoundedProgressDrawable(int color, float radiusPx) {
+            this.radiusPx = radiusPx;
+            paint.setColor(color);
+        }
+        @Override public void draw(android.graphics.Canvas canvas) {
+            android.graphics.RectF b = new android.graphics.RectF(getBounds());
+            float frac = Math.max(0f, Math.min(1f, getLevel() / 10000f));
+            float w = b.width() * frac;
+            if (w <= 0f) return;
+            canvas.drawRoundRect(b.left, b.top, b.left + w, b.bottom, radiusPx, radiusPx, paint);
+        }
+        @Override public void setAlpha(int alpha) { paint.setAlpha(alpha); }
+        @Override public void setColorFilter(android.graphics.ColorFilter cf) { paint.setColorFilter(cf); }
+        @Override public int getOpacity() { return android.graphics.PixelFormat.TRANSLUCENT; }
+    }
+    // ---- Logarithmic scaling: Hz / ms with portProperty logarithmic — Slider feels natural
+    static float logProgressToValue(float p01, float min, float max) {
+        if (min <= 0 || max <= min) return min + p01 * (max - min);
+        double logMin = Math.log(min);
+        double logMax = Math.log(max);
+        return (float) Math.exp(logMin + p01 * (logMax - logMin));
+    }
+    static float logValueToProgress(float val, float min, float max) {
+        if (min <= 0 || max <= min || val <= 0) return (val - min) / (max - min);
+        double logMin = Math.log(min);
+        double logMax = Math.log(max);
+        double logVal = Math.log(Math.max(min, val));
+        return (float) ((logVal - logMin) / (logMax - logMin));
     }
 
     public void showManualValueInputDialog(String controlName, float currentVal, float minVal, float maxVal, String unit, OnManualValueListener listener) {
-        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert);
-        
+        showManualValueInputDialog(controlName, currentVal, minVal, maxVal, unit, null, listener);
+    }
+
+    public void showManualValueInputDialog(String controlName, float currentVal, float minVal, float maxVal, String unit, String hint, OnManualValueListener listener) {
+        com.google.android.material.dialog.MaterialAlertDialogBuilder builder =
+                new com.google.android.material.dialog.MaterialAlertDialogBuilder(this);
+        if (hint != null && !hint.isEmpty()) builder.setMessage(hint);
+
         LinearLayout container = new LinearLayout(this);
         container.setOrientation(LinearLayout.VERTICAL);
         int pad = (int) (20 * getResources().getDisplayMetrics().density);
         container.setPadding(pad, pad / 2, pad, pad / 2);
         
         TextView hintView = new TextView(this);
-        String rangeStr = String.format(java.util.Locale.US, "Min: %.2f   Max: %.2f %s", minVal, maxVal, unit != null ? unit : "");
+        // Percent rule (same as ParameterFormatter): scale 0..1 -> 0..100
+        // ONLY when the final unit is "%". Unitless 0..1 stays raw.
+        final boolean pctScaled = ParameterFormatter.isPercentScaled(unit, minVal, maxVal);
+        final String unitLabel = (unit != null) ? unit : "";
+        float dMin = pctScaled ? minVal * 100f : minVal;
+        float dMax = pctScaled ? maxVal * 100f : maxVal;
+        float dCur = pctScaled ? currentVal * 100f : currentVal;
+        String rangeStr = "Min: " + ParameterFormatter.formatNumber(dMin)
+                + "   Max: " + ParameterFormatter.formatNumber(dMax)
+                + (unitLabel.isEmpty() ? "" : " " + unitLabel);
         hintView.setText(rangeStr);
         hintView.setTextColor(Color.parseColor("#8F94A0"));
         hintView.setTextSize(12);
@@ -3219,7 +4645,9 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER 
                 | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL 
                 | android.text.InputType.TYPE_NUMBER_FLAG_SIGNED);
-        input.setText(String.format(java.util.Locale.US, "%.2f", currentVal));
+        // Display value uses the main formatter's numbering so the dialog
+        // matches knob/slider readouts (e.g. raw 0.71 -> "71" for %).
+        input.setText(ParameterFormatter.formatNumber(dCur));
         input.setTextColor(Color.WHITE);
         input.setTextSize(18);
         input.setSelectAllOnFocus(true);
@@ -3228,38 +4656,47 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         builder.setTitle("Set " + controlName)
                .setView(container)
                .setPositiveButton("SET", (dialog, which) -> {
-                   String text = input.getText().toString().trim().replace(',', '.');
-                   try {
-                       float entered = Float.parseFloat(text);
-                       float clamped = Math.max(minVal, Math.min(maxVal, entered));
-                       if (listener != null) listener.onValueSet(clamped);
-                   } catch (Exception e) {
-                       toast("Invalid number format");
-                   }
-               })
+                    String text = input.getText().toString().trim().replace(',', '.');
+                    try {
+                        float enteredDisplay = Float.parseFloat(text);
+                        float clampedDisplay = Math.max(dMin, Math.min(dMax, enteredDisplay));
+                        float rawVal = pctScaled ? clampedDisplay / 100f : clampedDisplay;
+                        rawVal = Math.max(minVal, Math.min(maxVal, rawVal));
+                        if (listener != null) listener.onValueSet(rawVal);
+                    } catch (Exception e) {
+                        toast("Invalid number format");
+                    }
+                })
                .setNegativeButton("CANCEL", null);
                
-        android.app.AlertDialog dialog = builder.create();
+         androidx.appcompat.app.AlertDialog dialog = builder.create();
         if (dialog.getWindow() != null) {
             dialog.getWindow().setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
         }
-        dialog.show();
-        input.requestFocus();
+         dialog.show();
+         input.setTextColor(Color.WHITE);
+         input.setHintTextColor(Color.parseColor("#8F94A0"));
+         input.requestFocus();
     }
 
     interface OnManualValueListener {
         void onValueSet(float value);
     }
 
-    static String formatParamValue(float val, String unit) {
-        if (unit == null || unit.isEmpty())
-            return String.format("%.0f", val);
-        if (unit.equals("Hz") || unit.equals("%"))
-            return String.format("%.0f%s", val, unit);
-        if (unit.equals("ms"))
-            return String.format("%.1f%s", val, unit);
-        return String.format("%.2fdB", val);
+    private static int nearestEnumIndex(float value, float[] values) {
+        if (values == null || values.length == 0) return 0;
+        int best = 0;
+        float distance = Math.abs(value - values[0]);
+        for (int i = 1; i < values.length; i++) {
+            float next = Math.abs(value - values[i]);
+            if (next < distance) {
+                distance = next;
+                best = i;
+            }
+        }
+        return best;
     }
+
 
     void loadPreset(Map map) {
         if (map == null) {
@@ -3312,8 +4749,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 if (!(o instanceof Map))
                     continue;
                 Map<?, ?> p = (Map<?, ?>) o;
-                if (Boolean.FALSE.equals(p.get("enabled")))
-                    continue;
 
                 JSONObject jo = new JSONObject();
                 Object nameObj = p.get("name");
@@ -3322,6 +4757,10 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     continue;
                 }
                 jo.put("name", nameObj.toString());
+                // Bypassed blocks still load (models, knobs, files) — the bypass
+                // itself is re-applied by loadPreset(String) after the build.
+                // Dropping them here deleted bypassed blocks on every restore.
+                jo.put("enabled", !Boolean.FALSE.equals(p.get("enabled")));
 
                 StringBuilder controls = new StringBuilder();
                 Object controlsObj = p.get("controls");
@@ -3347,8 +4786,41 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                             jo.put("audioFile", rel.toString());
                     }
                 }
+                // Preserve TONE3000 origin metadata for missing-file handling & badge restore
+                for (String k : new String[]{"tone3000ToneId","tone3000ModelId","tone3000Creator","tone3000ToneTitle","tone3000Format","tone3000GearType","tone3000SourceUrl"}) {
+                    Object v = p.get(k);
+                    if (v != null && !v.toString().isEmpty()) {
+                        try { jo.put(k, v.toString()); } catch (Exception ignore) {}
+                    }
+                }
 
                 legacy.put(String.valueOf(plugin), jo.toString());
+                // Keep pending T3K meta for post-load badge + missing check
+                try {
+                    JSONObject t3k = new JSONObject();
+                    boolean hasT3k = false;
+                    for (String k : new String[]{"tone3000ToneId","tone3000ModelId","tone3000Creator","tone3000ToneTitle","tone3000Format","tone3000GearType","tone3000SourceUrl"}) {
+                        Object v = p.get(k);
+                        if (v != null && !v.toString().isEmpty()) { t3k.put(k, v.toString()); hasT3k = true; }
+                    }
+                    if (hasT3k) pendingT3kLoad.put(plugin, t3k);
+                    // also keep file path for existence check
+                    Object fp0 = p.get("file_ports");
+                    if (fp0 instanceof java.util.List) {
+                        java.util.List<?> fpl = (java.util.List<?>) fp0;
+                        if (!fpl.isEmpty() && fpl.get(0) instanceof Map) {
+                            Object rp = ((Map<?,?>)fpl.get(0)).get("relative_path");
+                            if (rp != null) pendingT3kFile.put(plugin, rp.toString());
+                        }
+                    } else if (fpObj instanceof java.util.List) {
+                        // already handled above — also keep for pending check
+                        java.util.List<?> fpl2 = (java.util.List<?>) fpObj;
+                        if (!fpl2.isEmpty() && fpl2.get(0) instanceof Map) {
+                            Object rp = ((Map<?,?>)fpl2.get(0)).get("relative_path");
+                            if (rp != null) pendingT3kFile.put(plugin, rp.toString());
+                        }
+                    }
+                } catch (Exception ignore) {}
                 plugin++;
             }
 
@@ -3374,10 +4846,27 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     }
 
     void loadPreset(String preset) {
+        // Bypass is released in finally: any exception escaping the body used
+        // to wedge bypass stuck true = whole chain silent until the next load.
+        AudioEngine.bypass(true);
+        try {
+            loadPresetInner(preset);
+        } finally {
+            AudioEngine.bypass(false);
+        }
+    }
+
+    private void loadPresetInner(String preset) {
         // forgot to add this. that this was forgotten was very difficult to guess
         AudioEngine.bypass(true);
         AudioEngine.clearActiveQueue();
         resetPluginMIDI();
+        // TONE3000 session state is PER-PRESET: stale meta/paths from the
+        // previously loaded preset must never survive a load — otherwise the
+        // save fallback injects the old T3K model into EVERY following preset
+        // whose amp block has no engine-read-back file.
+        t3kBlockMeta.clear();
+        t3kModelPath.clear();
 
         Log.d(TAG, "loadPreset: " + preset);
         JSONObject jsonObject;
@@ -3404,6 +4893,8 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         }
 
         final List<Integer> savedGraphEdges = new ArrayList<>();
+        // Engine slots of blocks saved as bypassed (re-applied after build).
+        final List<Integer> disabledSlots = new ArrayList<>();
         if (jsonObject.has("graph")) {
             JSONArray graphArr = jsonObject.optJSONArray("graph");
             if (graphArr != null && graphArr.length() % 2 == 0) {
@@ -3467,6 +4958,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             String audioFile = null ;
             String audioFileR = null ;
             float irBlend = 0.5f ;
+            boolean enabled = true ;
             try {
                 name = jo.getString("name");
                 controls = jo.getString("controls");
@@ -3516,6 +5008,8 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     audioFileR = jo.getString("audioFileR");
                 if (jo.has("irBlend"))
                     irBlend = (float) jo.getDouble("irBlend");
+                // schema-v1 snapshots carry per-block bypass (default: enabled)
+                enabled = jo.optBoolean("enabled", true);
             } catch (JSONException e) {
                 e.printStackTrace();
                 Log.e(TAG, "loadPreset: unable to parse name or controls for key: " + key, e);
@@ -3531,25 +5025,40 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             String[] control = controls.split(";");
 
 
+            // Holders populate asynchronously after layout; during bulk load they
+            // are legitimately empty and sliders bind on the adapter refresh
+            // at the end of loadPreset. Never touch the adapter here: this
+            // method can run off the UI thread (preset callbacks), where
+            // notifyDataSetChanged() throws CalledFromWrongThreadException.
             DataAdapter.ViewHolder holder = null;
-            if (dataAdapter.holders.size() == 0)
-                Log.e(TAG, "loadPreset: data adapter holders is zero", null);
-            else
-                dataAdapter.holders.get(plugin);
+            try {
+                if (plugin >= 0 && plugin < dataAdapter.holders.size()) {
+                    holder = dataAdapter.holders.get(plugin);
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "loadPreset: holder lookup failed for " + plugin, e);
+            }
             if (holder == null) {
-                Log.e(TAG, "loadPreset: cannot find holder for " + (ret - 1), null);
+                Log.d(TAG, "loadPreset: no holder yet for " + plugin + " (binds on adapter refresh)");
             }
 
 
+            // Schema-v1 presets may carry an empty controls string: "".split(";")
+            // yields [""], whose parse throws. Skip quietly and keep defaults.
+            if (controls == null || controls.trim().isEmpty()) {
+                Log.d(TAG, "loadPreset: no saved controls, keeping plugin defaults");
+            } else {
             Log.d(TAG, "loadPreset: loading " + control.length + " controls from " + controls);
             for (int i = 0; i < control.length; i++) {
-                Log.d(TAG, "loadPreset: " + i + ": " + control[i]);
+                String token = control[i] == null ? "" : control[i].trim();
+                if (token.isEmpty()) continue;
+                Log.d(TAG, "loadPreset: " + i + ": " + token);
                 //                holder.sliders.get(i).setValue(Integer.parseInt(control [i]));
                 float savedValue = -6906;// aaaaargh
                 try {
-                    savedValue = Float.parseFloat(control[i]);
+                    savedValue = Float.parseFloat(token);
                 } catch (Exception e) {
-                    Log.e(TAG, "loadPreset: cannot load saved float value for " + control[i], e);
+                    Log.e(TAG, "loadPreset: cannot load saved float value for " + token, e);
                     continue;
                 }
 
@@ -3557,6 +5066,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 // forgot this too
                 AudioEngine.setPluginControl(plugin, i, savedValue);
             }
+            } // end non-empty controls
 
             int pos = dataAdapter.getItemCount();
 
@@ -3566,6 +5076,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 dataAdapter.setAudioFiles(plugin, audioFile);
             if (audioFileR != null)
                 dataAdapter.setAudioFilesR(plugin, audioFileR);
+            if (!enabled) disabledSlots.add(plugin);
 
             plugin++;
 
@@ -3576,6 +5087,17 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         }
 
         AudioEngine.bypass(false);
+
+        // Re-apply per-block bypass from schema-v1 snapshots (slots == load
+        // order; fresh adds default to enabled). Legacy snapshots carry no
+        // "enabled" key so this loop is a no-op for them.
+        for (int s : disabledSlots) {
+            try {
+                if (s >= 0 && s < AudioEngine.getActivePlugins()) AudioEngine.togglePlugin(s, false);
+            } catch (Exception e) {
+                Log.w(TAG, "loadPreset: bypass restore failed for slot " + s, e);
+            }
+        }
 
         // Refresh visual chain and select the first active block in the editor
         if (signalChainCanvas != null) {
@@ -3607,6 +5129,69 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         if (dataAdapter != null) {
             dataAdapter.notifyDataSetChanged();
         }
+
+        // TONE3000: restore badges from preset + check missing files (post, after canvas rebuild)
+        if (!pendingT3kLoad.isEmpty() || !pendingT3kFile.isEmpty()) {
+            final java.util.Map<Integer, JSONObject> copyMeta = new java.util.HashMap<>(pendingT3kLoad);
+            final java.util.Map<Integer, String> copyFile = new java.util.HashMap<>(pendingT3kFile);
+            pendingT3kLoad.clear();
+            pendingT3kFile.clear();
+            // merge into live maps for future saves
+            for (java.util.Map.Entry<Integer, JSONObject> e : copyMeta.entrySet()) {
+                t3kBlockMeta.put(e.getKey(), e.getValue());
+                // file path for that slot
+                String fp = copyFile.get(e.getKey());
+                if (fp != null) t3kModelPath.put(e.getKey(), fp);
+            }
+            // also for entries that only have file path but no meta (legacy)
+            for (java.util.Map.Entry<Integer, String> e : copyFile.entrySet()) {
+                if (!t3kModelPath.containsKey(e.getKey())) t3kModelPath.put(e.getKey(), e.getValue());
+            }
+            // after canvas rebuild, apply badges + missing check (600ms to ensure loadFromActivePlugins done)
+            if (signalChainCanvas != null) {
+                signalChainCanvas.postDelayed(() -> {
+                    // Use CURRENT t3kBlockMeta (may have been shifted by a delete that
+                    // ran between load and this re-apply) instead of the snapshot copyMeta.
+                    // Gate on engine truth: stale meta must never badge a block
+                    // that cannot hold a model (the badge-on-non-NAM bug).
+                    for (Integer slot : t3kBlockMeta.keySet()) {
+                        try {
+                            if (slot != null && canLoadNamModel(slot))
+                                signalChainCanvas.setT3kBadge(slot, true);
+                            else
+                                Log.w(TAG, "skipping T3K badge on non-loader slot " + slot);
+                        } catch (Exception ignore) {}
+                    }
+                    // missing file check: if T3K toneId present but local file absent, prompt
+                    // Use current t3kBlockMeta (same keys as t3kModelPath after any shift).
+                    for (java.util.Map.Entry<Integer, JSONObject> e : t3kBlockMeta.entrySet()) {
+                        int slot = e.getKey();
+                        String path = t3kModelPath.get(slot);
+                        boolean missing = true;
+                        if (path != null) {
+                            try { missing = !new java.io.File(path).exists(); } catch (Exception ignore) { missing = true; }
+                            // also try sidecar model file via t3kModelPath
+                            if (missing) {
+                                String alt = t3kModelPath.get(slot);
+                                if (alt != null) try { missing = !new java.io.File(alt).exists(); } catch (Exception ignore) {}
+                            }
+                        }
+                        if (missing) {
+                            try {
+                                JSONObject meta = e.getValue();
+                                LocalPresetManager.PluginItem dummy = new LocalPresetManager.PluginItem();
+                                dummy.tone3000ToneId = meta.optString("tone3000ToneId", null);
+                                dummy.tone3000ToneTitle = meta.optString("tone3000ToneTitle", null);
+                                dummy.tone3000Creator = meta.optString("tone3000Creator", null);
+                                dummy.name = dummy.tone3000ToneTitle != null ? dummy.tone3000ToneTitle : "TONE3000";
+                                handleMissingTone3000Model(dummy, slot);
+                                break; // show one at a time
+                            } catch (Exception ignore) {}
+                        }
+                    }
+                }, 650);
+            }
+        }
     }
 
     void syncTopBarPresetInfo() {
@@ -3623,7 +5208,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 if (sel >= 0) num = sel + 1;
             }
             android.text.SpannableStringBuilder sb = new android.text.SpannableStringBuilder();
-            String numStr = String.valueOf(num) + "  ";
+            String numStr = String.valueOf(num) + ". ";
             int start = sb.length();
             sb.append(numStr);
             sb.setSpan(new android.text.style.StyleSpan(android.graphics.Typeface.BOLD),
@@ -3648,6 +5233,15 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
     public float getBpm() { return bpmValue; }
 
+    public void setBpm(float bpm) {
+        bpmValue = bpm;
+        SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(this);
+        sp.edit().putFloat(PREF_BPM, bpm).apply();
+        syncTimeBlocksToBpm(bpm);
+        TextView chip = findViewById(R.id.top_bpm_text);
+        if (chip != null) chip.setText((int) bpm + " BPM");
+    }
+
     public String getBpmDisplay() {
         SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(this);
         bpmValue = sp.getFloat(PREF_BPM, 120f);
@@ -3667,27 +5261,30 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 String blockName;
                 try { blockName = AudioEngine.getActivePluginName(p); } catch (Exception e) { blockName = "?"; }
                 for (int c = 0; c < controls; c++) {
-                    String cn;
-                    try { cn = AudioEngine.getControlName(p, c); } catch (Exception e) { continue; }
-                    if (cn == null) continue;
-                    String s = cn.toLowerCase();
-                    boolean timeCtl = s.contains("delay") && !s.contains("feedback")
-                            && !s.contains("range") && !s.contains("spread")
-                            && (s.contains("time") || s.contains("second") || s.contains("(s)"));
-                    if (!timeCtl) continue;
+                    String unit;
+                    try { unit = AudioEngine.getControlUnit(p, c); } catch (Exception e) { continue; }
+                    // Tempo sync only targets ports whose authoritative metadata
+                    // declares seconds or milliseconds. Names are not semantic data.
+                    if (!("s".equals(unit) || "ms".equals(unit))) continue;
                     float val = quarterSec * bpmDivision;
-                    val = Math.max(0.005f, Math.min(10f, val));
+                    float[] bounds = AudioEngine.getPluginControlValues(p, c);
+                    if (bounds == null || bounds.length < 3) continue;
+                    val = "ms".equals(unit) ? val * 1000f : val;
+                    val = Math.max(bounds[1], Math.min(bounds[2], val));
                     try {
                         AudioEngine.setPluginControl(p, c, val);
                         hits++;
-                        Log.i(TAG, "syncTimeBlocksToBpm: " + blockName + " [" + cn + "] -> " + val + "s");
+                        Log.i(TAG, "syncTimeBlocksToBpm: " + blockName + " control=" + c + " -> " + val + unit);
                     } catch (Exception e) {
-                        Log.w(TAG, "bpm set failed " + cn, e);
+                        Log.w(TAG, "bpm set failed control=" + c, e);
                     }
                 }
             }
-            toast(hits > 0 ? ("Tempo synced to " + hits + " delay control(s)")
-                           : "No delay blocks to sync");
+            if (hits > 0) {
+                toast("Tempo synced to " + hits + " delay control(s)");
+            } else {
+                Log.d(TAG, "syncTimeBlocksToBpm: no delay blocks to sync");
+            }
         } catch (Exception e) {
             Log.w(TAG, "syncTimeBlocksToBpm failed", e);
         }
@@ -3710,13 +5307,18 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         slider.setValueTo(240);
         slider.setStepSize(1);
         slider.setValue(currentBpm[0]);
+        slider.setTrackActiveTintList(android.content.res.ColorStateList.valueOf(Color.parseColor("#FFFFFF")));
+        slider.setTrackInactiveTintList(android.content.res.ColorStateList.valueOf(Color.parseColor("#444444")));
+        slider.setThumbTintList(android.content.res.ColorStateList.valueOf(Color.parseColor("#FFFFFF")));
+        slider.setTrackHeight(16);
+        slider.setThumbRadius(16);
         box.addView(slider);
 
         TextView readout = new TextView(this);
         readout.setText(String.valueOf((int) currentBpm[0]));
         readout.setTextSize(34);
         readout.setGravity(android.view.Gravity.CENTER);
-        readout.setTextColor(Color.parseColor("#FFAA00"));
+        readout.setTextColor(Color.parseColor("#FFFFFF"));
         box.addView(readout);
 
         slider.addOnChangeListener((s, value, fromUser) -> {
@@ -3825,10 +5427,26 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     }
 
     /** Apply an already-on-disk model file to the given active block via its atom port. */
-    /** Only amp/cab-class blocks expose LV2 file-path ports (99/100) for .nam models. */
+    /** Engine truth: can a model file actually attach to this slot? Name/category
+     *  heuristics used to claim every AMP block was NAM-capable (wrong subtitle,
+     *  badge on non-NAM blocks, doomed setPluginFilename calls). */
     private boolean canLoadNamModel(int plugin) {
         try {
             return AudioEngine.canLoadModelFile(plugin);
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    private boolean canLoadIrModel(int plugin) {
+        try {
+            if (plugin < 0 || plugin >= AudioEngine.getActivePlugins()) return false;
+            String n = AudioEngine.getActivePluginName(plugin);
+            if (n == null) return false;
+            String ln = n.toLowerCase();
+            CategoryHelper.Category c = CategoryHelper.getCategory(n);
+            return ln.contains("ir") || ln.contains("convolution") || ln.contains("cab")
+                    || ln.contains("reverb") || c == CategoryHelper.Category.CABINET;
         } catch (Throwable t) {
             return false;
         }
@@ -3869,10 +5487,9 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     }
 
     /**
-     * In-app plugin/model selector dialog:
-     * - For NAM / IR blocks: browse locally stored .nam models + SAF storage picker.
-     * - For standard effects (Reverb, Delay, Modulation, Distortion, EQ, etc.): list all
-     *   built-in plugins matching that category so the user can swap models directly.
+     * Modern Two-Column Model Browser Dialog:
+     * - Left column: categories with icons and count/name
+     * - Right column: model cards with thumbnail, brand/name, and star favorites
      */
     public void showModelPickerDialog(int position) {
         String pluginName;
@@ -3880,64 +5497,587 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         catch (Exception e) { pluginName = null; }
         if (pluginName == null) pluginName = "Plugin " + position;
 
-        CategoryHelper.Category category = CategoryHelper.getCategory(pluginName);
-        boolean isFileBasedBlock = (category == CategoryHelper.Category.AMP
-                || category == CategoryHelper.Category.CABINET
-                || pluginName.toLowerCase().contains("neural")
-                || pluginName.toLowerCase().contains("nam")
-                || pluginName.toLowerCase().contains("ir")
-                || pluginName.toLowerCase().contains("impulse"));
+        CategoryHelper.Category currentCat = CategoryHelper.getCategory(pluginName);
 
-        if (isFileBasedBlock) {
-            // File-based model selection (NAM / IR cabinets)
-            File baseDir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
-            ArrayList<File> models = new ArrayList<>();
-            ArrayList<String> labels = new ArrayList<>();
+        final androidx.appcompat.app.AlertDialog dialog = new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setView(R.layout.dialog_model_browser)
+                .create();
 
-            File ownDir = new File(baseDir, pluginName);
-            File[] own = ownDir.listFiles((d, n) -> n.toLowerCase().endsWith(".nam") || n.toLowerCase().endsWith(".wav"));
-            if (own != null) {
-                java.util.Arrays.sort(own);
-                for (File f : own) { models.add(f); labels.add(f.getName()); }
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+        }
+
+        dialog.show();
+
+        ImageButton closeX = dialog.findViewById(R.id.dialog_model_close_x);
+        com.google.android.material.button.MaterialButton closeBtn = dialog.findViewById(R.id.dialog_model_close_btn);
+        LinearLayout catContainer = dialog.findViewById(R.id.category_container);
+        LinearLayout modelsContainer = dialog.findViewById(R.id.models_container);
+
+        if (closeX != null) closeX.setOnClickListener(v -> dialog.dismiss());
+        if (closeBtn != null) closeBtn.setOnClickListener(v -> dialog.dismiss());
+
+        // Category List Definitions — must cover every CategoryHelper family,
+        // otherwise classified plugins become unreachable in the browser.
+        final CategoryHelper.Category[] categories = {
+                CategoryHelper.Category.AMP,
+                CategoryHelper.Category.CABINET,
+                CategoryHelper.Category.DISTORTION,
+                CategoryHelper.Category.DYNAMICS,
+                CategoryHelper.Category.MODULATION,
+                CategoryHelper.Category.DELAY,
+                CategoryHelper.Category.REVERB,
+                CategoryHelper.Category.EQ,
+                CategoryHelper.Category.PITCH,
+                CategoryHelper.Category.WAH,
+                CategoryHelper.Category.UTILITY,
+                CategoryHelper.Category.GATE
+        };
+
+        final String[] catLabels = {
+                "Amp / Head", "Cabinet", "Overdrive / Dist", "Compressor",
+                "Modulation", "Delay", "Reverb", "EQ", "Pitch / Synth",
+                "Wah", "Volume / Utility", "Noise Gate"
+        };
+
+        final Runnable[] populateModelsForCat = new Runnable[1];
+        // Active category holder — drives the global search fallback (empty query = this cat).
+        final CategoryHelper.Category[] activeModelCat = {currentCat};
+
+        if (catContainer != null) {
+            catContainer.removeAllViews();
+            for (int i = 0; i < categories.length; i++) {
+                final int catIdx = i;
+                final CategoryHelper.Category cat = categories[i];
+                View catView = getLayoutInflater().inflate(R.layout.item_model_category_row, catContainer, false);
+                ImageView icon = catView.findViewById(R.id.item_cat_icon);
+                TextView title = catView.findViewById(R.id.item_cat_title);
+
+                title.setText(catLabels[i]);
+                int catColor = CategoryHelper.getColor(cat.name());
+                icon.setImageResource(CategoryHelper.getIconRes(cat.name()));
+                icon.setColorFilter(catColor, android.graphics.PorterDuff.Mode.SRC_IN);
+
+                boolean isSelected = (cat == currentCat);
+                catView.setBackgroundResource(isSelected ? R.drawable.glass_category_selected_bg : R.drawable.glass_card_bg);
+
+                catView.setOnClickListener(v -> {
+                    for (int c = 0; c < catContainer.getChildCount(); c++) {
+                        catContainer.getChildAt(c).setBackgroundResource(R.drawable.glass_card_bg);
+                    }
+                    catView.setBackgroundResource(R.drawable.glass_category_selected_bg);
+                    activeModelCat[0] = cat;
+                    EditText si = dialog.findViewById(R.id.model_search_input);
+                    if (si != null && si.getText().length() > 0) {
+                        si.setText(""); // watcher repopulates with the new category
+                    } else {
+                        loadModelsIntoContainer(modelsContainer, cat, position, dialog);
+                    }
+                });
+
+                catContainer.addView(catView);
             }
+        }
 
-            File[] dirs = baseDir.listFiles(File::isDirectory);
-            if (dirs != null) {
-                java.util.Arrays.sort(dirs, (a, b) -> a.getName().compareToIgnoreCase(b.getName()));
-                for (File d : dirs) {
-                    if (d.getName().equals(pluginName)) continue;
-                    File[] fs = d.listFiles((dd, n) -> n.toLowerCase().endsWith(".nam") || n.toLowerCase().endsWith(".wav"));
-                    if (fs == null) continue;
-                    for (File f : fs) { models.add(f); labels.add("[" + d.getName() + "] " + f.getName()); }
+        // Initially populate for the active block's category
+        if (modelsContainer != null) {
+            loadModelsIntoContainer(modelsContainer, currentCat, position, dialog);
+        }
+
+        // Wire GLOBAL search: non-empty query searches every category,
+        // empty query falls back to the active category.
+        EditText searchInput = dialog.findViewById(R.id.model_search_input);
+        ImageButton searchClear = dialog.findViewById(R.id.model_search_clear);
+        if (searchInput != null && modelsContainer != null) {
+            if (searchClear != null) {
+                searchClear.setOnClickListener(v -> searchInput.setText(""));
+            }
+            searchInput.addTextChangedListener(new android.text.TextWatcher() {
+                @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+                @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                    String query = s.toString().trim().toLowerCase();
+                    if (searchClear != null) {
+                        searchClear.setVisibility(query.isEmpty() ? View.GONE : View.VISIBLE);
+                    }
+                    if (query.isEmpty()) {
+                        loadModelsIntoContainer(modelsContainer, activeModelCat[0], position, dialog);
+                    } else {
+                        loadModelsMatchingQuery(modelsContainer, query, position, dialog, categories);
+                    }
+                }
+                @Override public void afterTextChanged(android.text.Editable s) {}
+            });
+        }
+    }
+
+    public void showPluginPickerDialog() {
+        final androidx.appcompat.app.AlertDialog dialog = new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setView(R.layout.dialog_plugin_picker)
+                .create();
+        dialog.setCanceledOnTouchOutside(false);
+        dialog.setCancelable(false);
+
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+        }
+
+        dialog.show();
+
+        ImageButton closeX = dialog.findViewById(R.id.picker_close_btn);
+        com.google.android.material.button.MaterialButton closeBtn = dialog.findViewById(R.id.picker_bottom_close_btn);
+        LinearLayout catContainer = dialog.findViewById(R.id.picker_cat_container);
+        LinearLayout itemsContainer = dialog.findViewById(R.id.picker_items_container);
+        LinearLayout t3kContainer = dialog.findViewById(R.id.t3k_entry_container);
+
+        if (closeX != null) closeX.setOnClickListener(v -> dialog.dismiss());
+        if (closeBtn != null) closeBtn.setOnClickListener(v -> dialog.dismiss());
+
+        // TONE3000 entry point — glass-styled, full-logo context, below ADD header (spec §5/6/25)
+        if (t3kContainer != null) try {
+            t3kContainer.setVisibility(View.VISIBLE);
+            t3kContainer.removeAllViews();
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            row.setPadding(Math.round(10 * getResources().getDisplayMetrics().density), Math.round(10 * getResources().getDisplayMetrics().density), Math.round(8 * getResources().getDisplayMetrics().density), Math.round(10 * getResources().getDisplayMetrics().density));
+            row.setBackgroundResource(R.drawable.glass_card_bg);
+            row.setClickable(true);
+            row.setFocusable(true);
+            try {
+                android.util.TypedValue tv = new android.util.TypedValue();
+                getTheme().resolveAttribute(android.R.attr.selectableItemBackground, tv, true);
+                if (tv.resourceId != 0) row.setForeground(getDrawable(tv.resourceId));
+            } catch (Exception ignore) {}
+
+            // Left: TONE3000 text-logo block + description
+            LinearLayout left = new LinearLayout(this);
+            left.setOrientation(LinearLayout.VERTICAL);
+            left.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+            TextView logo = new TextView(this);
+            logo.setText("TONE3000");
+            logo.setTextColor(Color.parseColor("#FF8A00"));
+            logo.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12f);
+            logo.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+            logo.setLetterSpacing(0.08f);
+            TextView sub = new TextView(this);
+            sub.setText("Browse TONE3000  •  NAM captures & IRs");
+            sub.setTextColor(Color.parseColor("#E6E6E6"));
+            sub.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11f);
+            sub.setPadding(0, Math.round(2 * getResources().getDisplayMetrics().density), 0, 0);
+            TextView hint = new TextView(this);
+            hint.setText("Giggin' Gear integrates with TONE3000 — massive community library");
+            hint.setTextColor(Color.parseColor("#A1A1AA"));
+            hint.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 9f);
+            hint.setPadding(0, Math.round(2 * getResources().getDisplayMetrics().density), 0, 0);
+            left.addView(logo); left.addView(sub); left.addView(hint);
+
+            com.google.android.material.button.MaterialButton browse = new com.google.android.material.button.MaterialButton(this, null, com.google.android.material.R.attr.materialButtonStyle);
+            browse.setText("Browse");
+            browse.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11f);
+            browse.setCornerRadius(Math.round(8 * getResources().getDisplayMetrics().density));
+            browse.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#FF8A00")));
+            browse.setTextColor(Color.WHITE);
+            browse.setPadding(Math.round(14 * getResources().getDisplayMetrics().density), 0, Math.round(14 * getResources().getDisplayMetrics().density), 0);
+            LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, Math.round(36 * getResources().getDisplayMetrics().density));
+            bp.gravity = Gravity.CENTER_HORIZONTAL;
+            bp.setMarginStart(0);
+            browse.setLayoutParams(bp);
+
+            View.OnClickListener goT3k = v -> {
+                dialog.dismiss();
+                // If not authenticated, show partnership sheet first; else go straight to Select
+                if (!Tone3000Config.isConfigured(this)) {
+                    new androidx.appcompat.app.AlertDialog.Builder(this)
+                        .setTitle("TONE3000 not configured")
+                        .setMessage("Missing TONE3000_CLIENT_ID.\n\nAdd it via BuildConfig (gradle -P TONE3000_CLIENT_ID=xxx) or AndroidManifest meta-data com.kancrutt.gigginggear.TONE3000_CLIENT_ID.\n\nGet your publishable key at tone3000.com/settings → API Keys.")
+                        .setPositiveButton("OK", null)
+                        .show();
+                    return;
+                }
+                // Show partnership/entry sheet (spec §6) — it handles PKCE + Custom Tabs
+                try {
+                    Tone3000EntrySheet sheet = Tone3000EntrySheet.newInstance();
+                    sheet.show(getSupportFragmentManager(), "t3k_entry");
+                } catch (Exception e) {
+                    // fallback: direct Custom Tabs launch
+                    try {
+                        Tone3000AuthManager.AuthStart s = Tone3000AuthManager.get(this).startSelectFlow(this);
+                        androidx.browser.customtabs.CustomTabsIntent cti = new androidx.browser.customtabs.CustomTabsIntent.Builder().setShowTitle(true).build();
+                        cti.launchUrl(this, android.net.Uri.parse(s.authorizeUrl));
+                    } catch (Exception ex) { toast("TONE3000 failed: " + ex.getMessage()); }
+                }
+            };
+            row.setOnClickListener(goT3k);
+            browse.setOnClickListener(goT3k);
+            row.addView(left);
+            row.addView(browse);
+            t3kContainer.addView(row);
+
+            // Divider hint
+            View divider = new View(this);
+            LinearLayout.LayoutParams dp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Math.round(1 * getResources().getDisplayMetrics().density));
+            dp.setMargins(0, Math.round(8 * getResources().getDisplayMetrics().density), 0, 0);
+            divider.setLayoutParams(dp);
+            divider.setBackgroundColor(Color.parseColor("#1E232A"));
+        } catch (Exception e) { android.util.Log.w("GigginGear", "TONE3000 entry injection failed", e); }
+
+        final CategoryHelper.Category[] categories = {
+                CategoryHelper.Category.AMP,
+                CategoryHelper.Category.CABINET,
+                CategoryHelper.Category.DISTORTION,
+                CategoryHelper.Category.DYNAMICS,
+                CategoryHelper.Category.MODULATION,
+                CategoryHelper.Category.DELAY,
+                CategoryHelper.Category.REVERB,
+                CategoryHelper.Category.EQ,
+                CategoryHelper.Category.PITCH,
+                CategoryHelper.Category.WAH,
+                CategoryHelper.Category.UTILITY,
+                CategoryHelper.Category.GATE,
+                CategoryHelper.Category.SPLIT
+        };
+
+        final String[] catLabels = {
+                "Amp / Head", "Cabinet", "Overdrive / Dist", "Compressor",
+                "Modulation", "Delay", "Reverb", "EQ", "Pitch / Synth",
+                "Wah", "Volume / Utility", "Noise Gate", "Routing / Utility"
+        };
+        // Active category holder — drives the global search fallback (empty query = this cat).
+        final CategoryHelper.Category[] activePickerCat = {categories[0]};
+
+        if (catContainer != null) {
+            catContainer.removeAllViews();
+            for (int i = 0; i < categories.length; i++) {
+                final CategoryHelper.Category cat = categories[i];
+                View catView = getLayoutInflater().inflate(R.layout.item_model_category_row, catContainer, false);
+                ImageView icon = catView.findViewById(R.id.item_cat_icon);
+                TextView title = catView.findViewById(R.id.item_cat_title);
+
+                title.setText(catLabels[i]);
+                int catColor = CategoryHelper.getColor(cat.name());
+                icon.setImageResource(CategoryHelper.getIconRes(cat.name()));
+                icon.setColorFilter(catColor, android.graphics.PorterDuff.Mode.SRC_IN);
+
+                boolean isInitial = (i == 0);
+                catView.setBackgroundResource(isInitial ? R.drawable.glass_category_selected_bg : R.drawable.glass_card_bg);
+
+                catView.setOnClickListener(v -> {
+                    for (int c = 0; c < catContainer.getChildCount(); c++) {
+                        catContainer.getChildAt(c).setBackgroundResource(R.drawable.glass_card_bg);
+                    }
+                    catView.setBackgroundResource(R.drawable.glass_category_selected_bg);
+                    activePickerCat[0] = cat;
+                    EditText si = dialog.findViewById(R.id.picker_search_input);
+                    if (si != null && si.getText().length() > 0) {
+                        si.setText(""); // watcher repopulates with the new category
+                    } else {
+                        loadPluginsIntoContainer(itemsContainer, cat, dialog);
+                    }
+                });
+
+                catContainer.addView(catView);
+            }
+        }
+
+        if (itemsContainer != null) {
+            loadPluginsIntoContainer(itemsContainer, categories[0], dialog);
+        }
+
+        // Wire GLOBAL search for add plugin dialog: non-empty query searches
+        // every category, empty query falls back to the active category.
+        EditText pickerSearch = dialog.findViewById(R.id.picker_search_input);
+        ImageButton pickerClear = dialog.findViewById(R.id.picker_search_clear);
+        if (pickerSearch != null && itemsContainer != null) {
+            if (pickerClear != null) {
+                pickerClear.setOnClickListener(v -> pickerSearch.setText(""));
+            }
+            pickerSearch.addTextChangedListener(new android.text.TextWatcher() {
+                @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+                @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                    String query = s.toString().trim().toLowerCase();
+                    if (pickerClear != null) {
+                        pickerClear.setVisibility(query.isEmpty() ? View.GONE : View.VISIBLE);
+                    }
+                    if (query.isEmpty()) {
+                        loadPluginsIntoContainer(itemsContainer, activePickerCat[0], dialog);
+                    } else {
+                        loadPluginsMatchingQuery(itemsContainer, query, dialog, categories);
+                    }
+                }
+                @Override public void afterTextChanged(android.text.Editable s) {}
+            });
+        }
+    }
+
+    private void loadPluginsIntoContainer(LinearLayout container, CategoryHelper.Category cat, androidx.appcompat.app.AlertDialog dialog) {
+        if (container == null) return;
+        container.removeAllViews();
+
+        if (cat == CategoryHelper.Category.SPLIT || cat == CategoryHelper.Category.MERGE) {
+            addPluginPickerRow(container, "SPLIT (Parallel Branch)", "Split signal into 2 parallel paths", R.drawable.ic_routing_split, dialog, v -> {
+                addRoutingBlock(true);
+                dialog.dismiss();
+            });
+            addPluginPickerRow(container, "MERGE (Sum to Mono)", "Combine parallel branches into 1 path", R.drawable.ic_routing_merge, dialog, v -> {
+                addRoutingBlock(false);
+                dialog.dismiss();
+            });
+            return;
+        }
+
+        JSONObject[] sources = {availablePlugins, availablePluginsLV2};
+        ArrayList<String> loadedPluginNames = new ArrayList<>();
+
+        for (JSONObject source : sources) {
+            if (source == null) continue;
+            Iterator<String> keys = source.keys();
+            while (keys.hasNext()) {
+                String k = keys.next();
+                JSONObject obj = source.optJSONObject(k);
+                if (obj == null) continue;
+                String pName = obj.optString("name", "");
+                if (pName.isEmpty() || loadedPluginNames.contains(pName)) continue;
+
+                CategoryHelper.Category pCat = CategoryHelper.getCategory(pName);
+                if (pCat == cat) {
+                    loadedPluginNames.add(pName);
+                    String desc = obj.optString("desc", obj.optString("description", "Built-in Effect"));
+                    if (desc.length() > 40) desc = desc.substring(0, 37) + "\u2026";
+
+                    final String pluginName = pName;
+                    addPluginPickerRow(container, pName, desc, CategoryHelper.getIconRes(pName), dialog, v -> {
+                        addPluginByName(pluginName);
+                        dialog.dismiss();
+                    });
                 }
             }
-            labels.add("Load from storage…");
+        }
 
-            final ArrayList<File> finalModels = models;
-            new androidx.appcompat.app.AlertDialog.Builder(this)
-                    .setTitle("Choose " + category.name() + " Model")
-                    .setItems(labels.toArray(new CharSequence[0]), (d, which) -> {
-                        if (which < finalModels.size()) {
-                            applyLocalModelToPlugin(position, finalModels.get(which));
-                            TextView mn = findViewById(R.id.detail_model_name);
-                            if (mn != null) mn.setText(finalModels.get(which).getName());
-                        } else {
-                            Intent intent_upload = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-                            intent_upload.setType("*/*");
-                            intent_upload.addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
-                            intent_upload.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                            startActivityForResult(intent_upload, 5000 + position);
+        if (loadedPluginNames.isEmpty() && (cat == CategoryHelper.Category.AMP || cat == CategoryHelper.Category.CABINET)) {
+            String[] sampleAmps = {"Neural Amp Modeler", "Convolution Reverb", "AIDA-X"};
+            for (String sa : sampleAmps) {
+                final String pluginName = sa;
+                addPluginPickerRow(container, sa, cat.name() + " Loader", CategoryHelper.getIconRes(cat.name()), dialog, v -> {
+                    addPluginByName(pluginName);
+                    dialog.dismiss();
+                });
+            }
+        }
+    }
+
+    /** Global plugin search: matches across every category plus routing blocks. */
+    private void loadPluginsMatchingQuery(LinearLayout container, String query,
+                                          androidx.appcompat.app.AlertDialog dialog,
+                                          CategoryHelper.Category[] categories) {
+        if (container == null) return;
+        container.removeAllViews();
+        String q = query.toLowerCase();
+        int hits = 0;
+
+        // Routing blocks on match
+        if ("split (parallel branch)".contains(q) || "split signal into 2 parallel paths".contains(q)) {
+            addPluginPickerRow(container, "SPLIT (Parallel Branch)", "Split signal into 2 parallel paths", R.drawable.ic_routing_split, dialog, v -> {
+                addRoutingBlock(true);
+                dialog.dismiss();
+            });
+            hits++;
+        }
+        if ("merge (sum to mono)".contains(q) || "combine parallel branches into 1 path".contains(q)) {
+            addPluginPickerRow(container, "MERGE (Sum to Mono)", "Combine parallel branches into 1 path", R.drawable.ic_routing_merge, dialog, v -> {
+                addRoutingBlock(false);
+                dialog.dismiss();
+            });
+            hits++;
+        }
+
+        // Every plugin across all categories
+        JSONObject[] sources = {availablePlugins, availablePluginsLV2};
+        ArrayList<String> seen = new ArrayList<>();
+        for (JSONObject source : sources) {
+            if (source == null) continue;
+            Iterator<String> keys = source.keys();
+            while (keys.hasNext()) {
+                JSONObject obj = source.optJSONObject(keys.next());
+                if (obj == null) continue;
+                final String pName = obj.optString("name", "");
+                if (pName.isEmpty() || seen.contains(pName)) continue;
+                String desc = obj.optString("desc", obj.optString("description", "Built-in Effect"));
+                if (!(pName.toLowerCase().contains(q) || desc.toLowerCase().contains(q))) continue;
+                seen.add(pName);
+                String shortDesc = desc.length() > 40 ? desc.substring(0, 37) + "…" : desc;
+                addPluginPickerRow(container, pName, shortDesc, CategoryHelper.getIconRes(pName), dialog, v -> {
+                    addPluginByName(pName);
+                    dialog.dismiss();
+                });
+                hits++;
+            }
+        }
+
+        if (hits == 0) {
+            TextView empty = new TextView(this);
+            empty.setText("No matches for \"" + query + "\"");
+            empty.setTextColor(Color.parseColor("#A1A1AA"));
+            empty.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12f);
+            empty.setPadding(Math.round(12 * getResources().getDisplayMetrics().density),
+                    Math.round(16 * getResources().getDisplayMetrics().density),
+                    Math.round(12 * getResources().getDisplayMetrics().density),
+                    Math.round(16 * getResources().getDisplayMetrics().density));
+            container.addView(empty);
+        }
+    }
+
+    private void addPluginPickerRow(LinearLayout container, String title, String desc, int iconRes, androidx.appcompat.app.AlertDialog dialog, View.OnClickListener onClick) {
+        View row = getLayoutInflater().inflate(R.layout.item_model_browser_row, container, false);
+        TextView t = row.findViewById(R.id.item_model_title);
+        TextView b = row.findViewById(R.id.item_model_brand);
+        ImageView thumb = row.findViewById(R.id.item_model_thumb);
+        row.findViewById(R.id.item_model_star).setVisibility(View.GONE);
+
+        t.setText(title);
+        b.setText(desc);
+        thumb.setImageResource(iconRes);
+        thumb.setColorFilter(CategoryHelper.getColor(title), android.graphics.PorterDuff.Mode.SRC_IN);
+
+        row.setOnClickListener(onClick);
+        container.addView(row);
+    }
+
+    private void loadModelsIntoContainer(LinearLayout container, CategoryHelper.Category cat, int position, androidx.appcompat.app.AlertDialog dialog) {
+        if (container == null) return;
+        container.removeAllViews();
+
+        boolean isFileBased = (cat == CategoryHelper.Category.AMP || cat == CategoryHelper.Category.CABINET);
+
+        if (isFileBased) {
+            // Load local files + Storage Option
+            File baseDir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+            ArrayList<File> filesList = new ArrayList<>();
+            if (baseDir != null) {
+                File[] dirs = baseDir.listFiles(File::isDirectory);
+                if (dirs != null) {
+                    for (File d : dirs) {
+                        File[] fs = d.listFiles((dd, n) -> n.toLowerCase().endsWith(".nam") || n.toLowerCase().endsWith(".wav"));
+                        if (fs != null) {
+                            for (File f : fs) filesList.add(f);
                         }
-                    })
-                    .setNegativeButton("Cancel", null)
-                    .show();
-        } else {
-            // Built-in plugin selection for Reverb, Delay, Modulation, Drive, EQ, etc.
-            ArrayList<String> categoryPluginNames = new ArrayList<>();
-            ArrayList<String> displayLabels = new ArrayList<>();
+                    }
+                }
+            }
 
-            // Scan all available LADSPA & LV2 plugins matching this category
+            // Factory name-only rows deleted: they changed no sound (no file,
+            // no DSP call). Real sources below: local .nam/.wav, TONE3000, Storage.
+
+            // 2. Add local downloaded user models if present
+            if (!filesList.isEmpty()) {
+                for (File f : filesList) {
+                    View row = getLayoutInflater().inflate(R.layout.item_model_browser_row, container, false);
+                    TextView t = row.findViewById(R.id.item_model_title);
+                    TextView b = row.findViewById(R.id.item_model_brand);
+                    ImageView thumb = row.findViewById(R.id.item_model_thumb);
+
+                    t.setText(f.getName());
+                    b.setText("Local Storage • " + cat.name());
+                    thumb.setImageResource(CategoryHelper.getIconRes(cat.name()));
+                    thumb.setColorFilter(CategoryHelper.getColor(cat.name()), android.graphics.PorterDuff.Mode.SRC_IN);
+
+                    row.setOnClickListener(v -> {
+                        applyLocalModelToPlugin(position, f);
+                        TextView mn = findViewById(R.id.detail_model_name);
+                        if (mn != null) mn.setText(f.getName());
+                        dialog.dismiss();
+                    });
+                    container.addView(row);
+                }
+            }
+
+            // Real built-in AMP/CABINET plugins (swap the block — actual sound
+            // change). This replaces the deleted name-only factory rows, so
+            // Browse always offers non-NAM amp/cab choices that really work.
+            {
+                JSONObject[] pluginSources = {availablePlugins, availablePluginsLV2};
+                ArrayList<String> pluginNames = new ArrayList<>();
+                for (JSONObject source : pluginSources) {
+                    if (source == null) continue;
+                    Iterator<String> keys = source.keys();
+                    while (keys.hasNext()) {
+                        String k = keys.next();
+                        JSONObject obj = source.optJSONObject(k);
+                        if (obj == null) continue;
+                        String pName = obj.optString("name", "");
+                        if (pName.isEmpty() || pluginNames.contains(pName)) continue;
+                        if (CategoryHelper.getCategory(pName) != cat) continue;
+                        pluginNames.add(pName);
+                        final String pick = pName;
+                        View prow = getLayoutInflater().inflate(R.layout.item_model_browser_row, container, false);
+                        ((TextView) prow.findViewById(R.id.item_model_title)).setText(pName);
+                        String desc = obj.optString("desc", obj.optString("description", "Built-in Effect"));
+                        if (desc.length() > 40) desc = desc.substring(0, 37) + "…";
+                        ((TextView) prow.findViewById(R.id.item_model_brand)).setText(desc);
+                        ImageView pthumb = prow.findViewById(R.id.item_model_thumb);
+                        pthumb.setImageResource(CategoryHelper.getIconRes(pName));
+                        pthumb.setColorFilter(CategoryHelper.getColor(pName), android.graphics.PorterDuff.Mode.SRC_IN);
+                        prow.findViewById(R.id.item_model_star).setVisibility(View.GONE);
+                        prow.setOnClickListener(v -> {
+                            swapActivePlugin(position, pick);
+                            dialog.dismiss();
+                        });
+                        container.addView(prow);
+                    }
+                }
+            }
+
+            // TONE3000 browse row — persistent per spec §18
+            View t3kRow = getLayoutInflater().inflate(R.layout.item_model_browser_row, container, false);
+            TextView t3kt = t3kRow.findViewById(R.id.item_model_title);
+            TextView t3kb = t3kRow.findViewById(R.id.item_model_brand);
+            ImageView t3kThumb = t3kRow.findViewById(R.id.item_model_thumb);
+            t3kRow.findViewById(R.id.item_model_star).setVisibility(View.GONE);
+            t3kt.setText("Browse TONE3000");
+            t3kt.setTextColor(Color.parseColor("#FF8A00"));
+            t3kb.setText("NAM captures & IRs — massive community library");
+            t3kThumb.setImageResource(R.drawable.ic_cat_amp);
+            t3kThumb.setColorFilter(Color.parseColor("#FF8A00"), android.graphics.PorterDuff.Mode.SRC_IN);
+            t3kRow.setBackgroundResource(R.drawable.glass_card_bg);
+            t3kRow.setOnClickListener(v -> {
+                dialog.dismiss();
+                if (!Tone3000Config.isConfigured(this)) {
+                    new androidx.appcompat.app.AlertDialog.Builder(this)
+                        .setTitle("TONE3000 not configured")
+                        .setMessage("Missing TONE3000_CLIENT_ID.\n\nAdd it via BuildConfig or manifest meta-data.")
+                        .setPositiveButton("OK", null).show();
+                    return;
+                }
+                Tone3000EntrySheet sheet = Tone3000EntrySheet.newInstance();
+                sheet.show(getSupportFragmentManager(), "t3k_entry");
+            });
+            container.addView(t3kRow);
+
+            // Storage picker row
+            View storageRow = getLayoutInflater().inflate(R.layout.item_model_browser_row, container, false);
+            TextView st = storageRow.findViewById(R.id.item_model_title);
+            TextView sb = storageRow.findViewById(R.id.item_model_brand);
+            ImageView sthumb = storageRow.findViewById(R.id.item_model_thumb);
+            storageRow.findViewById(R.id.item_model_star).setVisibility(View.GONE);
+
+            st.setText("Load from Storage…");
+            sb.setText("Select custom .nam / .wav file");
+            sthumb.setImageResource(R.drawable.ic_baseline_save_24);
+            sthumb.setColorFilter(Color.parseColor("#FF8A00"), android.graphics.PorterDuff.Mode.SRC_IN);
+
+            storageRow.setOnClickListener(v -> {
+                dialog.dismiss();
+                Intent intent_upload = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                intent_upload.setType("*/*");
+                intent_upload.addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+                intent_upload.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                startActivityForResult(intent_upload, 5000 + position);
+            });
+            container.addView(storageRow);
+
+        } else {
+            // Built-in LADSPA/LV2 plugins
             JSONObject[] pluginSources = {availablePlugins, availablePluginsLV2};
+            ArrayList<String> pluginNames = new ArrayList<>();
             for (JSONObject source : pluginSources) {
                 if (source == null) continue;
                 Iterator<String> keys = source.keys();
@@ -3948,49 +6088,204 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     String pName = obj.optString("name", "");
                     if (pName.isEmpty()) continue;
                     CategoryHelper.Category pCat = CategoryHelper.getCategory(pName);
-                    if (pCat == category && !categoryPluginNames.contains(pName)) {
-                        categoryPluginNames.add(pName);
-                        String desc = obj.optString("desc", obj.optString("description", ""));
-                        if (!desc.isEmpty() && desc.length() > 50) desc = desc.substring(0, 47) + "…";
-                        displayLabels.add(pName + (desc.isEmpty() ? "" : "\n" + desc));
+                    if (pCat == cat && !pluginNames.contains(pName)) {
+                        pluginNames.add(pName);
+                        View row = getLayoutInflater().inflate(R.layout.item_model_browser_row, container, false);
+                        TextView t = row.findViewById(R.id.item_model_title);
+                        TextView b = row.findViewById(R.id.item_model_brand);
+                        ImageView thumb = row.findViewById(R.id.item_model_thumb);
+
+                        t.setText(pName);
+                        String desc = obj.optString("desc", obj.optString("description", "Built-in Effect"));
+                        if (desc.length() > 40) desc = desc.substring(0, 37) + "…";
+                        b.setText(desc);
+                        thumb.setImageResource(CategoryHelper.getIconRes(pName));
+                        thumb.setColorFilter(CategoryHelper.getColor(pName), android.graphics.PorterDuff.Mode.SRC_IN);
+
+                        row.setOnClickListener(v -> {
+                            swapActivePlugin(position, pName);
+                            dialog.dismiss();
+                        });
+                        container.addView(row);
                     }
                 }
             }
+        }
+    }
 
-            if (categoryPluginNames.isEmpty()) {
-                toast("No alternative " + category.name() + " plugins found");
-                return;
+    /** Global model search: matches across every category (factories, local files, all plugins). */
+    private void loadModelsMatchingQuery(LinearLayout container, String query, int position,
+                                         androidx.appcompat.app.AlertDialog dialog,
+                                         CategoryHelper.Category[] categories) {
+        if (container == null) return;
+        container.removeAllViews();
+        String q = query.toLowerCase();
+        int hits = 0;
+
+        // (Factory name-only rows deleted: they changed no sound.)
+
+        // Local downloaded files (.nam / .wav)
+        try {
+            File baseDir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+            if (baseDir != null) {
+                File[] dirs = baseDir.listFiles(File::isDirectory);
+                if (dirs != null) {
+                    for (File d : dirs) {
+                        File[] fs = d.listFiles((dd, n) -> n.toLowerCase().endsWith(".nam") || n.toLowerCase().endsWith(".wav"));
+                        if (fs == null) continue;
+                        for (File f : fs) {
+                            if (!f.getName().toLowerCase().contains(q)) continue;
+                            View row = getLayoutInflater().inflate(R.layout.item_model_browser_row, container, false);
+                            ((TextView) row.findViewById(R.id.item_model_title)).setText(f.getName());
+                            ((TextView) row.findViewById(R.id.item_model_brand)).setText("Local Storage");
+                            ImageView thumb = row.findViewById(R.id.item_model_thumb);
+                            thumb.setImageResource(CategoryHelper.getIconRes(CategoryHelper.Category.AMP.name()));
+                            row.setOnClickListener(v -> {
+                                applyLocalModelToPlugin(position, f);
+                                TextView mn = findViewById(R.id.detail_model_name);
+                                if (mn != null) mn.setText(f.getName());
+                                dialog.dismiss();
+                            });
+                            container.addView(row);
+                            hits++;
+                        }
+                    }
+                }
             }
+        } catch (Exception ignore) {}
 
-            new androidx.appcompat.app.AlertDialog.Builder(this)
-                    .setTitle("Choose " + category.name() + " Plugin")
-                    .setItems(displayLabels.toArray(new CharSequence[0]), (d, which) -> {
-                        String selectedPlugin = categoryPluginNames.get(which);
-                        swapActivePlugin(position, selectedPlugin);
-                    })
-                    .setNegativeButton("Cancel", null)
-                    .show();
+        // Every built-in plugin across all categories
+        JSONObject[] pluginSources = {availablePlugins, availablePluginsLV2};
+        ArrayList<String> seen = new ArrayList<>();
+        for (JSONObject source : pluginSources) {
+            if (source == null) continue;
+            Iterator<String> keys = source.keys();
+            while (keys.hasNext()) {
+                JSONObject obj = source.optJSONObject(keys.next());
+                if (obj == null) continue;
+                final String pName = obj.optString("name", "");
+                if (pName.isEmpty() || seen.contains(pName)) continue;
+                String desc = obj.optString("desc", obj.optString("description", "Built-in Effect"));
+                if (!(pName.toLowerCase().contains(q) || desc.toLowerCase().contains(q))) continue;
+                seen.add(pName);
+                View row = getLayoutInflater().inflate(R.layout.item_model_browser_row, container, false);
+                ((TextView) row.findViewById(R.id.item_model_title)).setText(pName);
+                String shortDesc = desc.length() > 40 ? desc.substring(0, 37) + "…" : desc;
+                ((TextView) row.findViewById(R.id.item_model_brand)).setText(shortDesc);
+                ImageView thumb = row.findViewById(R.id.item_model_thumb);
+                thumb.setImageResource(CategoryHelper.getIconRes(pName));
+                thumb.setColorFilter(CategoryHelper.getColor(pName), android.graphics.PorterDuff.Mode.SRC_IN);
+                row.setOnClickListener(v -> {
+                    swapActivePlugin(position, pName);
+                    dialog.dismiss();
+                });
+                container.addView(row);
+                hits++;
+            }
+        }
+
+        if (hits == 0) {
+            TextView empty = new TextView(this);
+            empty.setText("No matches for \"" + query + "\"");
+            empty.setTextColor(Color.parseColor("#A1A1AA"));
+            empty.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12f);
+            empty.setPadding(Math.round(12 * getResources().getDisplayMetrics().density),
+                    Math.round(16 * getResources().getDisplayMetrics().density),
+                    Math.round(12 * getResources().getDisplayMetrics().density),
+                    Math.round(16 * getResources().getDisplayMetrics().density));
+            container.addView(empty);
+        }
+    }
+
+    /** True when a plugin name resolves in the bundled LADSPA/LV2 inventories (no DSP calls). */
+    private boolean isPluginKnown(String pluginName) {
+        if (pluginName == null || pluginName.isEmpty()) return false;
+        JSONObject[] sources = {availablePlugins, availablePluginsLV2};
+        for (JSONObject source : sources) {
+            if (source == null) continue;
+            Iterator<String> keys = source.keys();
+            while (keys.hasNext()) {
+                JSONObject obj = source.optJSONObject(keys.next());
+                if (obj == null) continue;
+                if (pluginName.equals(obj.optString("name", ""))) return true;
+            }
+        }
+        return false;
+    }
+
+    /** Delete guarded by a live slot-range check — a stale index aborts native (SIGABRT, uncatchable). */
+    private boolean safeDeletePlugin(int slot) {
+        try {
+            int total = AudioEngine.getActivePlugins();
+            if (slot < 0 || slot >= total) {
+                Log.w(TAG, "safeDeletePlugin: stale slot " + slot + " of " + total + ", skipping");
+                return false;
+            }
+            AudioEngine.deletePlugin(slot);
+            return true;
+        } catch (Throwable t) {
+            Log.e(TAG, "safeDeletePlugin failed", t);
+            return false;
         }
     }
 
     /** Swap the active plugin at a given slot with another plugin and refresh UI. */
     public void swapActivePlugin(int position, String newPluginName) {
+        // Guard: never destroy the current plugin for a name the engine can't resolve.
+        if (!isPluginKnown(newPluginName)) {
+            Log.e(TAG, "swapActivePlugin: unknown plugin name " + newPluginName);
+            toast("Couldn't find " + newPluginName);
+            return;
+        }
         try {
+            // Guard: stale position aborts native — bail before touching the chain.
+            int total = AudioEngine.getActivePlugins();
+            if (position < 0 || position >= total) {
+                Log.e(TAG, "swapActivePlugin: stale position " + position + " of " + total);
+                toast("Couldn't find " + newPluginName);
+                return;
+            }
             // Save state of enabled before delete
             boolean wasEnabled = AudioEngine.getActivePluginEnabled(position);
-            // Replace plugin: delete current, add new
-            AudioEngine.deletePlugin(position);
+            // Trial-at-end: append the replacement FIRST and only delete the
+            // old slot on success. Delete-first destroys the old block when
+            // the add fails, and the stale addedPos math below can then move
+            // an innocent block into place (wrong order / wrong sound).
+            int before = AudioEngine.getActivePlugins();
             addPluginByName(newPluginName);
+            if (AudioEngine.getActivePlugins() != before + 1) {
+                Log.e(TAG, "swapActivePlugin: add failed for " + newPluginName + ", old block kept");
+                toast("Couldn't load " + newPluginName);
+                return;
+            }
+            int addedPos = AudioEngine.getActivePlugins() - 1;
+            // Keep T3K meta aligned with engine slots: the delete shifts everything
+            // > position down, the move below shifts it back. Without these
+            // shifts the badge/meta for adjacent T3K blocks drifts by one slot each
+            // swap — eventually the badge lands on an unrelated block (the
+            // "badge pindah ke block sebelah" bug on swap + load).
+            AudioEngine.deletePlugin(position);
+            shiftT3kMetaOnDelete(position);
+            // The delete shifted the trial (was last) down one slot.
+            int trial = addedPos - 1;
+            if (trial >= 0 && trial != position && position >= 0 && position <= trial) {
+                AudioEngine.movePlugin(trial, position);
+                shiftT3kMetaOnMove(trial, position);
+            }
+            try { AudioEngine.togglePlugin(position, wasEnabled); } catch (Exception ignore) {}
 
-            // Re-populate inline parameter editor with the newly loaded plugin
-            int newPosition = AudioEngine.getActivePlugins() - 1;
-            if (newPosition >= 0) {
-                populateInlineParameterEditor(newPosition, newPluginName);
-            }
+            // Refresh signal chain canvas and force re-select the current node so its icon & color update
             if (signalChainCanvas != null) {
-                signalChainCanvas.postDelayed(signalChainCanvas::loadFromActivePlugins, 100);
+                signalChainCanvas.clearT3kBadges();
+                signalChainCanvas.loadFromActivePlugins(true);
+                signalChainCanvas.post(() -> signalChainCanvas.reapplyT3kBadgesFromMeta(t3kBlockMeta));
+                signalChainCanvas.selectNode(position);
+                signalChainCanvas.invalidate();
             }
-            toast("Loaded: " + newPluginName);
+
+            // Re-populate inline parameter editor with the newly loaded plugin at the correct slot
+            populateInlineParameterEditor(position, newPluginName);
+            toast("Loaded: " + PluginNaming.displayName(newPluginName));
         } catch (Exception e) {
             Log.e(TAG, "swapActivePlugin failed", e);
             toast("Error loading " + newPluginName);
@@ -4016,7 +6311,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             getSupportFragmentManager()
                     .beginTransaction()
                     .replace(R.id.fragment_container, fragment)
-                    .commit();
+                    .commitNow();
             return true;
         }
         return false;
@@ -4028,6 +6323,16 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                         Toast.LENGTH_LONG)
                 .show();
 
+    }
+
+    /**
+     * Header-scoped dialog builder: AppCompat + Material3 glass overlay so every
+     * alert dialog uses the dark theme with white/light-grey text AND light
+     * button text. Must stay AppCompat — the old android.app.AlertDialog ignored
+     * the M3 button styling and rendered Cancel/Delete/etc. in black.
+     */
+    public static androidx.appcompat.app.AlertDialog.Builder dialogBuilder(Context ctx) {
+        return new androidx.appcompat.app.AlertDialog.Builder(ctx, R.style.ThemeOverlay_Giggin_Dialog);
     }
 
     public static void alert(String title, String text) {
@@ -4142,10 +6447,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         }
     }
 
-    private void handlePurchase() {
-        proVersion = true;
-    }
-
     public static Bitmap scaleBackground(Bitmap originalImage, int width, int height) {
         Bitmap background = Bitmap.createBitmap((int) width, (int) height, Bitmap.Config.ARGB_8888);
 
@@ -4178,7 +6479,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         boolean darkMode = PreferenceManager.getDefaultSharedPreferences(context).getBoolean("dark_mode", true) ;
         String mTheme = darkMode ? "Theme.AmpRack" : "Theme.Light" ;
         Log.d(TAG, "applyWallpaper: setting native theme " + mTheme);
-        SkinEngine.setColorScheme((MainActivity) context, mTheme);
 
         if (lowMemoryMode) {
             imageView.setBackgroundColor(_context.getResources().getColor(R.color.black));
@@ -4188,8 +6488,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         String wallpaper = PreferenceManager.getDefaultSharedPreferences(_context).getString("background", null);
         Log.d(TAG, "applyWallpaper: wallpaper: " + wallpaper);
 
-        if (useTheme && skinEngine != null) {
-            skinEngine.setNativeTheme();
+        if (useTheme) {
             // Disabled legacy skin wallpaper to allow clean pedalboard canvas!
             imageView.setBackgroundColor(Color.parseColor("#121214"));
             return ;
@@ -4214,7 +6513,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
     public static void applyWallpaper1(Context _context, Window window, Resources resources, ImageView imageView, int width, int height) {
         if (useTheme) {
-            skinEngine.setNativeTheme();
             imageView.setBackgroundColor(Color.parseColor("#121214"));
             return ;
         }
@@ -4364,6 +6662,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 //        Log.d(TAG, "addPluginByName: " + pluginName);
 //        Log.d(TAG, "addPluginByName: " + availablePlugins.toString());
         JSONObject plugins = availablePlugins;
+        if (plugins == null) { Log.e(TAG, "availablePlugins is null"); addPluginByNameLV2(pluginName); return; }
         Iterator<String> keys = plugins.keys();
 
         while (keys.hasNext()) {
@@ -4382,11 +6681,23 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
                     if (pluginName.equals(name)) {
                         Log.d(TAG, "addPluginByName: found plugin " + name);
-                        int ret = AudioEngine.addPluginLazy(lib, plugin);
-                        if (dataAdapter != null && ret >= 0) {
+                        // Native drops unloadable plugins silently: only touch
+                        // UI state when the chain actually grew, or UI/engine
+                        // slots desync (stale indices, blank editors).
+                        int before = AudioEngine.getActivePlugins();
+                        AudioEngine.addPluginLazy(lib, plugin);
+                        if (AudioEngine.getActivePlugins() <= before) {
+                            Log.e(TAG, "addPluginByName: engine refused " + name);
+                            toast("Couldn't load " + name);
+                            return;
+                        }
+                        if (dataAdapter != null) {
                             int pluginID = 0;
                             try { pluginID = Integer.parseInt(key); } catch (Exception ignored) {}
                             dataAdapter.addItem(pluginID, dataAdapter.getItemCount());
+                        }
+                        if (signalChainCanvas != null) {
+                            signalChainCanvas.post(() -> signalChainCanvas.loadFromActivePlugins());
                         }
                         return;
                     }
@@ -4396,14 +6707,16 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             }
         }
 
-        Log.e(TAG, "addPluginByName: unable to find plugin name " + pluginName + " ... trying LV2 plugins ...");
+        // First-chance LADSPA miss is the normal path for LV2-only names.
+        Log.d(TAG, "addPluginByName: not a LADSPA name (" + pluginName + ") ... trying LV2 plugins ...");
         addPluginByNameLV2(pluginName);
     }
 
     public void addPluginByNameLV2(String pluginName) {
 //        Log.d(TAG, "addPluginByName: " + pluginName);
-        Log.d(TAG, "addPluginByName: " + availablePluginsLV2.toString());
+        if (availablePluginsLV2 != null) Log.d(TAG, "addPluginByName: " + availablePluginsLV2.toString());
         JSONObject plugins = availablePluginsLV2;
+        if (plugins == null) { Log.e(TAG, "availablePluginsLV2 is null for " + pluginName); return; }
         Iterator<String> keys = plugins.keys();
 
         while (keys.hasNext()) {
@@ -4421,12 +6734,21 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 //                    Log.d(TAG, String.format ("addPluginByName: comparing %s and %s", pluginName, name));
 
                     if (pluginName.equals(name)) {
-                        Log.d(TAG, "addPluginByName: found plugin " + name);
-                        int ret = AudioEngine.addPluginLazyLV2(lib, plugin);
-                        if (dataAdapter != null && ret >= 0) {
+                        Log.d(TAG, "addPluginByNameLV2: found plugin " + name);
+                        int before = AudioEngine.getActivePlugins();
+                        AudioEngine.addPluginLazyLV2(lib, plugin);
+                        if (AudioEngine.getActivePlugins() <= before) {
+                            Log.e(TAG, "addPluginByNameLV2: engine refused " + name);
+                            toast("Couldn't load " + name);
+                            return;
+                        }
+                        if (dataAdapter != null) {
                             int pluginID = 0;
                             try { pluginID = Integer.parseInt(key); } catch (Exception ignored) {}
                             dataAdapter.addItem(pluginID, dataAdapter.getItemCount());
+                        }
+                        if (signalChainCanvas != null) {
+                            signalChainCanvas.post(() -> signalChainCanvas.loadFromActivePlugins());
                         }
                         return;
                     }
@@ -4458,9 +6780,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     }
 
     public void testLV2 () {
-        Log.d(TAG, "testLV2: " +
-                String.format("%d\t%d",
-                        getDisplayRotation(),getCameraSensorOrientation(camera2.cameraCharacteristicsHashMap.get(camera2.cameraId))));
+        Log.d(TAG, "testLV2: ");
 //        Log.d(TAG, "testLV2: " + getLV2Info("eql"));
 //        AudioEngine.testLV2();
         AudioDeviceInfo[] audioDevicesInput, audioDevicesOutput ;
@@ -4485,8 +6805,47 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             pluginName = p [p.length -1];
         }
 
-        Log.d(TAG, "getLV2Info: lv2/" + libraryName + "/" + pluginName + ".json");
-        JSONObject jsonObject = ConnectGuitar.loadJSONFromAssetFile(context, "lv2/" + libraryName + "/" + pluginName + ".json");
+        Context ctx = context;
+        String rel = "lv2/" + libraryName + "/" + pluginName + ".json";
+        Log.d(TAG, "getLV2Info: " + rel);
+
+        JSONObject jsonObject = null;
+        if (ctx != null) {
+            try {
+                jsonObject = ConnectGuitar.loadJSONFromAssetFile(ctx, rel);
+            } catch (Throwable t) {
+                Log.e(TAG, "getLV2Info: exception for " + rel, t);
+                jsonObject = null;
+            }
+            if (jsonObject == null) {
+                try {
+                    String[] assets = ctx.getAssets().list("lv2/" + libraryName);
+                    if (assets != null) {
+                        for (String a : assets) {
+                            if (a.endsWith(".json")) {
+                                try {
+                                    JSONObject fallback = ConnectGuitar.loadJSONFromAssetFile(ctx, "lv2/" + libraryName + "/" + a);
+                                    if (fallback != null) {
+                                        Log.w(TAG, "getLV2Info: fell back to lv2/" + libraryName + "/" + a);
+                                        jsonObject = fallback;
+                                        break;
+                                    }
+                                } catch (Throwable t2) {
+                                    Log.e(TAG, "getLV2Info: fallback read failed " + a, t2);
+                                }
+                            }
+                        }
+                    }
+                } catch (Throwable t3) {
+                    Log.e(TAG, "getLV2Info: cannot list lv2/" + libraryName, t3);
+                }
+            }
+        }
+
+        if (jsonObject == null) {
+            Log.w(TAG, "getLV2Info: no manifest for " + rel + ", returning {}");
+            return "{}";
+        }
         return jsonObject.toString();
     }
 
@@ -4964,12 +7323,528 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         dialog.show();
     }
 
-    public void cameraPreview() {
-        Intent intent = new Intent(context, Camera.class);
-        startActivity(intent);
+    // ---- restored from git HEAD (methods lost during cleanup) ----
+
+    public boolean isHeadphonesPlugged(){
+        AudioManager audioManager = (AudioManager)getSystemService(Context.AUDIO_SERVICE);
+        AudioDeviceInfo[] audioDevices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS);
+        for(AudioDeviceInfo deviceInfo : audioDevices){
+            if(Arrays.stream(safeAudioDevices).anyMatch(x -> x == deviceInfo.getType())){
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+
+    public String getFileContent(Uri uri) {
+        InputStreamReader inputStreamReader = null;
+        try {
+            if (!uri.toString().startsWith("/"))
+                inputStreamReader = new InputStreamReader(getContentResolver().openInputStream(uri));
+            else {
+                inputStreamReader = new InputStreamReader(new FileInputStream(new File(String.valueOf(uri))));
+            }
+
+        } catch (FileNotFoundException e) {
+            Log.e(TAG, "getFileContent: ", e);
+//            throw new RuntimeException(e);
+            return null;
+        }
+
+        BufferedReader bufferedReader = new BufferedReader(inputStreamReader);
+        StringBuilder sb = new StringBuilder();
+        String s;
+        while (true) {
+            try {
+                if (!((s = bufferedReader.readLine()) != null)) break;
+            } catch (IOException e) {
+                Log.e(TAG, "getFileContent: ", e);
+                throw new RuntimeException(e);
+            }
+
+            sb.append(s);
+        }
+        String fileContent = sb.toString();
+        return fileContent;
+    }
+
+
+    public void unzipNAMModel (String dir, Uri uri) {
+        InputStream inputStream = null;
+        String basename = null ;
+        try {
+            inputStream = getContentResolver().openInputStream(uri);
+        } catch (FileNotFoundException e) {
+            MainActivity.alert("Cannot load model", e.getMessage());
+            Log.e(TAG, "onActivityResult: ", e);
+        }
+        try {
+            basename = unzip(inputStream, dir);
+        } catch (IOException e) {
+            MainActivity.alert("Cannot unzip model", e.getMessage());
+            Log.e(TAG, "onActivityResult: ", e);
+        }
+
+        toast("Successfully extracted Model " + basename);
+    }
+
+    private static String unzip(InputStream zipFilePath, String destDirectory) throws IOException {
+        File destDir = new File(destDirectory);
+        String dirname = null ;
+        if (!destDir.exists()) {
+            destDir.mkdir();
+        }
+        ZipInputStream zipIn = new ZipInputStream(zipFilePath);
+        ZipEntry entry = zipIn.getNextEntry();
+        while (entry != null) {
+            Log.d(TAG, String.format("[unzip] %s: %s", destDirectory, entry.getName()));
+            String filePath = destDirectory + File.separator + entry.getName();
+            if (dirname == null)
+                dirname = entry.getName();
+            if (!entry.isDirectory()) {
+                extractFile(zipIn, filePath);
+            } else {
+                File dir = new File(filePath);
+                dir.mkdirs();
+            }
+            zipIn.closeEntry();
+            entry = zipIn.getNextEntry();
+        }
+        zipIn.close();
+        return dirname;
+    }
+
+    private static void extractFile(ZipInputStream zipIn, String filePath) throws IOException {
+        BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(filePath));
+        byte[] bytesIn = new byte[1024];
+        int read = 0;
+        while ((read = zipIn.read(bytesIn)) != -1) {
+            bos.write(bytesIn, 0, read);
+        }
+        bos.close();
+    }
+
+
+    public static void writeFile (String path, String text) {
+        try {
+            File file = new File(path);
+
+            if (!file.exists()) {
+                file.createNewFile();
+            }
+            FileWriter writer = new FileWriter(file);
+            writer.append(text);
+            writer.flush();
+            writer.close();
+        } catch (IOException e) {
+            Log.e(TAG, "writeFile: ", e);
+            toast(e.getMessage());
+        }
+    }
+
+
+    private void copyFile(Uri pathFrom, Uri pathTo) throws IOException {
+        try (InputStream in = getContentResolver().openInputStream(pathFrom)) {
+            if(in == null) return;
+            try (OutputStream out = getContentResolver().openOutputStream(pathTo)) {
+                if(out == null) return;
+                // Transfer bytes from in to out
+                byte[] buf = new byte[1024];
+                int len;
+                while ((len = in.read(buf)) > 0) {
+                    out.write(buf, 0, len);
+                }
+            }
+        }
+    }
+
+
+    void setMidiControl (View view, int plugin, int control, MIDIControl.Type type, MIDIControl.Scope scope) {
+        Log.i(TAG, String.format(
+                "[set midi control] plugin: %d, control: %d",
+                plugin, control
+        ));
+
+        String channel = "";
+        String data1 = "";
+
+        MIDIControl old = null;
+        
+        for (MIDIControl midiControl: midiControls) {
+            Log.d(TAG, String.format ("[midi plugin check] %d: %d",
+                    midiControl.view.getId(), view.getId()
+                    ));
+
+            if (midiControl.view.getId() == view.getId()) {
+                old = midiControl ;
+                data1 = String.valueOf(midiControl.control);
+                channel = String.valueOf(midiControl.channel);
+                break ;
+            }
+        }
+
+        MIDIControl midiControl = new MIDIControl() ;
+        midiControl.plugin = plugin ;
+        midiControl.scope = scope ;
+        midiControl.type = type;
+//        if (scope == MIDIControl.Scope.GLOBAL) {
+//            midiControl.type = MIDIControl.Type.TOGGLE;
+//        }
+//        midiControl.control = control ;
+        midiControl.pluginControl = control ;
+        midiControl.view = view ;
+
+        midiLayout = (ConstraintLayout) getLayoutInflater().inflate(R.layout.midi_add_control, null);
+        ((EditText) midiLayout.findViewById(R.id.channel)).setText(channel);
+        ((EditText) midiLayout.findViewById(R.id.control)).setText(data1);
+
+        triggerMidiButton = midiLayout.findViewById(R.id.midi_trigger);
+
+        channelEdit = midiLayout.findViewById(R.id.channel) ;
+        controlEdit = midiLayout.findViewById(R.id.control) ;
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setView(midiLayout);
+        if (scope == MIDIControl.Scope.PLUGIN)
+            builder.setTitle("Set MIDI Control for " + AudioEngine.getActivePluginName(plugin) + " " + AudioEngine.getControlName(plugin, control));
+        else
+            builder.setTitle("Set MIDI Control");
+
+        MIDIControl finalOld = old;
+        builder.setPositiveButton("Save", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                if (finalOld != null)
+                    midiControls.remove(finalOld);
+                String channel = ((EditText) midiLayout.findViewById(R.id.channel)).getText().toString();
+                String program = ((EditText) midiLayout.findViewById(R.id.control)).getText().toString();
+
+                int ch = -1 ;
+                int pr =  -1 ;
+
+                try {
+                    pr = Integer.parseInt(program);
+                    ch = Integer.parseInt(channel);
+                } catch (NumberFormatException e) {
+                    Log.e(TAG, "onDismiss: ", e);
+                    alert("Failed to set MIDI control", e.getMessage());
+                    return;
+                }
+
+                midiControl.channel = ch ;
+                midiControl.control = pr ;
+                midiControls.add(midiControl);
+
+                Toast.makeText(MainActivity.this, "MIDI control set successfully", Toast.LENGTH_SHORT).show();
+                Log.d(TAG, "[midi controls]: " + midiControls.toString());
+                if (scope == MIDIControl.Scope.GLOBAL) {
+                    saveGlobalMidi();
+                } else {
+                    saveActivePreset();
+                }
+            }
+        }) ;
+
+        builder.setNegativeButton("Cancel", null);
+
+        AlertDialog dialog = builder.create() ;
+
+        midiAddDialog = dialog ;
+        dialog.setOnDismissListener(new DialogInterface.OnDismissListener() {
+            @Override
+            public void onDismiss(DialogInterface dialog) {
+                Log.i(TAG, "onDismiss: midi add dialog set to null");
+                midiAddDialog = null ;
+            }
+        });
+
+        dialog.show();
+    }
+
+
+    void processMIDIMessage (int channel, int data1, int data2) {
+//        Log.d(TAG, "processMIDIMessage: process message " +
+//                String.format("%d %d %d", channel, data1, data2));
+        String msg = String.format(
+                "%d %d %d",
+                channel, data1, data2
+        );
+
+        mainActivity.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                midiDisplay.setText(msg);
+
+                if (midiAddDialog != null && triggerMidiButton != null && triggerMidiButton.isChecked()) {
+                    EditText ed1 = ((EditText) midiAddDialog.findViewById(R.id.channel));
+                    if (ed1 != null)
+                        ed1.setText(String.valueOf(channel));
+                    EditText ed2 = ((EditText) midiAddDialog.findViewById(R.id.control));
+                    if (ed2 != null)
+                        ed2.setText(String.valueOf(data1));
+                }
+            }
+        });
+
+        for (MIDIControl midiControl: midiControls) {
+//            Log.i(TAG, "processMIDIMessage: probe midiControl " + midiControl);
+
+            if (midiControl.channel == channel && data1 == midiControl.control) {
+                midiControl.process(data2);
+                break ;
+            }
+        }
+    }
+
+
+    void loadGlobalMidi () {
+        Log.i(TAG, "loadGlobalMidi: loading settings");
+        String s = defaultSharedPreferences.getString("global_midi", null);
+        if (s == null) {
+            Log.i(TAG, "loadGlobalMidi: no saved settings");
+            return;
+        } else {
+            Log.i(TAG, "loadGlobalMidi: saved settings found " + s);
+        }
+
+        JSONArray jsonArray;
+        try {
+            jsonArray = new JSONArray(s);
+            for (int i = 0 ; i < jsonArray.length(); i ++) {
+                JSONObject j = jsonArray.getJSONObject(i);
+                MIDIControl midiControl = new MIDIControl();
+                midiControl.scope = MIDIControl.Scope.GLOBAL;
+                String idString = j.getString("view");
+                if (idString.isEmpty()) {
+                    Log.w(TAG, "loadGlobalMidi: invalid settings, skipping " + j);
+                    continue;
+                }
+                midiControl.view = findViewById(stringToId(idString));
+                switch (j.getString ("type")) {
+                    case "KNOB":
+                        midiControl.type = MIDIControl.Type.KNOB ;
+                        break ;
+                    case "SLIDER":
+                        midiControl.type = MIDIControl.Type.SLIDER ;
+                        break ;
+                    case "TOGGLE":
+                    default:
+                        midiControl.type = MIDIControl.Type.TOGGLE ;
+                        break ;
+                }
+
+                midiControl.scope = MIDIControl.Scope.GLOBAL;
+                midiControl.channel = j.getInt("channel");
+                midiControl.control = j.getInt("control");
+                midiControls.add(midiControl);
+                Log.i(TAG, "loadGlobalMidi: added control " + midiControl);
+            }
+        } catch (JSONException e) {
+            throw new RuntimeException(e);
+        }
 
     }
 
+
+    void saveGlobalMidi () {
+        JSONArray jsonArray = new JSONArray();
+        for (MIDIControl midiControl: midiControls) {
+            if (midiControl.scope == MIDIControl.Scope.PLUGIN || midiControl.view == null)
+                continue;
+
+            try {
+                JSONObject jsonObject = midiControl.get() ;
+                Log.i(TAG, "saveGlobalMidi: " + jsonObject.toString());
+                jsonArray.put(jsonObject);
+            } catch (JSONException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        Log.i(TAG, "saveGlobalMidi: " + jsonArray.toString());
+        defaultSharedPreferences.edit().putString("global_midi", jsonArray.toString()).apply();
+    }
+
+
+    void resetPluginMIDI () {
+        for (MIDIControl midiControl: midiControls) {
+            if (midiControl.scope == MIDIControl.Scope.GLOBAL)
+                continue;
+
+            midiControls.remove(midiControl);
+        }
+    }
+
+
+    String midiControlsForDB (int plugin) {
+        StringBuilder s = new StringBuilder();
+        for (MIDIControl midiControl: midiControls) {
+            if (midiControl.scope == MIDIControl.Scope.GLOBAL|| midiControl.plugin != plugin)
+                continue;
+
+            s.append(midiControl.getForDB()).append("|");
+        }
+
+        return s.toString();
+    }
+
+
+    JSONObject midiPluginControlsAsJSON () {
+        JSONObject jsonObject = new JSONObject();
+        for (MIDIControl midiControl: midiControls) {
+            if (midiControl.scope == MIDIControl.Scope.GLOBAL)
+                continue;
+
+            try {
+                if (! jsonObject.has(String.valueOf(midiControl.plugin)))
+                    jsonObject.put(String.valueOf(midiControl.plugin), new JSONArray());
+                jsonObject.getJSONArray(String.valueOf(midiControl.plugin)).put(midiControl.get());
+            } catch (JSONException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        Log.i(TAG, "midiPluginControlsAsJSON: " + jsonObject);
+        return jsonObject;
+    }
+
+
+    void scanBLE () {
+        if (Build.VERSION.SDK_INT < 33) {
+            AlertDialog.Builder builder = new AlertDialog.Builder(this);
+            builder.setTitle("Bluetooth MIDI only supported on Android 13 and above.");
+            builder.setMessage("To use a Bluetooth MIDI Controller with Amp Rack, install MIDI BLE Connect from the Play store, connect to your BLE MIDI Controller and then restart Amp Rack");
+            builder.setPositiveButton("Install MIDI BLE Connect", new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    String url = "https://play.google.com/store/apps/details?id=com.mobileer.example.midibtlepairing";
+                    Intent i = new Intent(Intent.ACTION_VIEW);
+                    i.setData(Uri.parse(url));
+                    startActivity(i);
+                }
+            });
+
+            builder.show();
+            return;
+        }
+
+        deviceManager =
+                (CompanionDeviceManager) getSystemService(
+                        Context.COMPANION_DEVICE_SERVICE
+                );
+
+        // To skip filtering based on name and supported feature flags,
+        // do not include calls to setNamePattern() and addServiceUuid(),
+        // respectively. This example uses Bluetooth.
+        BluetoothDeviceFilter deviceFilter =
+                new BluetoothDeviceFilter.Builder()
+                        .setNamePattern(Pattern.compile("My device"))
+                        .addServiceUuid(
+                                new ParcelUuid(new UUID(0x123abcL, -1L)), null
+                        )
+                        .build();
+
+        // The argument provided in setSingleDevice() determines whether a single
+        // device name or a list of device names is presented to the user as
+        // pairing options.
+        AssociationRequest pairingRequest = new AssociationRequest.Builder()
+//                .addDeviceFilter(deviceFilter)
+//                .setSingleDevice(true)
+                .build();
+
+        // When the app tries to pair with the Bluetooth device, show the
+        // appropriate pairing request dialog to the user.
+        deviceManager.associate(pairingRequest, executor, new CompanionDeviceManager.Callback() {
+            // Called when a device is found. Launch the IntentSender so the user can
+            // select the device they want to pair with.
+            @Override
+            public void onDeviceFound(IntentSender chooserLauncher) {
+                try {
+                    startIntentSenderForResult(
+                            chooserLauncher, SELECT_DEVICE_REQUEST_CODE, null, 0, 0, 0
+                    );
+                } catch (IntentSender.SendIntentException e) {
+                    Log.e("MainActivity", "Failed to send intent");
+                }
+            }
+
+            @RequiresApi(api = Build.VERSION_CODES.TIRAMISU)
+            @Override
+            public void onAssociationCreated(AssociationInfo associationInfo) {
+                // AssociationInfo object is created and get association id and the
+                // macAddress.
+                int associationId = associationInfo.getId();
+                MacAddress macAddress = associationInfo.getDeviceMacAddress();
+            }
+
+            @Override
+            public void onFailure(CharSequence errorMessage) {
+                // Handle the failure.
+            }
+        });
+    }
+
+
+    void midiConnect (MidiDeviceInfo midiDeviceInfo, int outputPort) {
+        int finalOutputPort = outputPort;
+        Log.d(TAG, String.format ("[midi] opening device: %s", midiDeviceInfo.toString()));
+        try {
+            midiManager.openDevice(midiDeviceInfo, device -> {
+                midiDevice = device;
+                Log.d(TAG, String.format("[midi] device opened: opening port..."));
+                midiOutputPort = device.openOutputPort(finalOutputPort);
+                Log.d(TAG, String.format("[midi] port opened: port %d", midiOutputPort.getPortNumber()));
+                midiOutputPort.connect(midiReciever);
+                mainActivity.runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (midiDevice == null)
+                            return;
+
+                        Log.i(TAG, "[bt] run: connected device " + midiDevice.getInfo().getType() + " >" + midiDeviceInfo.getProperties().getString("name", ""));
+                        ((TextView) findViewById(R.id.midi_name)).setText(midiDeviceInfo.getProperties().getString("name", ""));
+                        if (midiDevice.getInfo().getType() == MidiDeviceInfo.TYPE_USB || midiDevice.getInfo().getType() == MidiDeviceInfo.TYPE_VIRTUAL) {
+                            (findViewById(R.id.midi_icon)).setVisibility(VISIBLE);
+                            (findViewById(R.id.midi_icon)).setOnClickListener(new View.OnClickListener() {
+                                @Override
+                                public void onClick(View v) {
+                                    selectMidiDevice();
+                                }
+                            });
+                        } else if (midiDevice.getInfo().getType() == MidiDeviceInfo.TYPE_BLUETOOTH) {
+                            (findViewById(R.id.bt_icon)).setVisibility(VISIBLE);
+                            (findViewById(R.id.bt_icon)).setOnClickListener(new View.OnClickListener() {
+                                @Override
+                                public void onClick(View v) {
+                                    detachBLE();
+                                }
+                            });
+                        }
+                    }
+                });
+            }, null);
+        } catch (Exception e) {
+            Log.e(TAG, "onCreate: ", e);
+//                    Toast.makeText(mainActivity, e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
+    }
+
+
+    public static abstract class OnEngineStartListener {
+        abstract void run () ;
+
+        OnEngineStartListener () {
+            engineStartListeners.add(this);
+        }
+    }
+
+
+    private static final int SELECT_DEVICE_REQUEST_CODE = 100000;
+
+
+    // ==== additional restored from HEAD ====
     public int [] safeAudioDevices = {
             AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
             AudioDeviceInfo.TYPE_AUX_LINE,
@@ -4990,17 +7865,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             AudioDeviceInfo.TYPE_WIRED_HEADSET
     } ;
 
-    public boolean isHeadphonesPlugged(){
-        AudioManager audioManager = (AudioManager)getSystemService(Context.AUDIO_SERVICE);
-        AudioDeviceInfo[] audioDevices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS);
-        for(AudioDeviceInfo deviceInfo : audioDevices){
-            if(Arrays.stream(safeAudioDevices).anyMatch(x -> x == deviceInfo.getType())){
-                return true;
-            }
-        }
-
-        return false;
-    }
 
     public static void setAudioDevice () {
         AudioDeviceInfo[] audioDevicesInput, audioDevicesOutput ;
@@ -5163,272 +8027,13 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         builder.show();
     }
 
+
     public static void about () {
         Intent intent = new Intent(mainActivity, About.class);
         mainActivity.startActivity(intent);
 
     }
 
-    public void createTextureView() {
-        Log.d(TAG, "createTextureView: creating surface");
-        rack.videoTexture = (TextureView) findViewById(R.id.video_texture);
-        rack.videoTexture.setSurfaceTextureListener(this);
-        if (rack.videoTexture.isAvailable()) {
-            onSurfaceTextureAvailable(rack.videoTexture.getSurfaceTexture(),
-                    rack.videoTexture.getWidth(), rack.videoTexture.getHeight());
-
-        }
-    }
-
-    public void onSurfaceTextureAvailable(SurfaceTexture surface,
-                                          int width, int height) {
-//        createNativeCamera();
-
-//        resizeTextureView(width, height);
-//        surface.setDefaultBufferSize(cameraPreviewSize_.getWidth(),
-//                cameraPreviewSize_.getHeight());
-//        surface_ = new Surface(surface);
-//        surfaceTexture = surface;
-//        camera2.createCameraPreview();
-//        camera2.updatePreview();
-
-//        onPreviewSurfaceCreated(ndkCamera_, surface_);
-    }
-    public void onSurfaceTextureSizeChanged(SurfaceTexture surface,
-                                            int width, int height) {
-    }
-
-    public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
-//        onPreviewSurfaceDestroyed(ndkCamera_, surface_);
-//        deleteCamera(ndkCamera_, surface_);
-//        ndkCamera_ = 0;
-        surface_ = null;
-        return true;
-    }
-
-    public void onSurfaceTextureUpdated(SurfaceTexture surface) {
-    }
-
-
-    public void RequestCamera() {
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA) !=
-                PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(
-                    this,
-                    new String[]{Manifest.permission.CAMERA},
-                    PERMISSION_REQUEST_CODE_CAMERA);
-            return;
-        }
-        createTextureView();
-    }
-
-    void setTextureTransform(CameraCharacteristics characteristics) {
-        Size previewSize = getPreviewSize(characteristics);
-        int width = previewSize.getWidth();
-        int height = previewSize.getHeight();
-        int sensorOrientation = getCameraSensorOrientation(characteristics);
-        // Indicate the size of the buffer the texture should expect
-//        rack.videoTexture.getSurfaceTexture().setDefaultBufferSize(width, height);
-        // Save the texture dimensions in a rectangle
-        RectF viewRect = new RectF(0,0, rack.videoTexture.getWidth(), rack.videoTexture.getHeight());
-        // Determine the rotation of the display
-        float rotationDegrees = 0;
-        try {
-            rotationDegrees = (float)getDisplayRotation();
-        } catch (Exception ignored) {
-        }
-        float w, h;
-        if ((sensorOrientation - rotationDegrees) % 180 == 0) {
-            w = width;
-            h = height;
-        } else {
-            // Swap the width and height if the sensor orientation and display rotation don't match
-            w = height;
-            h = width;
-        }
-        float viewAspectRatio = viewRect.width()/viewRect.height();
-        float imageAspectRatio = w/h;
-        final PointF scale;
-        // This will make the camera frame fill the texture view, if you'd like to fit it into the view swap the "<" sign for ">"
-        if (viewAspectRatio < imageAspectRatio) {
-            // If the view is "thinner" than the image constrain the height and calculate the scale for the texture width
-            scale = new PointF((viewRect.height() / viewRect.width()) * ((float) height / (float) width), 1f);
-        } else {
-            scale = new PointF(1f, (viewRect.width() / viewRect.height()) * ((float) width / (float) height));
-        }
-        if (rotationDegrees % 180 != 0) {
-            // If we need to rotate the texture 90º we need to adjust the scale
-            float multiplier = viewAspectRatio < imageAspectRatio ? w/h : h/w;
-            scale.x *= multiplier;
-            scale.y *= multiplier;
-        }
-
-        Matrix matrix = new Matrix();
-        // Set the scale
-        matrix.setScale(scale.x, scale.y, viewRect.centerX(), viewRect.centerY());
-        if (rotationDegrees != 0) {
-            // Set rotation of the device isn't upright
-            matrix.postRotate(0 - rotationDegrees, viewRect.centerX(), viewRect.centerY());
-        }
-        // Transform the texture
-        rack.videoTexture.setTransform(matrix);
-    }
-
-    int getDisplayRotation() {
-        switch (rack.videoTexture.getDisplay().getRotation()) {
-            case Surface.ROTATION_0:
-            default:
-                return 0;
-            case Surface.ROTATION_90:
-                return  90;
-            case Surface.ROTATION_180:
-                return  180;
-            case Surface.ROTATION_270:
-                return 270;
-        }
-    }
-
-    Size getPreviewSize(CameraCharacteristics characteristics) {
-        StreamConfigurationMap map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
-        Size[] previewSizes = map.getOutputSizes(SurfaceTexture.class);
-        // TODO: decide on which size fits your view size the best
-        return previewSizes[0];
-    }
-
-    int getCameraSensorOrientation(CameraCharacteristics characteristics) {
-        Integer cameraOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);
-        return (360 - (cameraOrientation != null ? cameraOrientation : 0)) % 360;
-    }
-
-    public static void pushToVideo (float [] data, int nframes) {
-//        Log.d(TAG, String.format ("%d: %f - %f", nframes, data [0], data [nframes - 1]));
-        if (! mainActivity.videoRecording || ! mainActivity.camera2.mMuxerStarted)
-            return;
-
-        /*
-        ByteBuffer buffer = ByteBuffer.allocate(nframes*2);
-        for (int i = 0 ; i < nframes ; i ++)
-            buffer.putChar(data [i]);
-
-        MediaCodec.BufferInfo bufferInfo = new MediaCodec.BufferInfo();
-
-        bufferInfo.set(0, nframes, mainActivity.camera2.timestamp.get(), 0);
-        mainActivity.camera2.mMuxer.writeSampleData(mainActivity.camera2.audioTrackIndex, buffer, bufferInfo);
-
-         */
-
-        AVBuffer buffer = new AVBuffer();
-        buffer.size = nframes;
-        buffer.bytes = data.clone();
-
-        try {
-            avBuffer.put(buffer);
-        } catch (InterruptedException e) {
-            Log.e(TAG, "pushToVideo: error adding avbuffer to queue", e);
-            throw new RuntimeException(e);
-        }
-    }
-
-    private static long computePresentationTimeNsec(long frameIndex, int sampleRate) {
-        final long ONE_BILLION = 1000000000;
-        return frameIndex * ONE_BILLION / sampleRate;
-    }
-
-    void startDemoRecord () {
-        SimpleDateFormat formatter = new SimpleDateFormat("dd-MM-yyyy_HH.mm.ss");
-        Date date = new Date();
-        mainActivity.lastRecordedFileName = formatter.format(date);
-        mainActivity.lastRecordedFileName = mainActivity.dir.getAbsolutePath() + "/" + mainActivity.lastRecordedFileName  + ".wav";
-
-        try {
-            fileOutputStream = new FileOutputStream(mainActivity.lastRecordedFileName);
-        } catch (IOException e) {
-            fileOutputStream = null ;
-            dataOutputStream = null ;
-            throw new RuntimeException(e);
-        }
-
-        dataOutputStream = new DataOutputStream(fileOutputStream);
-    }
-
-    void stopDemoRecord () {
-        if (fileOutputStream == null)
-            return;
-        try {
-            dataOutputStream.close();
-            fileOutputStream.close();
-        } catch (IOException e) {
-            fileOutputStream = null ;
-            throw new RuntimeException(e);
-        }
-
-        fileOutputStream = null ;
-        dataOutputStream = null ;
-    }
-
-    public static Bitmap getBitmapFromAsset(AssetManager mgr, String path) {
-        InputStream is = null;
-        Bitmap bitmap = null;
-        try {
-            is = mgr.open(path);
-            bitmap = BitmapFactory.decodeStream(is);
-        } catch (final IOException e) {
-            bitmap = null;
-        } finally {
-            if (is != null) {
-                try {
-                    is.close();
-                } catch (IOException ignored) {
-                }
-            }
-        }
-        return bitmap;
-    }
-
-    public static double rootMeanSquare(float[] nums) {
-        double sum = 0.0;
-        for (double num : nums)
-            sum += num * num;
-        return Math.sqrt(sum / nums.length);
-    }
-
-    public static void cameraTest () {
-        SensorManager sensorManager;
-        final float[] rotationMatrix = new float[9];
-        float[] accelerometerReading = new float[9];
-        float[] magnetometerReading = new float[9];
-        SensorManager.getRotationMatrix(rotationMatrix, null,
-                accelerometerReading, magnetometerReading);
-
-        final float[] orientationAngles = new float[3];
-        SensorManager.getOrientation(rotationMatrix, orientationAngles);
-
-        Log.d(TAG, String.format ("[orientation]: %f %f %f",
-                orientationAngles[0],
-                orientationAngles[1],
-                orientationAngles[2]
-                ));
-    }
-
-    public static void setSampleRateDisplay (int sampleRateDisplay, boolean lowLatency) {
-        Log.d(TAG, String.format ("[audio]: %d (%b)", sampleRateDisplay, lowLatency));
-//        double inputLatency = AudioEngine.getLatency(true), outputLatency = AudioEngine.getLatency(false) ;
-
-        mainActivity.handler.post(() -> {
-            srLayout.setVisibility(VISIBLE);
-            mainActivity.sampleRateLabel.setText(String.format("%dkHz", sampleRateDisplay));
-            if (lowLatency)
-                mainActivity.latencyWarnLogo.setVisibility(GONE);
-            else
-                mainActivity.latencyWarnLogo.setVisibility(VISIBLE);
-
-            while (engineStartListeners.size() > 0) {
-                OnEngineStartListener onEngineStartListener = engineStartListeners.poll();
-                if (onEngineStartListener != null)
-                    onEngineStartListener.run();
-            }
-        });
-    }
 
     public static void lowLatencyDialog () {
         AlertDialog.Builder builder = new AlertDialog.Builder(mainActivity);
@@ -5439,723 +8044,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         builder.create().show();
     }
 
-    /*  I think this is pretty amazing.
-        Am I OOP yet?
-     */
-    public static abstract class OnEngineStartListener {
-        abstract void run () ;
-
-        OnEngineStartListener () {
-            engineStartListeners.add(this);
-        }
-    }
-
-    public String getFileContent(Uri uri) {
-        InputStreamReader inputStreamReader = null;
-        try {
-            if (!uri.toString().startsWith("/"))
-                inputStreamReader = new InputStreamReader(getContentResolver().openInputStream(uri));
-            else {
-                inputStreamReader = new InputStreamReader(new FileInputStream(new File(String.valueOf(uri))));
-            }
-
-        } catch (FileNotFoundException e) {
-            Log.e(TAG, "getFileContent: ", e);
-//            throw new RuntimeException(e);
-            return null;
-        }
-
-        BufferedReader bufferedReader = new BufferedReader(inputStreamReader);
-        StringBuilder sb = new StringBuilder();
-        String s;
-        while (true) {
-            try {
-                if (!((s = bufferedReader.readLine()) != null)) break;
-            } catch (IOException e) {
-                Log.e(TAG, "getFileContent: ", e);
-                throw new RuntimeException(e);
-            }
-
-            sb.append(s);
-        }
-        String fileContent = sb.toString();
-        return fileContent;
-    }
-
-    public void unzipNAMModel (String dir, Uri uri) {
-        InputStream inputStream = null;
-        String basename = null ;
-        try {
-            inputStream = getContentResolver().openInputStream(uri);
-        } catch (FileNotFoundException e) {
-            MainActivity.alert("Cannot load model", e.getMessage());
-            Log.e(TAG, "onActivityResult: ", e);
-        }
-        try {
-            basename = SkinEngine.unzip(inputStream, dir);
-        } catch (IOException e) {
-            MainActivity.alert("Cannot unzip model", e.getMessage());
-            Log.e(TAG, "onActivityResult: ", e);
-        }
-
-        toast("Successfully extracted Model " + basename);
-    }
-
-    /**
-     * Load a TONE3000-downloaded model file into a NAM/IR-capable slot.
-     * Restored from lastworks build 2026-09-11 22:50 (method size 3637B in dex).
-     */
-    public boolean loadTone3000Model(java.io.File modelFile,
-            com.kancrutt.gigginggear.tone3000.model.ModelDto model,
-            com.kancrutt.gigginggear.tone3000.model.ToneDto tone) {
-        if (modelFile == null || !modelFile.exists()) {
-            toast("Model file missing");
-            return false;
-        }
-        String fmt;
-        if (tone.format != null) fmt = tone.format.toLowerCase();
-        else fmt = "nam";
-        boolean isNam = fmt.contains("nam") || fmt.contains("aida") || model.isNam();
-        boolean isIr = fmt.contains("ir") || fmt.contains("wav") || model.isIr();
-        boolean isA2Direct = false;
-        int targetSlot = -1;
-        try {
-            int sel = dataAdapter.getSelectedPosition();
-            int total = AudioEngine.getActivePlugins();
-            if (sel >= 0 && sel < total) {
-                boolean canUse = false;
-                if (isNam) {
-                    try {
-                        if (canLoadNamModel(sel)) canUse = true;
-                    } catch (Exception ignored) {}
-                }
-                if (isIr) {
-                    try {
-                        if (canLoadIrModel(sel)) canUse = true;
-                    } catch (Exception ignored) {}
-                }
-                if (canUse) targetSlot = sel;
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "loadTone3000Model failed", e);
-            toast("Failed to load model: " + e.getMessage());
-            return false;
-        }
-        if (targetSlot < 0) {
-            try {
-                isA2Direct = model != null && "2".equals(model.architectureVersion);
-            } catch (Exception e) {
-                Log.e(TAG, "loadTone3000Model failed", e);
-                toast("Failed to load model: " + e.getMessage());
-                return false;
-            }
-        }
-        String loaderName;
-        if (isIr) loaderName = "Simple IR Loader";
-        else if (isA2Direct) loaderName = "Neural Amp Modeler NG";
-        else loaderName = "Neural Amp Modeler";
-        if (isIr) {
-            String[] irCandidates = {"Simple IR Loader", "Impulse Loader", "Neural Amp Modeler"};
-            for (String cand : irCandidates) {
-                try {
-                    int before = AudioEngine.getActivePlugins();
-                    try {
-                        addPluginByName(cand);
-                    } catch (Exception ignored) {}
-                    try {
-                        if (AudioEngine.getActivePlugins() > before) {
-                            targetSlot = AudioEngine.getActivePlugins() - 1;
-                            break;
-                        }
-                    } catch (Exception ignored) {}
-                } catch (Exception ignored) {}
-            }
-        } else {
-            try {
-                int before = AudioEngine.getActivePlugins();
-                addPluginByName(loaderName);
-                if (AudioEngine.getActivePlugins() > before) {
-                    targetSlot = AudioEngine.getActivePlugins() - 1;
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "loadTone3000Model failed", e);
-                toast("Failed to load model: " + e.getMessage());
-                return false;
-            }
-        }
-        if (targetSlot < 0 || targetSlot >= AudioEngine.getActivePlugins()) {
-            try {
-                toast("No slot available for model");
-            } catch (Exception e) {
-                Log.e(TAG, "loadTone3000Model failed", e);
-                toast("Failed to load model: " + e.getMessage());
-                return false;
-            }
-            return false;
-        }
-        try {
-            if (isNam && !canLoadNamModel(targetSlot)) {
-                Log.w(TAG, "target slot not NAM-capable but trying anyway: " + targetSlot);
-            }
-            if (isIr && isNam) {
-                Log.d(TAG, "format ambiguous nam/ir, using nam path for " + tone.title);
-                isIr = false;
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "loadTone3000Model failed", e);
-            toast("Failed to load model: " + e.getMessage());
-            return false;
-        }
-        try {
-            if (modelFile.length() == 0) {
-                try {
-                    toast("Downloaded file is empty");
-                } catch (Exception e) {
-                    Log.e(TAG, "loadTone3000Model failed", e);
-                    toast("Failed to load model: " + e.getMessage());
-                    return false;
-                }
-                return false;
-            }
-            String destPath = modelFile.getAbsolutePath();
-            try {
-                Log.i(TAG, "TONE3000 load: tone=" + tone.title + " arch=" + model.architectureVersion
-                        + " file=" + destPath + " size=" + modelFile.length());
-            } catch (Exception ignored) {}
-            if (model.architectureVersion != null && model.architectureVersion.equals("2")) {
-                try {
-                    String head = new String(java.nio.file.Files.readAllBytes(modelFile.toPath()),
-                            java.nio.charset.StandardCharsets.UTF_8);
-                    if (head.length() > 800) head = head.substring(0, 800);
-                    Log.d(TAG, "TONE3000 A2 head: " + head.replace("\n", " "));
-                } catch (Exception ignored) {}
-            }
-            String err = AudioEngine.setPluginFilename(destPath, targetSlot);
-            if (err != null) {
-                Log.w(TAG, "TONE3000 setPluginFilename failed (first try "
-                        + AudioEngine.getActivePluginName(targetSlot) + "): " + err
-                        + " arch=" + model.architectureVersion);
-                boolean isA2 = "2".equals(model.architectureVersion);
-                if (isA2Direct && isA2) {
-                    String[] fallbackLoaders = {"Neural Amp Modeler NG", "AIDA-X", "Neural Amp Modeler"};
-                    for (String fb : fallbackLoaders) {
-                        try {
-                            String curName = AudioEngine.getActivePluginName(targetSlot);
-                            if (fb.equals(curName)) continue;
-                            Log.i(TAG, "TONE3000 A2 fallback: trying loader " + fb);
-                            int before = AudioEngine.getActivePlugins();
-                            addPluginByName(fb);
-                            if (AudioEngine.getActivePlugins() != before + 1) {
-                                Log.w(TAG, "TONE3000 A2 fallback: add failed for " + fb + ", trying next");
-                                continue;
-                            }
-                            int trial = AudioEngine.getActivePlugins() - 1;
-                            if (!canLoadNamModel(trial)) {
-                                safeDeletePlugin(trial);
-                                continue;
-                            }
-                            String err2 = AudioEngine.setPluginFilename(destPath, trial);
-                            if (err2 == null) {
-                                if (!safeDeletePlugin(targetSlot)) {
-                                    safeDeletePlugin(trial);
-                                    continue;
-                                }
-                                int last = AudioEngine.getActivePlugins() - 1;
-                                try {
-                                    AudioEngine.movePlugin(last, targetSlot);
-                                } catch (Throwable t) {
-                                    Log.w(TAG, "movePlugin failed after fallback add", t);
-                                }
-                                Log.i(TAG, "TONE3000 A2 fallback succeeded with " + fb + " at slot " + targetSlot);
-                                err = null;
-                                break;
-                            }
-                            Log.w(TAG, "TONE3000 fallback " + fb + " failed: " + err2);
-                            safeDeletePlugin(trial);
-                        } catch (Exception fe) {
-                            Log.w(TAG, "fallback " + fb + " exception", fe);
-                        }
-                    }
-                }
-            }
-            if (err != null) {
-                if (err.toLowerCase().contains("unsupported") || err.toLowerCase().contains("format")
-                        || err.toLowerCase().contains("nam")) {
-                    if ("2".equals(model.architectureVersion)) {
-                        toast("NAM A2 not supported by this loader \u2014 try updating the app or use A1 model");
-                    } else {
-                        toast("Unsupported format: " + fmt);
-                    }
-                } else {
-                    toast("Model load failed: " + err);
-                    return false;
-                }
-                try {
-                    AudioEngine.deletePlugin(targetSlot);
-                    shiftT3kMetaOnDelete(targetSlot);
-                } catch (Exception ignored) {}
-                try {
-                    if (signalChainCanvas != null) {
-                        signalChainCanvas.clearT3kBadges();
-                        signalChainCanvas.post(() -> {
-                            signalChainCanvas.loadFromActivePlugins(true);
-                            signalChainCanvas.postDelayed(() ->
-                                    signalChainCanvas.reapplyT3kBadgesFromMeta(t3kBlockMeta), 120);
-                        });
-                    }
-                } catch (Exception e) {
-                    Log.e(TAG, "loadTone3000Model failed", e);
-                    toast("Failed to load model: " + e.getMessage());
-                    return false;
-                }
-                return false;
-            }
-            java.io.File metaFile = new java.io.File(modelFile.getParentFile(),
-                    modelFile.getName() + ".t3k.json");
-            JSONObject meta = new JSONObject();
-            meta.put("tone3000ToneId", String.valueOf(tone.id));
-            meta.put("tone3000ModelId", String.valueOf(model.id));
-            meta.put("tone3000Creator", tone.userUsername != null ? tone.userUsername : "");
-            meta.put("tone3000ToneTitle", tone.title);
-            meta.put("tone3000Format", tone.format);
-            meta.put("tone3000GearType", tone.gear);
-            meta.put("tone3000SourceUrl", model.modelUrl);
-            try (java.io.FileOutputStream fos = new java.io.FileOutputStream(metaFile)) {
-                fos.write(meta.toString(2).getBytes(java.nio.charset.StandardCharsets.UTF_8));
-            } catch (Exception e) {
-                Log.w(TAG, "failed to persist t3k meta", e);
-            }
-            t3kBlockMeta.put(targetSlot, meta);
-            t3kModelPath.put(targetSlot, destPath);
-            int badgeSlot = targetSlot;
-            if (signalChainCanvas != null) {
-                signalChainCanvas.post(() -> {
-                    signalChainCanvas.loadFromActivePlugins();
-                    signalChainCanvas.postDelayed(() -> {
-                        try {
-                            signalChainCanvas.setT3kBadge(badgeSlot, true);
-                        } catch (Exception ignored) {}
-                        signalChainCanvas.invalidate();
-                    }, 120);
-                });
-            }
-            if (dataAdapter != null) dataAdapter.notifyDataSetChanged();
-            String loaded = AudioEngine.getPluginLoadedFileName(targetSlot);
-            boolean engineConfirmed = loaded != null && !loaded.isEmpty()
-                    && (loaded.equals(destPath) || loaded.endsWith(modelFile.getName()));
-            boolean active = AudioEngine.getActivePluginEnabled(targetSlot);
-            try {
-                if (engineConfirmed) {
-                    Log.i(TAG, "TONE3000 ENGINE VERIFIED: slot=" + targetSlot + " file=" + loaded
-                            + " active=" + active + " arch=" + model.architectureVersion + " format=" + fmt);
-                    toast("Loaded TONE3000: " + tone.title + " \u2192 " + model.name
-                            + (active ? "" : " (bypassed)"));
-                } else {
-                    Log.e(TAG, "TONE3000 ENGINE VERIFY FAILED: expected=" + destPath + " got=" + loaded);
-                    toast("Model attached but engine read-back failed \u2014 check log");
-                }
-            } catch (Throwable ve) {
-                Log.w(TAG, "engine verification unavailable, assuming loaded", ve);
-                toast("Loaded TONE3000: " + tone.title + " \u2192 " + model.name);
-            }
-            return true;
-        } catch (Exception e) {
-            Log.e(TAG, "loadTone3000Model failed", e);
-            toast("Failed to load model: " + e.getMessage());
-            return false;
-        }
-    }
-
-    // ---- TONE3000 integration (restored from lastworks build 2026-09-11 22:50) ----
-
-    @Override
-    protected void onNewIntent(Intent intent) {
-        super.onNewIntent(intent);
-        setIntent(intent);
-        handleTone3000Callback(intent);
-    }
-
-    private void handleTone3000Callback(Intent intent) {
-        if (intent == null || intent.getData() == null) return;
-        android.net.Uri data = intent.getData();
-        if (data == null) return;
-        String scheme = data.getScheme();
-        String host = data.getHost();
-        boolean isT3k = data.toString().contains("tone3000/callback")
-                || ("gigginggear".equals(scheme) && "tone3000".equals(host))
-                || ("com.kancrutt.gigginggear".equals(scheme) && "tone3000".equals(host));
-        if (!isT3k) return;
-        Log.i("Amp Rack MainActivity", "TONE3000 callback: " + data);
-        try {
-            com.kancrutt.gigginggear.tone3000.Tone3000AuthManager auth =
-                    com.kancrutt.gigginggear.tone3000.Tone3000AuthManager.get(this);
-            com.kancrutt.gigginggear.tone3000.Tone3000AuthManager.CallbackResult cb = auth.handleCallback(data);
-            if (cb.canceled) {
-                if (cb.code != null) {
-                    exchangeTone3000Code(cb.code, null);
-                } else {
-                    toast("TONE3000 selection canceled");
-                }
-                return;
-            }
-            if (cb.error != null) {
-                toast("TONE3000 error: " + cb.error);
-                return;
-            }
-            exchangeTone3000Code(cb.code, cb.toneId);
-        } catch (com.kancrutt.gigginggear.tone3000.model.ApiException e) {
-            Log.e("Amp Rack MainActivity", "TONE3000 callback failed", e);
-            if ("state_mismatch".equals(e.errorCode)) {
-                toast("TONE3000 security check failed \u2014 please try again");
-            } else if ("missing_code".equals(e.errorCode)) {
-                toast("TONE3000 callback missing code");
-            } else {
-                toast("TONE3000 error: " + e.getMessage());
-            }
-        } catch (Exception e) {
-            Log.e("Amp Rack MainActivity", "TONE3000 callback exception", e);
-            toast("TONE3000 callback failed: " + e.getMessage());
-        }
-    }
-
-    private void exchangeTone3000Code(String code, String toneId) {
-        ProgressDialog pd = new ProgressDialog(this);
-        pd.setMessage("Connecting to TONE3000\u2026");
-        pd.setIndeterminate(true);
-        pd.setCancelable(false);
-        pd.show();
-        new Thread(() -> {
-            try {
-                com.kancrutt.gigginggear.tone3000.Tone3000AuthManager.get(this).exchangeCode(this, code);
-                runOnUiThread(() -> {
-                    try {
-                        pd.dismiss();
-                    } catch (Exception ignored) {}
-                    if (toneId != null && !toneId.isEmpty()) {
-                        com.kancrutt.gigginggear.tone3000.ui.Tone3000ToneDetailSheet sheet =
-                                com.kancrutt.gigginggear.tone3000.ui.Tone3000ToneDetailSheet.newInstance(toneId);
-                        sheet.show(getSupportFragmentManager(), "t3k_detail");
-                    } else {
-                        toast("TONE3000 connected \u2014 tap + to browse tones");
-                    }
-                });
-            } catch (com.kancrutt.gigginggear.tone3000.model.ApiException e) {
-                runOnUiThread(() -> {
-                    try {
-                        pd.dismiss();
-                    } catch (Exception ignored) {}
-                    Log.e("Amp Rack MainActivity", "TONE3000 token exchange failed", e);
-                    if (e.httpCode == 400) {
-                        toast("TONE3000 auth expired \u2014 please try again");
-                    } else {
-                        toast("TONE3000 auth failed: " + e.getMessage());
-                    }
-                });
-            } catch (Exception e) {
-                runOnUiThread(() -> {
-                    try {
-                        pd.dismiss();
-                    } catch (Exception ignored) {}
-                    toast("TONE3000 auth failed: " + e.getMessage());
-                });
-            }
-        }).start();
-    }
-
-    public JSONObject getTone3000MetaForSlot(int slot) {
-        JSONObject v = t3kBlockMeta.get(slot);
-        if (v != null) return v;
-        String p = t3kModelPath.get(slot);
-        if (p != null) {
-            try {
-                java.io.File meta = new java.io.File(new java.io.File(p).getParentFile(),
-                        new java.io.File(p).getName() + ".t3k.json");
-                if (meta.exists()) {
-                    String s = new String(java.nio.file.Files.readAllBytes(meta.toPath()),
-                            java.nio.charset.StandardCharsets.UTF_8);
-                    return new JSONObject(s);
-                }
-            } catch (Exception ignored) {}
-        }
-        return null;
-    }
-
-    public String getTone3000ModelPathForSlot(int slot) {
-        return t3kModelPath.get(slot);
-    }
-
-    public java.util.Set<Integer> getTone3000SlotIds() {
-        return new java.util.HashSet<>(t3kBlockMeta.keySet());
-    }
-
-    public boolean isTone3000Slot(int slot) {
-        return getTone3000MetaForSlot(slot) != null;
-    }
-
-    public void handleMissingTone3000Model(LocalPresetManager.PluginItem item, int slot) {
-        String toneId = item.tone3000ToneId;
-        String title = item.tone3000ToneTitle != null ? item.tone3000ToneTitle
-                : (item.name != null ? item.name : "TONE3000 model");
-        new AlertDialog.Builder(this)
-                .setTitle("TONE3000 model missing")
-                .setMessage("TONE3000 model is not downloaded on this device.\n\n" + title
-                        + (item.tone3000Creator != null ? " \u2014 @" + item.tone3000Creator : "")
-                        + "\n\nDownload again or choose a replacement.")
-                .setPositiveButton("Download again", (d, w) -> {
-                    if (toneId != null && !toneId.isEmpty()) {
-                        com.kancrutt.gigginggear.tone3000.ui.Tone3000ToneDetailSheet sheet =
-                                com.kancrutt.gigginggear.tone3000.ui.Tone3000ToneDetailSheet.newInstance(toneId);
-                        sheet.show(getSupportFragmentManager(), "t3k_detail_rereload");
-                    } else {
-                        com.kancrutt.gigginggear.tone3000.ui.Tone3000EntrySheet.newInstance()
-                                .show(getSupportFragmentManager(), "t3k_entry");
-                    }
-                })
-                .setNeutralButton("Choose replacement", (d, w) -> {
-                    com.kancrutt.gigginggear.tone3000.ui.Tone3000EntrySheet.newInstance()
-                            .show(getSupportFragmentManager(), "t3k_entry");
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
-    }
-
-    public void deletePluginAndSyncTone3000(int slot) {
-        int total = AudioEngine.getActivePlugins();
-        if (slot < 0 || slot >= total) {
-            Log.w("Amp Rack MainActivity", "deletePluginAndSyncTone3000: stale slot " + slot
-                    + " of " + total + ", skipping");
-            return;
-        }
-        try {
-            AudioEngine.deletePlugin(slot);
-        } catch (Exception e) {
-            Log.e("Amp Rack MainActivity", "deletePlugin failed", e);
-            return;
-        }
-        shiftT3kMetaOnDelete(slot);
-        if (signalChainCanvas != null) {
-            signalChainCanvas.clearT3kBadges();
-            signalChainCanvas.post(() -> {
-                signalChainCanvas.loadFromActivePlugins(true);
-                signalChainCanvas.postDelayed(() ->
-                        signalChainCanvas.reapplyT3kBadgesFromMeta(t3kBlockMeta), 120);
-            });
-        }
-    }
-
-    private void shiftT3kMetaOnDelete(int deletedSlot) {
-        Map<Integer, JSONObject> newMeta = new HashMap<>();
-        Map<Integer, String> newPath = new HashMap<>();
-        for (Map.Entry<Integer, JSONObject> e : t3kBlockMeta.entrySet()) {
-            int k = e.getKey();
-            if (k == deletedSlot) continue;
-            int nk = k > deletedSlot ? k - 1 : k;
-            newMeta.put(nk, e.getValue());
-        }
-        for (Map.Entry<Integer, String> e : t3kModelPath.entrySet()) {
-            int k = e.getKey();
-            if (k == deletedSlot) continue;
-            int nk = k > deletedSlot ? k - 1 : k;
-            newPath.put(nk, e.getValue());
-        }
-        t3kBlockMeta.clear();
-        t3kBlockMeta.putAll(newMeta);
-        t3kModelPath.clear();
-        t3kModelPath.putAll(newPath);
-    }
-
-    private void shiftT3kMetaOnMove(int from, int to) {
-        if (from == to || from < 0 || to < 0) return;
-        int lo = Math.min(from, to);
-        int hi = Math.max(from, to);
-        Map<Integer, JSONObject> newMeta = new HashMap<>();
-        Map<Integer, String> newPath = new HashMap<>();
-        for (Map.Entry<Integer, JSONObject> e : t3kBlockMeta.entrySet()) {
-            int k = e.getKey();
-            if (k == from) newMeta.put(to, e.getValue());
-            else if (k >= lo && k <= hi) newMeta.put(k + (to > from ? -1 : 1), e.getValue());
-            else newMeta.put(k, e.getValue());
-        }
-        for (Map.Entry<Integer, String> e : t3kModelPath.entrySet()) {
-            int k = e.getKey();
-            if (k == from) newPath.put(to, e.getValue());
-            else if (k >= lo && k <= hi) newPath.put(k + (to > from ? -1 : 1), e.getValue());
-            else newPath.put(k, e.getValue());
-        }
-        t3kBlockMeta.clear();
-        t3kBlockMeta.putAll(newMeta);
-        t3kModelPath.clear();
-        t3kModelPath.putAll(newPath);
-    }
-
-    private boolean canLoadIrModel(int plugin) {
-        boolean ok = false;
-        if (plugin >= 0) {
-            try {
-                if (plugin >= AudioEngine.getActivePlugins()) return ok;
-                String n = AudioEngine.getActivePluginName(plugin);
-                if (n == null) return ok;
-                String ln = n.toLowerCase();
-                CategoryHelper.Category c = CategoryHelper.getCategory(n);
-                if (ln.contains("ir") || ln.contains("convolution") || ln.contains("reverb")
-                        || c == CategoryHelper.Category.CABINET) ok = true;
-                return ok;
-            } catch (Throwable t) {
-                return ok;
-            }
-        }
-        return ok;
-    }
-
-    private boolean safeDeletePlugin(int slot) {
-        try {
-            int total = AudioEngine.getActivePlugins();
-            if (slot >= 0 && slot < total) {
-                AudioEngine.deletePlugin(slot);
-                return true;
-            }
-            Log.w("Amp Rack MainActivity", "safeDeletePlugin: stale slot " + slot + " of " + total + ", skipping");
-            return false;
-        } catch (Exception e) {
-            Log.e("Amp Rack MainActivity", "safeDeletePlugin failed", e);
-            return false;
-        }
-    }
-
-    public void manageNAMModels (Spinner spinner, String dir) {
-        DocumentFile root = DocumentFile.fromFile(new File(dir));
-        DocumentFile [] files = root.listFiles() ;
-        ArrayList <String> models = new ArrayList<>();
-        for (DocumentFile file: files) {
-            Log.d(TAG, String.format ("%s: %s", file.getName(), file.getUri()));
-            models.add(file.getName());
-        }
-
-        ArrayList <Integer> selectedItems = new ArrayList();
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        // Set the dialog title.
-        builder.setTitle("Manage NAM Models")
-                // Specify the list array, the items to be selected by default (null for
-                // none), and the listener through which to receive callbacks when items
-                // are selected.
-                .setMultiChoiceItems(models.toArray(new CharSequence[models.size()]), null,
-                        new DialogInterface.OnMultiChoiceClickListener() {
-                            @Override
-                            public void onClick(DialogInterface dialog, int which,
-                                                boolean isChecked) {
-                                if (isChecked) {
-                                    // If the user checks the item, add it to the selected
-                                    // items.
-                                    selectedItems.add(which);
-                                } else if (selectedItems.contains(which)) {
-                                    // If the item is already in the array, remove it.
-                                    selectedItems.remove(which);
-                                }
-                            }
-                        });
-
-        builder.setNegativeButton("Cancel", null)
-                .setPositiveButton("Delete Selected", new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        AlertDialog.Builder builder1 = new AlertDialog.Builder(mainActivity);
-                        builder1.setTitle("Delete selected models?");
-                        builder1.setMessage("This step cannot be undone.");
-                        builder1.setPositiveButton("Delete selected", new DialogInterface.OnClickListener() {
-                            public void onClick(DialogInterface dialog, int id) {
-//                                Log.d(TAG, String.format ("delete: %s", selectedItems.toString()));
-                                for (int s: selectedItems) {
-                                    new File(dir +"/"+ models.get(s)).delete();
-                                }
-
-                                setSpinnerFromDir(spinner, dir, null);
-                            }
-                        });
-
-                        builder1.setNegativeButton("Cancel", null);
-                        builder1.show();
-                    }
-                }).setNeutralButton("Delete All", new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        AlertDialog.Builder builder1 = new AlertDialog.Builder(mainActivity);
-                        builder1.setTitle("Delete all models?");
-                        builder1.setMessage("This step cannot be undone.");
-                        builder1.setPositiveButton("Delete all", new DialogInterface.OnClickListener() {
-                            public void onClick(DialogInterface dialog, int id) {
-//                                Log.d(TAG, String.format ("delete: %s", selectedItems.toString()));
-                                for (String s: models) {
-                                    new File(dir + "/" + s).delete();
-                                }
-                                setSpinnerFromDir(spinner, dir, null);
-                            }
-                        });
-
-                        builder1.setNegativeButton("Cancel", null);
-                        builder1.show();
-                    }
-                });
-        builder.show();
-    }
-
-    public static int setSpinnerFromDir (Spinner spinner, String dir, String toSelect) {
-        if (spinner == null) {
-            return 0 ;
-        }
-
-        int selection = 0 ;
-        ArrayList <String> models = new ArrayList<>();
-        DocumentFile root = DocumentFile.fromFile(new File(dir));
-        DocumentFile [] files = root.listFiles() ;
-        int counter = 0 ;
-        for (DocumentFile file: files) {
-            Log.d(TAG, String.format ("%s: %s", file.getName(), file.getUri()));
-            models.add(file.getName());
-            if (toSelect != null && file.getName().equals(toSelect))
-                selection = counter ;
-            counter ++ ;
-        }
-
-        ArrayAdapter<String> adapter = new ArrayAdapter<String>(mainActivity,
-                android.R.layout.simple_spinner_item, models);
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spinner.setAdapter(adapter);
-        return selection;
-    }
-
-    public static void writeFile (String path, String text) {
-        try {
-            File file = new File(path);
-
-            if (!file.exists()) {
-                file.createNewFile();
-            }
-            FileWriter writer = new FileWriter(file);
-            writer.append(text);
-            writer.flush();
-            writer.close();
-        } catch (IOException e) {
-            Log.e(TAG, "writeFile: ", e);
-            toast(e.getMessage());
-        }
-    }
-
-    public static void getLatency () {
-        if (!mainActivity.running) {
-            Toast.makeText(context, "not running", Toast.LENGTH_SHORT).show();
-            Log.d(TAG, "getLatency: not running");
-            return;
-        }
-        
-        Toast.makeText(context,
-                String.format("%.0fms/%.0fms | %d/%d",
-                        AudioEngine.getLatency(true),
-                        AudioEngine.getLatency(false),
-                        AudioEngine.getBufferSizeInFrames(true),
-                        AudioEngine.getBufferSizeInFrames(false)
-                )
-                , Toast.LENGTH_LONG).show();
-    }
 
     public void addFavoritePreset (Map preset) {
         JSONObject jsonObject = new JSONObject(preset);
@@ -6164,12 +8052,14 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             writeFile(f.getPath(), jsonObject.toString());
     }
 
+
     public void removeFavoritePreset (Map preset) {
         File f = new File(new StringJoiner ("/").add(favPresetsDir).add (preset.get("name").toString()).toString());
         if (! f.delete()) {
             Toast.makeText(context, "Cannot remove preset " + preset.get("name"), Toast.LENGTH_SHORT).show();
         }
     }
+
 
     public static Map JSONtoMap (JSONObject j) {
         try {
@@ -6226,314 +8116,11 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         return map;
     }
 
-    public static void copy(File src, File dst) throws IOException {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            try (InputStream in = Files.newInputStream(src.toPath())) {
-                try (OutputStream out = Files.newOutputStream(dst.toPath())) {
-                    // Transfer bytes from in to out
-                    byte[] buf = new byte[1024];
-                    int len;
-                    while ((len = in.read(buf)) > 0) {
-                        out.write(buf, 0, len);
-                    }
-                }
-            }
-        }
-    }
-
-    private void copyFile(Uri pathFrom, Uri pathTo) throws IOException {
-        try (InputStream in = getContentResolver().openInputStream(pathFrom)) {
-            if(in == null) return;
-            try (OutputStream out = getContentResolver().openOutputStream(pathTo)) {
-                if(out == null) return;
-                // Transfer bytes from in to out
-                byte[] buf = new byte[1024];
-                int len;
-                while ((len = in.read(buf)) > 0) {
-                    out.write(buf, 0, len);
-                }
-            }
-        }
-    }
-
-    void setMidiControl (View view, int plugin, int control, MIDIControl.Type type, MIDIControl.Scope scope) {
-        Log.i(TAG, String.format(
-                "[set midi control] plugin: %d, control: %d",
-                plugin, control
-        ));
-
-        String channel = "";
-        String data1 = "";
-
-        MIDIControl old = null;
-        
-        for (MIDIControl midiControl: midiControls) {
-            Log.d(TAG, String.format ("[midi plugin check] %d: %d",
-                    midiControl.view.getId(), view.getId()
-                    ));
-
-            if (midiControl.view.getId() == view.getId()) {
-                old = midiControl ;
-                data1 = String.valueOf(midiControl.control);
-                channel = String.valueOf(midiControl.channel);
-                break ;
-            }
-        }
-
-        MIDIControl midiControl = new MIDIControl() ;
-        midiControl.plugin = plugin ;
-        midiControl.scope = scope ;
-        midiControl.type = type;
-//        if (scope == MIDIControl.Scope.GLOBAL) {
-//            midiControl.type = MIDIControl.Type.TOGGLE;
-//        }
-//        midiControl.control = control ;
-        midiControl.pluginControl = control ;
-        midiControl.view = view ;
-
-        midiLayout = (ConstraintLayout) getLayoutInflater().inflate(R.layout.midi_add_control, null);
-        ((EditText) midiLayout.findViewById(R.id.channel)).setText(channel);
-        ((EditText) midiLayout.findViewById(R.id.control)).setText(data1);
-
-        triggerMidiButton = midiLayout.findViewById(R.id.midi_trigger);
-
-        channelEdit = midiLayout.findViewById(R.id.channel) ;
-        controlEdit = midiLayout.findViewById(R.id.control) ;
-
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setView(midiLayout);
-        if (scope == MIDIControl.Scope.PLUGIN)
-            builder.setTitle("Set MIDI Control for " + AudioEngine.getActivePluginName(plugin) + " " + AudioEngine.getControlName(plugin, control));
-        else
-            builder.setTitle("Set MIDI Control");
-
-        MIDIControl finalOld = old;
-        builder.setPositiveButton("Save", new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                if (finalOld != null)
-                    midiControls.remove(finalOld);
-                String channel = ((EditText) midiLayout.findViewById(R.id.channel)).getText().toString();
-                String program = ((EditText) midiLayout.findViewById(R.id.control)).getText().toString();
-
-                int ch = -1 ;
-                int pr =  -1 ;
-
-                try {
-                    pr = Integer.parseInt(program);
-                    ch = Integer.parseInt(channel);
-                } catch (NumberFormatException e) {
-                    Log.e(TAG, "onDismiss: ", e);
-                    alert("Failed to set MIDI control", e.getMessage());
-                    return;
-                }
-
-                midiControl.channel = ch ;
-                midiControl.control = pr ;
-                midiControls.add(midiControl);
-
-                Toast.makeText(MainActivity.this, "MIDI control set successfully", Toast.LENGTH_SHORT).show();
-                Log.d(TAG, "[midi controls]: " + midiControls.toString());
-                if (scope == MIDIControl.Scope.GLOBAL) {
-                    saveGlobalMidi();
-                } else {
-                    saveActivePreset();
-                }
-            }
-        }) ;
-
-        builder.setNegativeButton("Cancel", null);
-
-        AlertDialog dialog = builder.create() ;
-
-        midiAddDialog = dialog ;
-        dialog.setOnDismissListener(new DialogInterface.OnDismissListener() {
-            @Override
-            public void onDismiss(DialogInterface dialog) {
-                Log.i(TAG, "onDismiss: midi add dialog set to null");
-                midiAddDialog = null ;
-            }
-        });
-
-        dialog.show();
-    }
-
-    void processMIDIMessage (int channel, int data1, int data2) {
-//        Log.d(TAG, "processMIDIMessage: process message " +
-//                String.format("%d %d %d", channel, data1, data2));
-        String msg = String.format(
-                "%d %d %d",
-                channel, data1, data2
-        );
-
-        mainActivity.runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                midiDisplay.setText(msg);
-
-                if (midiAddDialog != null && triggerMidiButton != null && triggerMidiButton.isChecked()) {
-                    EditText ed1 = ((EditText) midiAddDialog.findViewById(R.id.channel));
-                    if (ed1 != null)
-                        ed1.setText(String.valueOf(channel));
-                    EditText ed2 = ((EditText) midiAddDialog.findViewById(R.id.control));
-                    if (ed2 != null)
-                        ed2.setText(String.valueOf(data1));
-                }
-            }
-        });
-
-        for (MIDIControl midiControl: midiControls) {
-//            Log.i(TAG, "processMIDIMessage: probe midiControl " + midiControl);
-
-            if (midiControl.channel == channel && data1 == midiControl.control) {
-                midiControl.process(data2);
-                break ;
-            }
-        }
-    }
-
-    void loadGlobalMidi () {
-        Log.i(TAG, "loadGlobalMidi: loading settings");
-        String s = defaultSharedPreferences.getString("global_midi", null);
-        if (s == null) {
-            Log.i(TAG, "loadGlobalMidi: no saved settings");
-            return;
-        } else {
-            Log.i(TAG, "loadGlobalMidi: saved settings found " + s);
-        }
-
-        JSONArray jsonArray;
-        try {
-            jsonArray = new JSONArray(s);
-            for (int i = 0 ; i < jsonArray.length(); i ++) {
-                JSONObject j = jsonArray.getJSONObject(i);
-                MIDIControl midiControl = new MIDIControl();
-                midiControl.scope = MIDIControl.Scope.GLOBAL;
-                String idString = j.getString("view");
-                if (idString.isEmpty()) {
-                    Log.w(TAG, "loadGlobalMidi: invalid settings, skipping " + j);
-                    continue;
-                }
-                midiControl.view = findViewById(stringToId(idString));
-                switch (j.getString ("type")) {
-                    case "KNOB":
-                        midiControl.type = MIDIControl.Type.KNOB ;
-                        break ;
-                    case "SLIDER":
-                        midiControl.type = MIDIControl.Type.SLIDER ;
-                        break ;
-                    case "TOGGLE":
-                    default:
-                        midiControl.type = MIDIControl.Type.TOGGLE ;
-                        break ;
-                }
-
-                midiControl.scope = MIDIControl.Scope.GLOBAL;
-                midiControl.channel = j.getInt("channel");
-                midiControl.control = j.getInt("control");
-                midiControls.add(midiControl);
-                Log.i(TAG, "loadGlobalMidi: added control " + midiControl);
-            }
-        } catch (JSONException e) {
-            throw new RuntimeException(e);
-        }
-
-    }
-
-    void saveGlobalMidi () {
-        JSONArray jsonArray = new JSONArray();
-        for (MIDIControl midiControl: midiControls) {
-            if (midiControl.scope == MIDIControl.Scope.PLUGIN || midiControl.view == null)
-                continue;
-
-            try {
-                JSONObject jsonObject = midiControl.get() ;
-                Log.i(TAG, "saveGlobalMidi: " + jsonObject.toString());
-                jsonArray.put(jsonObject);
-            } catch (JSONException e) {
-                throw new RuntimeException(e);
-            }
-        }
-
-        Log.i(TAG, "saveGlobalMidi: " + jsonArray.toString());
-        defaultSharedPreferences.edit().putString("global_midi", jsonArray.toString()).apply();
-    }
 
     int stringToId (String s) {
         return getResources().getIdentifier(s, "id", getPackageName());
     }
 
-    JSONObject midiPluginControlsAsJSON () {
-        JSONObject jsonObject = new JSONObject();
-        for (MIDIControl midiControl: midiControls) {
-            if (midiControl.scope == MIDIControl.Scope.GLOBAL)
-                continue;
-
-            try {
-                if (! jsonObject.has(String.valueOf(midiControl.plugin)))
-                    jsonObject.put(String.valueOf(midiControl.plugin), new JSONArray());
-                jsonObject.getJSONArray(String.valueOf(midiControl.plugin)).put(midiControl.get());
-            } catch (JSONException e) {
-                throw new RuntimeException(e);
-            }
-        }
-
-        Log.i(TAG, "midiPluginControlsAsJSON: " + jsonObject);
-        return jsonObject;
-    }
-
-    JSONObject midiPluginControlsAsJSONObject () {
-        JSONObject jsonObject = new JSONObject();
-        for (MIDIControl midiControl: midiControls) {
-            if (midiControl.scope == MIDIControl.Scope.GLOBAL)
-                continue;
-
-            try {
-                if (! jsonObject.has(String.valueOf(midiControl.plugin)))
-                    jsonObject.put(String.valueOf(midiControl.plugin), new JSONObject());
-                if (! (jsonObject.getJSONObject(String.valueOf(midiControl.plugin)).has (String.valueOf(midiControl.pluginControl))))
-                    (jsonObject.getJSONObject(String.valueOf(midiControl.plugin))).put(String.valueOf(midiControl.pluginControl), midiControl.get ());
-            } catch (JSONException e) {
-                throw new RuntimeException(e);
-            }
-        }
-
-        Log.i(TAG, "midiPluginControlsAsJSONObject: " + jsonObject);
-        return jsonObject;
-    }
-
-    void resetPluginMIDI () {
-        for (MIDIControl midiControl: midiControls) {
-            if (midiControl.scope == MIDIControl.Scope.GLOBAL)
-                continue;
-
-            midiControls.remove(midiControl);
-        }
-    }
-
-    public static void resetMIDI () {
-        mainActivity.midiControls.clear();
-    }
-
-    public static void printMidi () {
-        Log.i(TAG, "printMidi: " + mainActivity.midiControls);
-    }
-
-    String midiControlsForDB (int plugin) {
-        StringBuilder s = new StringBuilder();
-        for (MIDIControl midiControl: midiControls) {
-            if (midiControl.scope == MIDIControl.Scope.GLOBAL|| midiControl.plugin != plugin)
-                continue;
-
-            s.append(midiControl.getForDB()).append("|");
-        }
-
-        return s.toString();
-    }
-
-    /* BLE MIDI Support */
-
-    private static final int SELECT_DEVICE_REQUEST_CODE = 100000;
 
     Executor executor = new Executor() {
         @Override
@@ -6542,151 +8129,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         }
     };
 
-    @RequiresApi(api = Build.VERSION_CODES.TIRAMISU)
-    void scanBLE () {
-        if (Build.VERSION.SDK_INT < 33) {
-            AlertDialog.Builder builder = new AlertDialog.Builder(this);
-            builder.setTitle("Bluetooth MIDI only supported on Android 13 and above.");
-            builder.setMessage("To use a Bluetooth MIDI Controller with Amp Rack, install MIDI BLE Connect from the Play store, connect to your BLE MIDI Controller and then restart Amp Rack");
-            builder.setPositiveButton("Install MIDI BLE Connect", new DialogInterface.OnClickListener() {
-                @Override
-                public void onClick(DialogInterface dialog, int which) {
-                    String url = "https://play.google.com/store/apps/details?id=com.mobileer.example.midibtlepairing";
-                    Intent i = new Intent(Intent.ACTION_VIEW);
-                    i.setData(Uri.parse(url));
-                    startActivity(i);
-                }
-            });
-
-            builder.show();
-            return;
-        }
-
-        deviceManager =
-                (CompanionDeviceManager) getSystemService(
-                        Context.COMPANION_DEVICE_SERVICE
-                );
-
-        // To skip filtering based on name and supported feature flags,
-        // do not include calls to setNamePattern() and addServiceUuid(),
-        // respectively. This example uses Bluetooth.
-        BluetoothDeviceFilter deviceFilter =
-                new BluetoothDeviceFilter.Builder()
-                        .setNamePattern(Pattern.compile("My device"))
-                        .addServiceUuid(
-                                new ParcelUuid(new UUID(0x123abcL, -1L)), null
-                        )
-                        .build();
-
-        // The argument provided in setSingleDevice() determines whether a single
-        // device name or a list of device names is presented to the user as
-        // pairing options.
-        AssociationRequest pairingRequest = new AssociationRequest.Builder()
-//                .addDeviceFilter(deviceFilter)
-//                .setSingleDevice(true)
-                .build();
-
-        // When the app tries to pair with the Bluetooth device, show the
-        // appropriate pairing request dialog to the user.
-        deviceManager.associate(pairingRequest, executor, new CompanionDeviceManager.Callback() {
-            // Called when a device is found. Launch the IntentSender so the user can
-            // select the device they want to pair with.
-            @Override
-            public void onDeviceFound(IntentSender chooserLauncher) {
-                try {
-                    startIntentSenderForResult(
-                            chooserLauncher, SELECT_DEVICE_REQUEST_CODE, null, 0, 0, 0
-                    );
-                } catch (IntentSender.SendIntentException e) {
-                    Log.e("MainActivity", "Failed to send intent");
-                }
-            }
-
-            @RequiresApi(api = Build.VERSION_CODES.TIRAMISU)
-            @Override
-            public void onAssociationCreated(AssociationInfo associationInfo) {
-                // AssociationInfo object is created and get association id and the
-                // macAddress.
-                int associationId = associationInfo.getId();
-                MacAddress macAddress = associationInfo.getDeviceMacAddress();
-            }
-
-            @Override
-            public void onFailure(CharSequence errorMessage) {
-                // Handle the failure.
-            }
-        });
-    }
-
-    void register_bt_callback () {
-        Log.i(TAG, "register_bt_callback: init");
-        IntentFilter filter = new IntentFilter();
-        filter.addAction(ACTION_BOND_STATE_CHANGED);
-
-        BroadcastReceiver receiver = new BroadcastReceiver() {
-            @Override
-            public void onReceive(Context context, Intent intent) {
-                Log.i(TAG, "[bt receiver] onReceive: " + intent.getIntExtra(EXTRA_BOND_STATE, -1));
-                //do something based on the intent's action
-                if (intent.getIntExtra(EXTRA_BOND_STATE, -1) == 11) {
-                    mainActivity.runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() {
-                            View icon = mainActivity.findViewById(R.id.bt_icon) ;
-                            if (icon != null)
-                                icon.setVisibility(VISIBLE);
-                        }
-                    });
-                    Toast.makeText(MainActivity.this, "Bluetooth device connected", Toast.LENGTH_SHORT).show();
-                } else {
-                    Toast.makeText(MainActivity.this, "Bluetooth device disconnected", Toast.LENGTH_SHORT).show();
-                    mainActivity.runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() {
-                            ((findViewById(R.id.bt_icon))).setVisibility(GONE);
-                        }
-                    });
-                }
-
-                Log.i(TAG, "onReceive: bluetooth device connected? " + intent.getIntExtra(EXTRA_BOND_STATE, -1) + ": " + intent.getParcelableExtra(EXTRA_DEVICE));
-            }
-        };
-
-        registerReceiver(receiver, filter);
-    }
-
-    public static void pluginsCrashTest () {
-        Handler handler = new Handler();
-        ProgressDialog dialog = ProgressDialog.show((Context) mainActivity, "Plugin Crash Test", "Testing ...", false, false, null);
-        dialog.setIndeterminate(false);
-
-        dialog.setMax(mainActivity.pluginDialogAdapter.pluginNames.size());
-        Runnable runnable = new Runnable() {
-            int p = 195;
-            Runnable r = this;
-
-            public void run() {
-                Log.i(TAG, "plugin crash test: " + String.format("plugin %s [%d of %d]", mainActivity.pluginDialogAdapter.pluginNames.get(p), p, mainActivity.pluginDialogAdapter.pluginNames.size()));
-                AudioEngine.clearActiveQueue();
-                mainActivity.dataAdapter.reset();
-
-                dialog.setProgress(p);
-                dialog.setMessage(p + "/" + totalPlugins + ": " + mainActivity.pluginDialogAdapter.pluginNames.get(p));
-                Log.i("plugin crash test", p + "/" + totalPlugins + ": " + mainActivity.pluginDialogAdapter.pluginNames.get(p));
-                mainActivity.addPluginByName(mainActivity.pluginDialogAdapter.pluginNames.get(p));
-                p++;
-
-                if (p >= totalPlugins) {
-                    alert("Test complete", "Successfully, probably, since we didn't crash ...");
-                    return;
-                }
-
-                handler.postDelayed(r, 500);
-            }
-        } ;
-
-        handler.postDelayed(runnable, 2000);
-    }
 
     void selectMidiDevice () {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
@@ -6828,7 +8270,8 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
         builder.show();
     }
-    
+
+
     void detachBLE () {
         Log.i(TAG, "detachBLE: ");
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
@@ -6857,49 +8300,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         builder.show();
     }
 
-    void midiConnect (MidiDeviceInfo midiDeviceInfo, int outputPort) {
-        int finalOutputPort = outputPort;
-        Log.d(TAG, String.format ("[midi] opening device: %s", midiDeviceInfo.toString()));
-        try {
-            midiManager.openDevice(midiDeviceInfo, device -> {
-                midiDevice = device;
-                Log.d(TAG, String.format("[midi] device opened: opening port..."));
-                midiOutputPort = device.openOutputPort(finalOutputPort);
-                Log.d(TAG, String.format("[midi] port opened: port %d", midiOutputPort.getPortNumber()));
-                midiOutputPort.connect(midiReciever);
-                mainActivity.runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        if (midiDevice == null)
-                            return;
-
-                        Log.i(TAG, "[bt] run: connected device " + midiDevice.getInfo().getType() + " >" + midiDeviceInfo.getProperties().getString("name", ""));
-                        ((TextView) findViewById(R.id.midi_name)).setText(midiDeviceInfo.getProperties().getString("name", ""));
-                        if (midiDevice.getInfo().getType() == MidiDeviceInfo.TYPE_USB || midiDevice.getInfo().getType() == MidiDeviceInfo.TYPE_VIRTUAL) {
-                            (findViewById(R.id.midi_icon)).setVisibility(VISIBLE);
-                            (findViewById(R.id.midi_icon)).setOnClickListener(new View.OnClickListener() {
-                                @Override
-                                public void onClick(View v) {
-                                    selectMidiDevice();
-                                }
-                            });
-                        } else if (midiDevice.getInfo().getType() == MidiDeviceInfo.TYPE_BLUETOOTH) {
-                            (findViewById(R.id.bt_icon)).setVisibility(VISIBLE);
-                            (findViewById(R.id.bt_icon)).setOnClickListener(new View.OnClickListener() {
-                                @Override
-                                public void onClick(View v) {
-                                    detachBLE();
-                                }
-                            });
-                        }
-                    }
-                });
-            }, null);
-        } catch (Exception e) {
-            Log.e(TAG, "onCreate: ", e);
-//                    Toast.makeText(mainActivity, e.getMessage(), Toast.LENGTH_SHORT).show();
-        }
-    }
 
     void midiMappingsDialog () {
         ArrayList <Integer> selectedItems = new ArrayList();  // Where we track the selected items
@@ -6968,15 +8368,30 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         builder.show();
     }
 
-    // ========== State persistence (recovered from APK smali) ==========
-    private final java.util.Map<String, float[]> savedNodePositions = new java.util.HashMap<>();
 
-    public void storeNodePositions(java.util.Map<String, float[]> positions) {
-        savedNodePositions.clear();
-        if (positions != null) savedNodePositions.putAll(positions);
+    public static int setSpinnerFromDir (Spinner spinner, String dir, String toSelect) {
+        if (spinner == null) {
+            return 0 ;
+        }
+
+        int selection = 0 ;
+        ArrayList <String> models = new ArrayList<>();
+        DocumentFile root = DocumentFile.fromFile(new File(dir));
+        DocumentFile [] files = root.listFiles() ;
+        int counter = 0 ;
+        for (DocumentFile file: files) {
+            Log.d(TAG, String.format ("%s: %s", file.getName(), file.getUri()));
+            models.add(file.getName());
+            if (toSelect != null && file.getName().equals(toSelect))
+                selection = counter ;
+            counter ++ ;
+        }
+
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(mainActivity,
+                android.R.layout.simple_spinner_item, models);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinner.setAdapter(adapter);
+        return selection;
     }
 
-    public java.util.Map<String, float[]> getSavedNodePositions() {
-        return new java.util.HashMap<>(savedNodePositions);
-    }
 }

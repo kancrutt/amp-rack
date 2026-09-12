@@ -258,13 +258,6 @@
     "index": 33,
     "library": "rkrlv2.so"
   },
-  "15030": {
-    "name": "rkr Sustainer",
-    "id": 5039,
-    "desc": "A very simple, no-frills soft knee compressor good for making notes sustain. Brighter than the full Rakarrack Compressor.",
-    "index": 30,
-    "library": "mda-rkrlv2.so"
-  },
   "15023": {
     "name": "rkr Synthfilter",
     "id": 5040,
@@ -285,13 +278,6 @@
     "index": 24,
     "desc": "Multi-band tremolo effect allowing 2 LFOs to modulate volume of any combination of 4 frequency bands.",
     "library": "rkrlv2.so"
-  },
-  "15040": {
-    "name": "rkr Vibe",
-    "id": 5043,
-    "desc": "The UniVibe was intended as a rotating speaker emulation. It does a poor job of that, but in its own right became a popular phase-shifter effect. This version has optional feedback to achieve some additional tones.",
-    "index": 40,
-    "library": "mda-rkrlv2.so"
   },
   "15029": {
     "name": "rkr Vocoder",
@@ -602,13 +588,6 @@
     "desc": "Simulation, based on a tube power amp circuit",
     "index": 0,
     "library": "libGxCreamMachine.lv2.so"
-  },
-  "19400": {
-    "name": "GxDOP270",
-    "id": 7008,
-    "desc": "Based on a classic Overdrive Amp",
-    "index": 0,
-    "library": "libGxDOP270.lv2.so"
   },
   "19500": {
     "name": "GxEpic",
@@ -979,7 +958,7 @@
   "24900": {
     "name": "Gx_DistortionPlus_",
     "id": 8020,
-    "desc":"Analogue simulation of a Distortion Pedal",
+    "desc": "Analogue simulation of a Distortion Pedal",
     "index": 0,
     "library": "libGxDistortionPlus.lv2.so"
   },
@@ -993,7 +972,7 @@
   "25100": {
     "name": "GxOsMutantes",
     "id": 8022,
-    "desc": "Analogue simulation of Circuit developed in 70’s",
+    "desc": "Analogue simulation of Circuit developed in 70\u2019s",
     "index": 0,
     "library": "libGxOsMutantes.lv2.so"
   },
@@ -1017,13 +996,6 @@
     "desc": "Digital reverse delay",
     "index": 0,
     "library": "libGxReverseDelay.lv2.so"
-  },
-  "25500": {
-    "name": "GxSwitchlessWah",
-    "id": 8026,
-    "desc": "Analog wah emulation with switchless activation",
-    "index": 0,
-    "library": "wah.so"
   },
   "25600": {
     "name": "Gx_tonemender_",
@@ -1295,7 +1267,7 @@
     "name": "Gx_vibe_mono",
     "id": 8065,
     "desc": "Vibrato Effect",
-    "index": 0,
+    "index": 1,
     "library": "libgx_vibe.lv2.so"
   },
   "29500": {
@@ -1548,13 +1520,6 @@
     "desc": "Deep learning plugin to create models of guitar amplifiers and pedals with state-of-the-art accuracy",
     "index": 0,
     "library": "neural_amp_modeler.so"
-  },
-  "33100": {
-    "name": "Tap IR",
-    "id": 8102,
-    "desc": "Impulse response",
-    "index": 0,
-    "library": "libir.so"
   },
   "33200": {
     "name": "convoLV2",

@@ -863,6 +863,13 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
             @Override
             public boolean onNavigationItemSelected(@NonNull MenuItem item) {
+                // Close tuner overlay first, before reselection guard
+                if (item.getItemId() != R.id.page_tuner) {
+                    FrameLayout tunerOverlay = findViewById(R.id.tuner_overlay_container);
+                    if (tunerOverlay != null && tunerOverlay.getVisibility() == View.VISIBLE) {
+                        closeTunerOverlay(tunerOverlay);
+                    }
+                }
                 // Reselection guard: re-tapping the active tab must not re-commit
                 // show/hide transactions (same-ms duplicate trigger source).
                 try {
@@ -872,12 +879,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 // Drop any open settings sub-screen before switching tabs
                 if (getSupportFragmentManager().getBackStackEntryCount() > 0) {
                     try { getSupportFragmentManager().popBackStackImmediate(); } catch (Exception ignored) {}
-                }
-                if (item.getItemId() != R.id.page_tuner) {
-                    FrameLayout tunerOverlay = findViewById(R.id.tuner_overlay_container);
-                    if (tunerOverlay != null && tunerOverlay.getVisibility() == View.VISIBLE) {
-                        closeTunerOverlay(tunerOverlay);
-                    }
                 }
                 Fragment fragment = null;
                 Class<Rack> fragmentClass = null;

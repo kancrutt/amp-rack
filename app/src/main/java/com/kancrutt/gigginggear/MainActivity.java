@@ -1974,6 +1974,8 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         applyWallpaper(context, getWindow(), getResources(), findViewById(R.id.wallpaper), getWindowManager().getDefaultDisplay().getWidth(), getWindowManager().getDefaultDisplay().getHeight()); //finally
 //        recreate();
         Log.d(TAG, "lifecycle: resumed");
+        // Restore chain state when resuming (tab switch / app backgrounding)
+        loadActivePreset();
 //        AudioEngine.create(); // originally was here
 //        loadPlugins();
 

@@ -429,7 +429,8 @@ public class Rack extends Fragment {
                         .setNegativeButton("Cancel", null)
                         .show();
             });
-            view.postDelayed(() -> signalChainCanvas.loadFromActivePlugins(), 600);
+//            view.postDelayed(() -> signalChainCanvas.loadFromActivePlugins(), 600);
+// Chain refresh happens after loadActivePreset() completes in MainActivity
         }
 
         TextView cpuMeter = view.findViewById(R.id.cpu_meter_text);

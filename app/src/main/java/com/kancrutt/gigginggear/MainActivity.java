@@ -3484,6 +3484,15 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             Log.d(TAG, "loadActivePreset: active preset is null or empty");
         }
         ensureDefaultChainHasAmp();
+        
+        // Refresh canvas after chain is restored
+        runOnUiThread(() -> {
+            signalChainCanvas.postDelayed(() -> {
+                if (signalChainCanvas != null) {
+                    signalChainCanvas.loadFromActivePlugins();
+                }
+            }, 100);
+        });
     }
 
     public void ensureDefaultChainHasAmp() {

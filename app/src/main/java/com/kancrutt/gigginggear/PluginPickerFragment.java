@@ -6,6 +6,7 @@ import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -37,6 +38,7 @@ import java.util.Iterator;
 
 public class PluginPickerFragment extends BottomSheetDialogFragment {
 
+    private static final String TAG = "PluginPickerFragment";
     private MainActivity mainActivity;
     private LinearLayout catContainer;
     private LinearLayout itemsContainer;
@@ -203,6 +205,10 @@ public class PluginPickerFragment extends BottomSheetDialogFragment {
             return;
         }
 
+        // Load blacklist
+        JSONObject blacklist = ConnectGuitar.loadJSONFromAssetFile(mainActivity, "blacklist.json");
+        boolean enableBlacklisted = mainActivity.defaultSharedPreferences.getBoolean("enableBlacklisted", false);
+
         // Scan available LADSPA & LV2 plugins
         JSONObject[] sources = {mainActivity.availablePlugins, mainActivity.availablePluginsLV2};
         ArrayList<String> loadedPluginNames = new ArrayList<>();
@@ -219,6 +225,12 @@ public class PluginPickerFragment extends BottomSheetDialogFragment {
                 // MIDI-only synths can never sound in a guitar chain (no audio
                 // input to feed them) — hide instead of offering a crash/toast.
                 if (MainActivity.isUnsupportedSynth(pName)) continue;
+
+                // Blacklist check
+                if (blacklist != null && blacklist.has(pName) && !enableBlacklisted) {
+                    Log.d(TAG, String.format ("[plugin picker] blacklisted: %s", pName));
+                    continue;
+                }
 
                 CategoryHelper.Category pCat = CategoryHelper.getCategory(pName);
                 if (pCat == cat) {

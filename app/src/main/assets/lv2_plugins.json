@@ -5,7 +5,7 @@
     "index": 9,
     "desc": "This effect features two alternating comb filters for a vocal/formant-like wah sound. It could be considered a combined flanger and phaser. It can be extreme or add very subtle shimmer",
     "library": "rkrlv2.so",
-    "category": "EQ / Filter"
+    "category": "Pitch / Wha"
   },
   "15005": {
     "name": "rkr Analog Phaser",
@@ -37,7 +37,7 @@
     "desc": "A flanger or chorus (depending on delay time) effect. Allows for fractional delays for a more intense effect.",
     "index": 4,
     "library": "rkrlv2.so",
-    "category": "Delay / Reverb"
+    "category": "Modulation"
   },
   "15027": {
     "name": "rkr Coil Crafter",
@@ -53,7 +53,7 @@
     "desc": "Multi-band compressor with 4 frequency bands and wet/dry mix control. Each band has individual ratio and threshold controls.",
     "index": 38,
     "library": "rkrlv2.so",
-    "category": "EQ / Filter"
+    "category": "Dynamics"
   },
   "15001": {
     "name": "rkr Compressor",
@@ -93,7 +93,7 @@
     "index": 17,
     "desc": "Two flange effects cascaded to create unique and more intense tones than available through a single flanger.",
     "library": "rkrlv2.so",
-    "category": "EQ / Filter"
+    "category": "Modulation"
   },
   "15003": {
     "name": "rkr Echo",
@@ -109,7 +109,7 @@
     "id": 5014,
     "index": 36,
     "library": "rkrlv2.so",
-    "category": "Amplifier"
+    "category": "Delay / Reverb"
   },
   "15026": {
     "name": "rkr Echoverse",
@@ -149,7 +149,7 @@
     "desc": "Analog BJT modeled dynamic expander for subtler noise suppression than a gate typically offers. Can also be used for interesting evelope-triggered swell and fade effects.",
     "index": 21,
     "library": "rkrlv2.so",
-    "category": "Modulation"
+    "category": "Dynamics"
   },
   "15043": {
     "name": "rkr NoiseGate",
@@ -173,7 +173,7 @@
     "desc": "This is the audio equivalent of a barber pole effect, with 8 filter bands continuously sweeping up or down. This has enough flexibility to create effects anywhere from subtle to insane.",
     "index": 41,
     "library": "rkrlv2.so",
-    "category": "EQ / Filter"
+    "category": "Distortion"
   },
   "15013": {
     "name": "rkr Musical Delay",
@@ -189,7 +189,7 @@
     "index": 25,
     "desc": "State variable filter with envelope or LFO modulation. Allows it to act like a mixable blend of highpass, lowpass or bandpass filter. Similar to a mutron III. Also useful for classic wah pedal emulation when wah parameter is controlled by an expression pedal.",
     "library": "rkrlv2.so",
-    "category": "EQ / Filter"
+    "category": "Utility"
   },
   "15039": {
     "name": "rkr OpticalTrem",
@@ -197,7 +197,7 @@
     "index": 39,
     "desc": "An optical tremolo effect emulation such as often built into a guitar amplifier. This varies the signal volume through an LFO.",
     "library": "rkrlv2.so",
-    "category": "Amplifier"
+    "category": "Modulation"
   },
   "15008": {
     "name": "rkr Pan",
@@ -229,7 +229,7 @@
     "index": 35,
     "desc": "Convolution-based reverb effect. IR samples can be converted to .rvb format and loaded into this effect for a less cpu-intensive convolution. Several files included.",
     "library": "rkrlv2.so",
-    "category": "Amplifier"
+    "category": "Delay / Reverb"
   },
   "15018": {
     "name": "rkr Ring",
@@ -237,7 +237,7 @@
     "desc": "A ring modulator with monophonic frequency recognition for synthesis.",
     "index": 18,
     "library": "rkrlv2.so",
-    "category": "EQ / Filter"
+    "category": "Modulation"
   },
   "15031": {
     "name": "rkr Sequence",
@@ -245,7 +245,7 @@
     "index": 31,
     "desc": "8-step modulation sequencer. Each step is user-adjustable. Signal amplitude, filter cutoff frequency, or pitch shifting modulations available.",
     "library": "rkrlv2.so",
-    "category": "Amplifier"
+    "category": "Utility"
   },
   "15028": {
     "name": "rkr Shelf Boost",
@@ -277,7 +277,7 @@
     "index": 37,
     "desc": "Pitch shifter that harmonizes 2 voices with your dry signal. This works best for monophonic sounds (a single note at a time). This version has a detune for stereo chorus effects. Also allows selection of root and chord for intelligent harmonies.",
     "library": "rkrlv2.so",
-    "category": "Modulation"
+    "category": "Pitch / Wha"
   },
   "15034": {
     "name": "rkr StompBox:Fuzz",
@@ -317,7 +317,7 @@
     "desc": "32 band vocoder. This type of effect is well known for creating robot-like voices in popular music. The input is divided into frequency bands and each band's volume is controlled by an auxiliary input's frequency curve such that the output signal is filtered to sound like the aux signal.",
     "index": 29,
     "library": "rkrlv2.so",
-    "category": "EQ / Filter"
+    "category": "Pitch / Wha"
   },
   "15014": {
     "name": "rkr WahWah",
@@ -333,7 +333,7 @@
     "id": 6001,
     "index": 0,
     "library": "mda-Ambience.so",
-    "category": "EQ / Filter"
+    "category": "Dynamics"
   },
   "15200": {
     "name": "MDA Bandisto",
@@ -349,7 +349,7 @@
     "desc": "Contains three samples (kick, snare and hat) designed to be triggered by incoming audio in three frequency ranges.  The default samples are based on the Roland CR-78.",
     "index": 0,
     "library": "mda-BeatBox.so",
-    "category": "Amplifier"
+    "category": "Utility"
   },
   "15400": {
     "name": "MDA Combo",
@@ -357,7 +357,7 @@
     "desc": "This plug-in can sound quite subtle but comes alive when used on guitar with the drive turned up! ",
     "index": 0,
     "library": "mda-Combo.so",
-    "category": "Distortion"
+    "category": "Amplifier"
   },
   "15500": {
     "name": "MDA De-ess",
@@ -373,7 +373,7 @@
     "desc": "Sample quality reduction",
     "index": 0,
     "library": "mda-Degrade.so",
-    "category": "Amplifier"
+    "category": "Distortion"
   },
   "15700": {
     "name": "MDA Delay",
@@ -381,7 +381,7 @@
     "index": 0,
     "desc": "Simple stereo delay with feedback tone control",
     "library": "mda-Delay.so",
-    "category": "EQ / Filter"
+    "category": "Delay / Reverb"
   },
   "15800": {
     "name": "MDA Detune",
@@ -397,7 +397,7 @@
     "desc": "When a waveform is rounded to the nearest 16 (or whatever)-bit value this causes distortion. Dither allows you to exchange this rough sounding signal-dependant distortion for a smooth background hiss.",
     "index": 0,
     "library": "mda-Dither.so",
-    "category": "Distortion"
+    "category": "Dynamics"
   },
   "16000": {
     "name": "MDA DubDelay",
@@ -405,7 +405,7 @@
     "index": 0,
     "desc": "Delay with feedback saturation and time/pitch modulation",
     "library": "mda-DubDelay.so",
-    "category": "Distortion"
+    "category": "Delay / Reverb"
   },
   "16200": {
     "name": "MDA Dynamics",
@@ -429,7 +429,7 @@
     "index": 0,
     "desc": "Rotary speaker simulator. No overdrive or speaker cabinet simulation is added - you may want to combine this plug-in with Combo.  For a much thicker sound try combining two Leslie plug-ins in series!",
     "library": "mda-Leslie.so",
-    "category": "Distortion"
+    "category": "Modulation"
   },
   "16700": {
     "name": "MDA Limiter",
@@ -445,7 +445,7 @@
     "index": 0,
     "desc": "Equal loudness contours for bass EQ and mix correction",
     "library": "mda-Loudness.so",
-    "category": "EQ / Filter"
+    "category": "Utility"
   },
   "16900": {
     "name": "MDA MultiBand",
@@ -485,7 +485,7 @@
     "index": 0,
     "desc": "Simple ring modulator with sine-wave oscillator",
     "library": "mda-RingMod.so",
-    "category": "Utility"
+    "category": "Modulation"
   },
   "17500": {
     "name": "MDA RoundPan",
@@ -493,7 +493,7 @@
     "desc": "3D panner. Like all 3D processes the result depends on where you sit relative to the speakers, and mono compatibility is not guaranteed. This plug-in must be used in a stereo channel or bus!",
     "index": 0,
     "library": "mda-RoundPan.so",
-    "category": "Amplifier"
+    "category": "Utility"
   },
   "17700": {
     "name": "MDA Splitter",
@@ -501,7 +501,7 @@
     "desc": "Frequency/level crossover for setting up dynamic processing. This plug-in can split a signal based on frequency or level, for example for producing dynamic effects where only loud drum hits are sent to a reverb. Other functions include a simple \"spectral gate\" in INVERSE mode and a conventional gate and filter for separating drum sounds in NORMAL mode.",
     "index": 0,
     "library": "mda-Splitter.so",
-    "category": "Amplifier"
+    "category": "EQ / Filter"
   },
   "17800": {
     "name": "MDA Stereo",
@@ -509,7 +509,7 @@
     "desc": "Haas delay and comb filtering.",
     "index": 0,
     "library": "mda-Stereo.so",
-    "category": "EQ / Filter"
+    "category": "Utility"
   },
   "18000": {
     "name": "MDA TalkBox",
@@ -517,7 +517,7 @@
     "desc": "High resolution vocoder. ",
     "index": 0,
     "library": "mda-TalkBox.so",
-    "category": "Utility"
+    "category": "Modulation"
   },
   "18100": {
     "name": "MDA TestTone",
@@ -525,7 +525,7 @@
     "index": 0,
     "desc": "Signal generator with pink and white noise, impulses and sweeps",
     "library": "mda-TestTone.so",
-    "category": "EQ / Filter"
+    "category": "Utility"
   },
   "18200": {
     "name": "MDA ThruZero",
@@ -533,7 +533,7 @@
     "index": 0,
     "desc": "Classic tape-flanging simulation. This plug simulates tape-flanging, where two copies of a signal cancel out completely as the tapes pass each other. It can also be used for other modulated delay effects such as phasing and simple chorusing.",
     "library": "mda-ThruZero.so",
-    "category": "Delay / Reverb"
+    "category": "Modulation"
   },
   "18300": {
     "name": "MDA Tracker",
@@ -541,14 +541,14 @@
     "desc": "Pitch tracking oscillator, or pitch tracking EQ",
     "index": 0,
     "library": "mda-Tracker.so",
-    "category": "EQ / Filter"
+    "category": "Pitch / Wha"
   },
   "18400": {
     "name": "MDA Transient",
     "id": 6034,
     "index": 0,
     "library": "mda-Transient.so",
-    "category": "Utility"
+    "category": "Dynamics"
   },
   "18700": {
     "name": "Gx_AxisFace_",

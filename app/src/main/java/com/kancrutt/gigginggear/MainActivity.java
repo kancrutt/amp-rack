@@ -6914,18 +6914,30 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         }
     }
 
-    /** Chain capacity: mirrors native FullDuplexPass MAX_PLUGINS=10. Publishing more
-     *  overruns fixed DSP arrays -> native force-close. All UI add paths refuse loudly. */
-    public static final int MAX_CHAIN_BLOCKS = 10;
+    /** Chain capacity: mirrors native FullDuplexPass MAX_PLUGINS=24. Two tiers —
+     *  series rigs cap at 10 (product rule), parallel rigs (any SPLIT/MERGE present)
+     *  may use up to 24 (4 lanes need 6 routing slots + ~18 effect slots). */
+    public static final int MAX_SERIES_BLOCKS = 10;
+    public static final int MAX_PARALLEL_BLOCKS = 24;
 
     /** Refuse the add when the chain is full (native would overrun DSP arrays).
      *  Returns true when there is room. */
     boolean chainHasRoom(String pluginName) {
         int n = 0;
         try { n = AudioEngine.getActivePlugins(); } catch (Exception e) { Log.w(TAG, "chainHasRoom query failed", e); }
-        if (n >= MAX_CHAIN_BLOCKS) {
+        boolean parallel = false;
+        try {
+            if (dataAdapter != null && dataAdapter.plugins != null) {
+                for (int id : dataAdapter.plugins) {
+                    if (id == ROUTING_ID_SPLIT || id == ROUTING_ID_MERGE) { parallel = true; break; }
+                }
+            }
+        } catch (Exception ignored) {}
+        int cap = parallel ? MAX_PARALLEL_BLOCKS : MAX_SERIES_BLOCKS;
+        if (n >= cap) {
             Log.w(TAG, "chain full (" + n + " blocks), refusing " + pluginName);
-            toast("Chain full (" + MAX_CHAIN_BLOCKS + " blocks max) — remove one first");
+            toast(parallel ? "Chain full (" + cap + " blocks max) — remove one first"
+                    : "Chain full (10 series max) — split a branch or remove one");
             return false;
         }
         return true;

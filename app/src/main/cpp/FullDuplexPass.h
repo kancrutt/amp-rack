@@ -31,7 +31,11 @@
 class FullDuplexPass : public FullDuplexStream {
     //| TODO: Limit number of plugins active in free version?
 public:
-    #define MAX_PLUGINS 10 // for now
+    // Fixed DSP slot arrays. 24 fits 4-lane parallel rigs (6 routing slots for a
+    // 4-lane binary tree + 18 effect slots) while series stays capped at 10 by
+    // UI policy. Raising this only costs pointer arrays — recompile required.
+    // Java mirrors: MainActivity.MAX_SERIES_BLOCKS / MAX_PARALLEL_BLOCKS.
+    #define MAX_PLUGINS 24
     float inputVolume = 1.0 ;
     float outputVolume = 1.0 ;
     bool meterEnabled = true ;

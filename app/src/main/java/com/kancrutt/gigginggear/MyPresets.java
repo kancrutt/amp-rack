@@ -65,6 +65,8 @@ public class MyPresets extends Fragment {
     boolean quick = false ;
     boolean factory = false ;
     public ToggleButton favToggle;
+    private boolean isLoading = false;
+    private long lastLoadTime = 0;
 
     public MyPresets () {
 
@@ -88,25 +90,44 @@ public class MyPresets extends Fragment {
     }
 
     void load () {
-        if (myPresetsAdapter != null) {
-            ArrayList<Map> mapList = new ArrayList<>();
-            if (factory) {
-                loadFactoryPresets(mapList);
-            } else if (quick) {
-                // Combined library: FACTORY first, then USER — the top-bar
-                // nav/picker must cover the whole library, not just local saves.
-                loadFactoryPresets(mapList);
-                loadUserPresets(mapList);
-            } else {
-                loadUserPresets(mapList);
-            }
-            myPresetsAdapter.presets = mapList;
-            myPresetsAdapter.allPresets = new ArrayList<>(mapList);
-            myPresetsAdapter.notifyDataSetChanged();
+        if (myPresetsAdapter == null || isLoading) return;
+        isLoading = true;
+        ArrayList<Map> mapList = new ArrayList<>();
+        if (factory) {
+            loadFactoryPresets(mapList);
+        } else if (quick) {
+            // Combined library: FACTORY first, then USER — the top-bar
+            // nav/picker must cover the whole library, not just local saves.
+            loadFactoryPresets(mapList);
+            loadUserPresets(mapList);
+        } else {
+            loadUserPresets(mapList);
         }
-        updateEmptyState();
-        if (myPresetsAdapter != null) {
-            myPresetsAdapter.quick = quick;
+        final ArrayList<Map> finalMap = mapList;
+        if (recyclerView != null) {
+            recyclerView.post(() -> {
+                if (myPresetsAdapter != null) {
+                    myPresetsAdapter.presets.clear();
+                    myPresetsAdapter.presets.addAll(finalMap);
+                    myPresetsAdapter.allPresets.clear();
+                    myPresetsAdapter.allPresets.addAll(finalMap);
+                    myPresetsAdapter.notifyDataSetChanged();
+                    myPresetsAdapter.quick = quick;
+                }
+                updateEmptyState();
+                isLoading = false;
+            });
+        } else {
+            if (myPresetsAdapter != null) {
+                myPresetsAdapter.presets.clear();
+                myPresetsAdapter.presets.addAll(finalMap);
+                myPresetsAdapter.allPresets.clear();
+                myPresetsAdapter.allPresets.addAll(finalMap);
+                myPresetsAdapter.notifyDataSetChanged();
+                myPresetsAdapter.quick = quick;
+            }
+            updateEmptyState();
+            isLoading = false;
         }
     }
 
@@ -227,11 +248,11 @@ public class MyPresets extends Fragment {
             @Override
             public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
                 super.onScrolled(recyclerView, dx, dy);
+                if (myPresetsAdapter == null || isLoading) return;
                 if (linearLayoutManager.findLastCompletelyVisibleItemPosition() == myPresetsAdapter.presets.size() - 1) {
-//                    loadMore.setVisibility(View.VISIBLE);
-//                    loadProgress.setVisibility(View.INVISIBLE);
-//                    loadProgress.setVisibility(View.VISIBLE);
-//                    loadMore.setVisibility(View.INVISIBLE);
+                    long now = System.currentTimeMillis();
+                    if (now - lastLoadTime < 500) return;
+                    lastLoadTime = now;
                     if (favToggle == null || ! favToggle.isChecked())
                         load();
                 }

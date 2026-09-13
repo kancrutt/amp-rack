@@ -2009,7 +2009,8 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 //        recreate();
         Log.d(TAG, "lifecycle: resumed");
         // Restore chain state when resuming (tab switch / app backgrounding)
-//        AudioEngine.create(); // originally was here
+        // Ensure engine exists before native calls in onResume
+        AudioEngine.create();
 //        loadPlugins();
 
         // our app got rejected because we use MANAGE STORAGE permission.
@@ -2018,13 +2019,15 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         dir = context.getExternalFilesDir(
                 Environment.DIRECTORY_MUSIC);
 
-        if (dir == null || !dir.mkdirs()) {
+        if (dir == null) {
+            Log.e(TAG, "External files dir is null");
+        } else if (!dir.exists() && !dir.mkdirs()) {
             Log.e(TAG, "Directory not created: " + dir.toString());
         } else {
             Log.d(TAG, "onResume: default directory set as " + dir.toString());
         }
 
-        String path = dir.getAbsolutePath();
+        String path = dir != null ? dir.getAbsolutePath() : "";
 
         AudioEngine.setExternalStoragePath(path);
         File defaultDir = dir;

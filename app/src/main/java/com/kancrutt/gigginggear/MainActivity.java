@@ -7326,18 +7326,8 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     }
      */
 
-    public static void drummer () {
-        Intent intent = new Intent(context, DrumMachineActivity.class);
-        mainActivity.startActivity(intent);
-     }
-
      public static void resetOnboard () {
         PreferenceManager.getDefaultSharedPreferences(context).edit().remove("currentVersion").apply();
-     }
-
-     public static void featured () {
-         Intent intent = new Intent(context, FeaturedVideos.class);
-         mainActivity.startActivity(intent);
      }
 
      /*

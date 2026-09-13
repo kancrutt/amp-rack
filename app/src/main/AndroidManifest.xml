@@ -27,18 +27,8 @@
             android:exported="false"
             android:theme="@style/Theme.AmpRack" />
         <activity
-            android:name=".FeaturedVideos"
-            android:exported="false"
-            android:label="@string/title_activity_featured_videos"
-            android:theme="@style/Theme.MySplash.NoActionBar" />
-        <activity
             android:name=".Onboard"
             android:exported="false"
-            android:theme="@style/Theme.AmpRack" />
-        <activity
-            android:name=".DrumMachineActivity"
-            android:exported="false"
-            android:label="Drummer"
             android:theme="@style/Theme.AmpRack" />
         <activity
             android:name=".ConnectGuitar"

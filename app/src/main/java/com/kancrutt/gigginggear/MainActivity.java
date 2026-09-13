@@ -5753,7 +5753,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         final String[] catLabels = {
                 "Amp / Head", "Cabinet", "Overdrive / Dist", "Compressor",
                 "Modulation", "Delay", "Reverb", "EQ", "Pitch / Synth",
-                "Wah", "Volume / Utility", "Noise Gate"
+                "Wah", "Utility", "Noise Gate"
         };
 
         final Runnable[] populateModelsForCat = new Runnable[1];
@@ -5957,7 +5957,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         final String[] catLabels = {
                 "Amp / Head", "Cabinet", "Overdrive / Dist", "Compressor",
                 "Modulation", "Delay", "Reverb", "EQ", "Pitch / Synth",
-                "Wah", "Volume / Utility", "Noise Gate", "Routing / Utility"
+                "Wah", "Utility", "Noise Gate", "Routing / Utility"
         };
         // Active category holder — drives the global search fallback (empty query = this cat).
         final CategoryHelper.Category[] activePickerCat = {categories[0]};

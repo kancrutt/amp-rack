@@ -2,9 +2,6 @@
     <string name="app_name">Giggin\' Gear</string>
     <string name="app_version">Giggin\' Gear v1.0</string>
     <string name="build_id">731</string>
-    <string name="variant">This version is extra cool</string>
-    <string name="quote">Powered by the Rock and Roll in your soul</string>
-    <string name="copyright">All trademarks are copyrights of their respective owners and do not represent affiliation or endorsement.</string>
     <string name="onboard_description">
         [new] Video Recorder\n\n
         Welcome to Version 5: \n\n
@@ -526,20 +523,6 @@
     </string-array>
     <string name="title_activity_settings">Settings</string>
 
-    <!-- Preference Titles -->
-    <string name="messages_header">Messages</string>
-    <string name="sync_header">Sync</string>
-
-    <!-- Messages Preferences -->
-    <string name="signature_title">Your signature</string>
-    <string name="reply_title">Default reply action</string>
-
-    <!-- Sync Preferences -->
-    <string name="sync_title">Sync email periodically</string>
-    <string name="attachment_title">Download incoming attachments</string>
-    <string name="attachment_summary_on">Automatically download attachments for incoming emails
-    </string>
-    <string name="attachment_summary_off">Only download attachments when manually requested</string>
     <string name="lame_preset_desc">Select Standard for (almost) transparent quality, although medium would suffice as well. Standard preset should generally be transparent to most people on most music and is already quite high in quality.</string>
     <string name="title_activity_connect_guitar">ConnectGuitar</string>
     <string name="lowLatencyWarning">
@@ -547,19 +530,6 @@
         some other app is running in the background and using audio (e.g Google Assistant).
         Try disabling \"Hey Google\" on your phone.
     </string>
-    <string name="title_activity_files">Files</string>
-    <!-- Strings used for fragments for navigation -->
-    <string name="first_fragment_label">First Fragment</string>
-    <string name="second_fragment_label">Second Fragment</string>
-    <string name="next">Next</string>
-    <string name="previous">Previous</string>
-
-    <string name="hello_first_fragment">Hello first fragment</string>
-    <string name="credits">
-        Default background photo by Giancarlo Duarte
-        https://unsplash.com/photos/cTj8vbZeX44
-    </string>
-    <string name="title_activity_delete_account">DeleteAccount</string>
     <string name="delete_warn">This action will delete the following data\n\t- Your presets\n\t-Your favorites\n\t-Associated account data</string>
     <string name="low_latency_warning">
         The app is not running in low latency mode.

@@ -1,18 +1,4 @@
 <resources>
-    <!-- Reply Preference -->
-    <string-array name="reply_entries">
-        <item>Reply</item>
-        <item>Reply to all</item>
-    </string-array>
-
-    <string-array name="headphone_warning">
-        <item>Do not show again</item>
-    </string-array>
-
-    <string-array name="reply_values">
-        <item>reply</item>
-        <item>reply_all</item>
-    </string-array>
     <string-array name="sample_rates">
         <item>44100</item>
         <item>48000</item>
@@ -57,45 +43,6 @@
         <item>Extreme</item>
         <item>Insane</item>
         <item>Are you nuts?</item>
-    </string-array>
-    <string-array name="backgrounds">
-        <item>Sky</item>
-        <item>Earth</item>
-        <item>Fire</item>
-        <item>Water</item>
-        <item>Space</item>
-    </string-array>
-    <string-array name="bg_m3">
-        <item>2.9 Beta</item>
-        <item>a1</item>
-        <item>a2</item>
-        <item>a3</item>
-        <item>a4</item>
-        <item>a5</item>
-    </string-array>
-    <string-array name="themes">
-        <item>Material</item>
-        <item>Adwaita</item>
-        <item>TubeAmp</item>
-        <item>Analog</item>
-        <item>Hybrid</item>
-        <item>Classic</item>
-        <item>Modern</item>
-    </string-array>
-    <string-array name="bg_m3_names">
-        <item>2.9 Beta</item>
-        <item>Passion</item>
-        <item>Desire</item>
-        <item>Hope</item>
-        <item>Wander</item>
-        <item>Ascend</item>
-    </string-array>
-    <string-array name="bg_values">
-        <item>2131230964</item>
-        <item>2131230962</item>
-        <item>2131230963</item>
-        <item>2131230965</item>
-        <item>2131230811</item>
     </string-array>
     <string-array name="hash_commands">
         <item>set: </item>

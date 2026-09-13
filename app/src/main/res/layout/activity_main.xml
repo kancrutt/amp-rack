@@ -22,6 +22,20 @@
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toTopOf="@id/bottom_nav_wrapper"/>
 
+    <!-- Settings sub-screens: dedicated overlay so opening a sub-screen NEVER
+         replace()s fragment_container (that destroyed the Board view, rebuilt the
+         chain on return and reset the canvas). Visibility follows back stack. -->
+    <FrameLayout
+        android:id="@+id/settings_sub_container"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:visibility="gone"
+        android:background="@color/gg_glass_bg"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/bottom_nav_wrapper"/>
+
     <!-- Bottom Navigation Bar Wrapper with Integrated Signal Meters -->
     <LinearLayout
         android:id="@+id/bottom_nav_wrapper"

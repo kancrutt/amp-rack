@@ -883,6 +883,14 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 if (getSupportFragmentManager().getBackStackEntryCount() > 0) {
                     try { getSupportFragmentManager().popBackStackImmediate(); } catch (Exception ignored) {}
                 }
+                // Hiding here (not relying on the async pop alone): the overlay must
+                // never linger over the tab being shown.
+                try {
+                    if (getSupportFragmentManager().getBackStackEntryCount() == 0) {
+                        View sub = findViewById(R.id.settings_sub_container);
+                        if (sub != null) sub.setVisibility(View.GONE);
+                    }
+                } catch (Exception ignored) {}
                 Fragment fragment = null;
                 Class<Rack> fragmentClass = null;
                 switch (item.getItemId()) {
@@ -981,6 +989,19 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         ft.commit();
 
         bottomNavigationView.setSelectedItemId(R.id.page_rack);
+        // Settings-sub overlay visibility follows the back stack (system Back press
+        // pops the sub-screen; the container must hide with it). The back stack is
+        // used ONLY by settings sub-screens in this activity.
+        try {
+            getSupportFragmentManager().addOnBackStackChangedListener(() -> {
+                try {
+                    View sub = findViewById(R.id.settings_sub_container);
+                    if (sub != null) sub.setVisibility(
+                            getSupportFragmentManager().getBackStackEntryCount() > 0
+                                    ? View.VISIBLE : View.GONE);
+                } catch (Exception ignored) {}
+            });
+        } catch (Exception ignored) {}
 
         // notification
         Intent intent = new Intent(this, MainActivity.class);
@@ -6485,9 +6506,16 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         final androidx.fragment.app.Fragment fragment = getSupportFragmentManager().getFragmentFactory().instantiate(
                 getClassLoader(), pref.getFragment());
         fragment.setArguments(args);
+        // Sub-screens live in the dedicated overlay container, NOT fragment_container:
+        // replace()ing the tab container destroyed the Board view, which rebuilt the
+        // chain and reset the canvas on return. Visibility follows the back stack.
+        try {
+            View sub = findViewById(R.id.settings_sub_container);
+            if (sub != null) sub.setVisibility(View.VISIBLE);
+        } catch (Exception ignored) {}
         getSupportFragmentManager().beginTransaction()
-                .replace(R.id.fragment_container, fragment)
-                .addToBackStack(null)
+                .replace(R.id.settings_sub_container, fragment)
+                .addToBackStack("settings_sub")
                 .commit();
         return true;
     }

@@ -312,6 +312,9 @@ public class MyPresetsAdapter extends RecyclerView.Adapter<MyPresetsAdapter.View
         });
 
         holder.delete.setOnClickListener(v -> {
+            // TEMP-DBG triage (remove after device roundtrip): total-silence tap?
+            Log.d(TAG, "DBG del tap pos=" + holder.getAdapterPosition());
+            MainActivity.toast("DBG del tap");
             // Capture everything at click time: re-querying getAdapterPosition()
             // inside the dialog callback can return NO_POSITION (silent no-op —
             // the "delete does nothing" symptom).
@@ -343,7 +346,10 @@ public class MyPresetsAdapter extends RecyclerView.Adapter<MyPresetsAdapter.View
                 }
                 boolean fileDeleted = false;
                 try {
+                    Log.d(TAG, "DBG del confirm id=" + clickId);
                     fileDeleted = localPresetManager.deletePreset(clickId);
+                    Log.d(TAG, "DBG del result=" + fileDeleted + " id=" + clickId);
+                    MainActivity.toast("DBG del result=" + fileDeleted);
                 } catch (Exception e) {
                     Log.e(TAG, "delete failed", e);
                 }
@@ -383,6 +389,7 @@ public class MyPresetsAdapter extends RecyclerView.Adapter<MyPresetsAdapter.View
                 MainActivity.toast("Deleted " + targetName);
             });
             builder.setNegativeButton("Cancel", null);
+            Log.d(TAG, "DBG del dialog show id=" + clickId);
             builder.show();
         });
     }

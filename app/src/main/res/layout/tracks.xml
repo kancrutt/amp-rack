@@ -195,14 +195,6 @@
                     android:textOff=" "
                     android:background="@drawable/ic_modern_play_btn"/>
                 <CheckBox
-                    android:id="@+id/loop"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:textSize="11sp"
-                    android:textColor="@color/gg_glass_text_secondary"
-                    android:buttonTint="@color/gg_accent"
-                    android:text="Loop"/>
-                <CheckBox
                     android:id="@+id/gapless"
                     android:visibility="gone"
                     android:layout_width="wrap_content"
@@ -250,11 +242,11 @@
                 android:textSize="10sp"
                 android:textColor="@color/gg_glass_text_secondary"
                 android:fontFamily="@font/plus_jakarta_sans"/>
-                    <!-- Invisible placeholder = BPM reset button (32dp + 8dp margin) so both
+                    <!-- Invisible placeholder = BPM reset button (24dp + 8dp margin) so both
                          sliders measure exactly the same length. -->
                     <Space
-                        android:layout_width="32dp"
-                        android:layout_height="32dp"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
                         android:layout_gravity="center_vertical"
                         android:layout_marginEnd="8dp"
                         android:visibility="invisible"/>
@@ -292,10 +284,12 @@
                 android:textColor="@color/gg_glass_text_secondary"
                 android:fontFamily="@font/plus_jakarta_sans"/>
                     <ImageButton
-                        android:layout_width="32dp"
-                        android:layout_height="32dp"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
                         android:layout_gravity="center"
                         android:layout_marginEnd="8dp"
+                        android:padding="3dp"
+                        android:scaleType="centerInside"
             android:background="@drawable/glass_card_bg"
                         android:src="@drawable/ic_baseline_refresh_24"
                         app:tint="@color/gg_glass_text_secondary"
@@ -314,18 +308,33 @@
             android:gravity="center_vertical"
             android:layout_gravity="center"
             android:orientation="horizontal">
+            <CheckBox
+                android:id="@+id/loop"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
+                android:textSize="11sp"
+                android:textColor="@color/gg_glass_text_secondary"
+                android:buttonTint="@color/gg_accent"
+                android:text="Loop"/>
             <com.google.android.material.button.MaterialButton
                 android:layout_width="wrap_content"
-                android:layout_height="40dp"
+                android:layout_height="32dp"
                 style="@style/Widget.Material3.Button.OutlinedButton"
                 android:id="@+id/load_file"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
                 app:icon="@drawable/baseline_file_open_24"
+                app:iconSize="18dp"
+                app:iconPadding="6dp"
                 app:iconTint="@color/gg_accent"
                 android:textColor="@color/gg_accent"
-                android:textSize="12sp"
+                android:textSize="11sp"
                 android:textStyle="bold"
                 android:fontFamily="@font/plus_jakarta_sans"
-                app:cornerRadius="10dp"
+                app:cornerRadius="8dp"
                 app:strokeColor="@color/gg_glass_border"
                 android:text="Load File"/>
 
@@ -343,11 +352,14 @@
                 android:layout_marginEnd="8dp"
                 android:fontFamily="@font/plus_jakarta_sans"/>
             <ToggleButton
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                android:layout_width="52dp"
+                android:layout_height="28dp"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
                 android:padding="0dp"
                 android:layout_margin="0dp"
-                android:textSize="11sp"
+                android:gravity="center"
+                android:textSize="10sp"
                 android:textColor="@color/gg_glass_text_secondary"
             android:background="@drawable/glass_card_bg"
                 android:id="@+id/skip_silence"/>

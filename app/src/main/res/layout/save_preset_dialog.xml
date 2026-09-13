@@ -16,6 +16,7 @@
             android:layout_height="wrap_content"
             android:fontFamily="@font/plus_jakarta_sans"
             android:textSize="20dp"
+            android:textColor="@color/gg_glass_text_primary"
             android:layout_weight="1"
             android:text="Save Preset"/>
 
@@ -25,19 +26,24 @@
             android:layout_height="wrap_content"
             android:checked="true"
             android:drawableLeft="@drawable/ic_baseline_share_24"
-            android:text=" Shared"/>
+            android:text=" Shared"
+            android:textColor="@color/gg_glass_text_primary"/>
     </LinearLayout>
     <EditText
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:padding="10dp"
         android:hint="Name"
+        android:textColor="@color/gg_glass_text_primary"
+        android:textColorHint="@color/gg_glass_text_secondary"
         android:id="@+id/save_preset_name"/>
     <EditText
         android:layout_width="match_parent"
         android:hint="Description"
         android:padding="10dp"
         android:layout_height="wrap_content"
+        android:textColor="@color/gg_glass_text_primary"
+        android:textColorHint="@color/gg_glass_text_secondary"
         android:id="@+id/save_preset_desc"/>
 
     <LinearLayout
@@ -49,12 +55,14 @@
             android:layout_height="wrap_content"
             android:text="Cancel"
             android:backgroundTint="@color/red"
+            android:textColor="@color/gg_glass_text_primary"
             android:layout_margin="10dp"/>
         <com.google.android.material.button.MaterialButton
             android:layout_marginTop="10dp"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Save"/>
+            android:text="Save"
+            android:textColor="@color/gg_glass_text_primary"/>
 
     </LinearLayout>
     <com.google.android.material.progressindicator.LinearProgressIndicator

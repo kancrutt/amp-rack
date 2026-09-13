@@ -541,6 +541,27 @@ public class Tracks extends Fragment {
         tracksAdapter.add(filename.toString());
     }
 
+    /**
+     * One-tap load (lastworks automation): after the file is chosen, register it,
+     * auto-enable Skip Silence for the track, and feed it straight into the play
+     * box (setMediaItem + prepare) so no extra click is needed. Mirrors the tap-a-row
+     * play path in TracksAdapter.onBindViewHolder.
+     */
+    public void loadAndPlay (Uri uri) {
+        tracksAdapter.add(uri.toString());
+        try { player.setSkipSilenceEnabled(true); } catch (Exception e) { Log.w(TAG, "loadAndPlay: skip silence enable failed", e); }
+        try {
+            MediaItem mediaItem = MediaItem.fromUri(uri);
+            player.setMediaItem(mediaItem);
+            player.prepare();
+            if (playPause != null) playPause.setChecked(true);
+        } catch (Exception e) { Log.w(TAG, "loadAndPlay: load-to-play-box failed", e); }
+        try {
+            ToggleButton skipSilenceToggle = (ToggleButton) constraintLayout.findViewById(R.id.skip_silence);
+            if (skipSilenceToggle != null) skipSilenceToggle.setChecked(true);
+        } catch (Exception e) { Log.w(TAG, "loadAndPlay: skip-silence UI sync failed", e); }
+    }
+
     private void stylePillSeekBar(android.widget.SeekBar seekBar) {
         float density = getResources().getDisplayMetrics().density;
         float trackRadiusPx = 7 * density;

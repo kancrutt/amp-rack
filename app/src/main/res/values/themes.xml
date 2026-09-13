@@ -84,6 +84,16 @@
         <!-- Title / body typography -->
         <item name="materialAlertDialogTitleTextStyle">@style/TextAppearance.Giggin.Dialog.Title</item>
         <item name="materialAlertDialogBodyTextStyle">@style/TextAppearance.Giggin.Dialog.Body</item>
+        <!-- Framework AlertDialog buttons are plain android.widget.Button: without an
+             explicit text color they fall back to black on the dark dialog. Force the
+             glass primary text color so Save / Cancel / Rename / Delete etc. stay legible. -->
+        <item name="buttonBarPositiveButtonStyle">@style/Widget.Giggin.DialogButton</item>
+        <item name="buttonBarNegativeButtonStyle">@style/Widget.Giggin.DialogButton</item>
+        <item name="buttonBarNeutralButtonStyle">@style/Widget.Giggin.DialogButton</item>
+    </style>
+
+    <style name="Widget.Giggin.DialogButton" parent="Widget.AppCompat.Button.ButtonBar.AlertDialog">
+        <item name="android:textColor">@color/gg_glass_text_primary</item>
     </style>
 
     <style name="ShapeAppearance.Giggin.Dialog" parent="ShapeAppearance.Material3.MediumComponent">

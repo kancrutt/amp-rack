@@ -1729,13 +1729,15 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                                     toast("File could not be deleted");
                                 } else {
                                     toast("File deleted");
-                                    dialog.dismiss();
+                                    _dialog.dismiss();
                                 }
                             }
                         })
                         .setNegativeButton("Cancel", null);
                 // Create the AlertDialog object and return it
-                builder.create().show();
+                AlertDialog _d2 = builder.create();
+                _d2.show();
+                colorDialogButtons(_d2);
             }
         });
         dialog.setOnDismissListener(new DialogInterface.OnDismissListener() {
@@ -1927,7 +1929,9 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     }
                 });
 
-                builder.show();
+                AlertDialog d = builder.create();
+                d.show();
+                colorDialogButtons(d);
             }
         });
         } // Closing brace for if (settings != null) {
@@ -2108,7 +2112,9 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                             }
                         })
                         .setTitle("Feedback Noise Warning") ;
-                builder.create().show();
+                AlertDialog d = builder.create();
+                d.show();
+                colorDialogButtons(d);
                 return;
             }
             // apply settings
@@ -2308,7 +2314,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 }
                 vals.add(selectedImage.toString());
                 Log.d(TAG, "onActivityResult: adding collection to list: " + vals.toString());
-                tracks.load(selectedImage);
+                tracks.loadAndPlay(selectedImage);
                 sharedPreferences.edit().putStringSet("tracks", vals).commit();
             }
             else {
@@ -2319,7 +2325,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 }
                 vals.add(selectedImage.toString());
                 Log.d(TAG, "onActivityResult: adding collection to list: " + vals.toString());
-                drums.load(selectedImage);
+                drums.loadAndPlay(selectedImage);
                 sharedPreferences.edit().putStringSet("drums", vals).commit();
             }
         }
@@ -3746,7 +3752,10 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             // ONLY the TONE3000-specific entries are AMP/CAB-gated: the injected
             // "Browse TONE3000 →" link below, and the T3K row inside the dialog
             // (loadModelsIntoContainer shows it only under AMP/CAB tabs).
-            final boolean allowT3k = isAmp || isCab || isTone3000Slot(position);
+            // Tone3K is a neural-model feature: it must only be offered when the
+            // active block can actually run neural models (canLoadNamModel). Plain
+            // amp sims (C* AmpVTS etc.) have no model file ports -> no Tone3K.
+            final boolean allowT3k = ((isAmp || isCab) && canLoadNamModel(position)) || isTone3000Slot(position);
             if (browseBtn != null) try {
                 browseBtn.setVisibility(View.VISIBLE);
                 JSONObject t3kMeta2 = getTone3000MetaForSlot(position);
@@ -4148,13 +4157,15 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                                  int cur = valuesFinal != null ? nearestEnumIndex(AudioEngine.getActivePluginValue(position, finalIEnum), valuesFinal) : Math.max(0, Math.min(labelsFinal.length - 1, (int) Math.round(AudioEngine.getActivePluginValue(position, finalIEnum) - fEnumMinVal)));
                                  b.setSingleChoiceItems(labelsFinal, cur, (dialog, which) -> {
                                      float newVal = valuesFinal != null ? valuesFinal[which] : fEnumMinVal + (float) which;
-                                    AudioEngine.setPluginControl(position, finalIEnum, newVal);
-                                    enumValue.setText(labelsFinal[which]);
-                                    dialog.dismiss();
-                                });
-                                b.setNegativeButton("CANCEL", null);
-                                b.show();
-                            } else {
+                                     AudioEngine.setPluginControl(position, finalIEnum, newVal);
+                                     enumValue.setText(labelsFinal[which]);
+                                     dialog.dismiss();
+                                 });
+                                 b.setNegativeButton("CANCEL", null);
+                                 AlertDialog d = b.create();
+                                 d.show();
+                                 colorDialogButtons(d);
+                             } else {
                                 // No labels — cycle integer steps via +/- in dialog
                                 String[] opts = new String[optionCount];
                                 for (int k = 0; k < optionCount; k++) opts[k] = String.valueOf(k);
@@ -4168,8 +4179,10 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                                     enumValue.setText(opts[which]);
                                     dialog.dismiss();
                                 });
-                                b.setNegativeButton("CANCEL", null);
-                                b.show();
+                                 b.setNegativeButton("CANCEL", null);
+                                 AlertDialog d2 = b.create();
+                                 d2.show();
+                                 colorDialogButtons(d2);
                             }
                         };
                         enumRow.setOnClickListener(enumClick);
@@ -4711,10 +4724,11 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                .setNegativeButton("CANCEL", null);
                
          androidx.appcompat.app.AlertDialog dialog = builder.create();
-        if (dialog.getWindow() != null) {
+         if (dialog.getWindow() != null) {
             dialog.getWindow().setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
         }
          dialog.show();
+         colorDialogButtons(dialog);
          input.setTextColor(Color.WHITE);
          input.setHintTextColor(Color.parseColor("#8F94A0"));
          input.requestFocus();
@@ -5549,6 +5563,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         }
 
         dialog.show();
+        colorDialogButtons(dialog);
 
         ImageButton closeX = dialog.findViewById(R.id.dialog_model_close_x);
         com.google.android.material.button.MaterialButton closeBtn = dialog.findViewById(R.id.dialog_model_close_btn);
@@ -5663,6 +5678,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         }
 
         dialog.show();
+        colorDialogButtons(dialog);
 
         ImageButton closeX = dialog.findViewById(R.id.picker_close_btn);
         com.google.android.material.button.MaterialButton closeBtn = dialog.findViewById(R.id.picker_bottom_close_btn);
@@ -6376,6 +6392,37 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         return new androidx.appcompat.app.AlertDialog.Builder(ctx, R.style.ThemeOverlay_Giggin_Dialog);
     }
 
+    /**
+     * AppCompat android.widget.Button negative/neutral/positive buttons render their
+     * label in the default black, ignoring the M3 theme's textColorPrimary (which is
+     * light). Force every dialog button label to the glass primary text color so Save /
+     * Cancel / Rename / Delete / Log out / CANCEL etc. are legible on the dark dialog.
+     */
+    public static void colorDialogButtons(androidx.appcompat.app.AlertDialog dialog) {
+        if (dialog == null) return;
+        try {
+            android.widget.Button b = dialog.getButton(android.content.DialogInterface.BUTTON_POSITIVE);
+            if (b != null) b.setTextColor(android.graphics.Color.parseColor("#E6E6E6"));
+            b = dialog.getButton(android.content.DialogInterface.BUTTON_NEGATIVE);
+            if (b != null) b.setTextColor(android.graphics.Color.parseColor("#E6E6E6"));
+            b = dialog.getButton(android.content.DialogInterface.BUTTON_NEUTRAL);
+            if (b != null) b.setTextColor(android.graphics.Color.parseColor("#E6E6E6"));
+        } catch (Exception e) { /* buttons not materialised yet */ }
+    }
+
+    /** Overload for legacy android.app.AlertDialog (used by Rack scene/rename/logout flows). */
+    public static void colorDialogButtons(android.app.AlertDialog dialog) {
+        if (dialog == null) return;
+        try {
+            android.widget.Button b = dialog.getButton(android.content.DialogInterface.BUTTON_POSITIVE);
+            if (b != null) b.setTextColor(android.graphics.Color.parseColor("#E6E6E6"));
+            b = dialog.getButton(android.content.DialogInterface.BUTTON_NEGATIVE);
+            if (b != null) b.setTextColor(android.graphics.Color.parseColor("#E6E6E6"));
+            b = dialog.getButton(android.content.DialogInterface.BUTTON_NEUTRAL);
+            if (b != null) b.setTextColor(android.graphics.Color.parseColor("#E6E6E6"));
+        } catch (Exception e) { /* buttons not materialised yet */ }
+    }
+
     public static void alert(String title, String text) {
         AlertDialog.Builder builder = new AlertDialog.Builder(mainActivity);
         builder.setMessage(text)
@@ -6384,6 +6431,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
         AlertDialog dialog = builder.create();
         dialog.show();
+        colorDialogButtons(dialog);
     }
 
     public void heartPlugin(String name) {

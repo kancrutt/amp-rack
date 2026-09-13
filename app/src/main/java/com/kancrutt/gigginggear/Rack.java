@@ -421,15 +421,18 @@ public class Rack extends Fragment {
             });
             signalChainCanvas.setOnWireDeleteListener(edge -> {
                 if (edge == null) return;
-                new AlertDialog.Builder(getContext())
+                AlertDialog.Builder wireBuilder = new AlertDialog.Builder(getContext());
+                wireBuilder
                         .setTitle("Remove connection?")
                         .setMessage("Delete this connection from the signal chain?")
                         .setPositiveButton("Delete", (dialog, which) -> {
                             signalChainCanvas.deleteEdge(edge);
                             if (mainActivity.dataAdapter != null) mainActivity.dataAdapter.notifyDataSetChanged();
                         })
-                        .setNegativeButton("Cancel", null)
-                        .show();
+                        .setNegativeButton("Cancel", null);
+                AlertDialog wireDialog = wireBuilder.create();
+                wireDialog.show();
+                MainActivity.colorDialogButtons(wireDialog);
             });
 //            view.postDelayed(() -> signalChainCanvas.loadFromActivePlugins(), 600);
 // Chain refresh happens after loadActivePreset() completes in MainActivity
@@ -512,7 +515,7 @@ public class Rack extends Fragment {
             volSeek.setMax(10000);
             volSeek.setProgress(7936);
             LinearLayout.LayoutParams vsLp = new LinearLayout.LayoutParams(
-                    (int) (80 * density), (int) (22 * density));
+                    (int) (80 * density), android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
             vsLp.gravity = android.view.Gravity.CENTER_VERTICAL;
             knobContainer.addView(volSeek, vsLp);
             if (topVolVal != null) {
@@ -597,7 +600,8 @@ public class Rack extends Fragment {
         if (sceneBtn != null) {
             sceneBtn.setText(sceneNames.get(0));
             sceneBtn.setOnClickListener(v -> {
-                new AlertDialog.Builder(getContext())
+                AlertDialog.Builder sceneBuilder = new AlertDialog.Builder(getContext());
+                sceneBuilder
                         .setTitle("Scene Options (" + sceneNames.get(currentSceneIndex) + ")")
                         .setSingleChoiceItems(sceneNames.toArray(new CharSequence[0]), currentSceneIndex, (d, which) -> {
                             currentSceneIndex = which;
@@ -629,10 +633,14 @@ public class Rack extends Fragment {
                                         sceneBtn.setText(nm);
                                     }
                                 });
-                                rb.show();
+                                AlertDialog rd = rb.create();
+                                rd.show();
+                                MainActivity.colorDialogButtons(rd);
                             })
-                        .setNegativeButton("Close", null)
-                        .show();
+                        .setNegativeButton("Close", null);
+                AlertDialog sceneDialog = sceneBuilder.create();
+                sceneDialog.show();
+                MainActivity.colorDialogButtons(sceneDialog);
             });
             sceneBtn.setOnLongClickListener(v -> {
                 saveCurrentChainToScene();
@@ -845,6 +853,7 @@ public class Rack extends Fragment {
                 });
 
                 alertDialog.show();
+                MainActivity.colorDialogButtons(alertDialog);
                 return true;
             }
         } ;
@@ -1026,6 +1035,7 @@ public class Rack extends Fragment {
 
                 AlertDialog dialog = builder.create();
                 dialog.show();
+                MainActivity.colorDialogButtons(dialog);
 
                 return false;
             }
@@ -1705,6 +1715,7 @@ public class Rack extends Fragment {
         });
 
         dialog.show();
+        MainActivity.colorDialogButtons(dialog);
     }
 
     public String syncData(String host, int port, String toSend){
@@ -1864,11 +1875,9 @@ public class Rack extends Fragment {
         }
         android.graphics.drawable.GradientDrawable containerBg = new android.graphics.drawable.GradientDrawable();
         containerBg.setColor(android.graphics.Color.parseColor("#272B33"));
-        containerBg.setStroke(dp(1), android.graphics.Color.parseColor("#FFAA00"));
         containerBg.setCornerRadius(dp(10));
         android.graphics.drawable.GradientDrawable rowBg = new android.graphics.drawable.GradientDrawable();
         rowBg.setColor(android.graphics.Color.parseColor("#14FFFFFF"));
-        rowBg.setStroke(dp(1), android.graphics.Color.parseColor("#FFAA00"));
         rowBg.setCornerRadius(dp(10));
         final androidx.appcompat.app.AlertDialog[] dialogRef = new androidx.appcompat.app.AlertDialog[1];
         LinearLayout container = new LinearLayout(getContext());
@@ -1938,6 +1947,7 @@ public class Rack extends Fragment {
         builder.setNegativeButton("Cancel", null);
         dialogRef[0] = builder.create();
         dialogRef[0].show();
+        MainActivity.colorDialogButtons(dialogRef[0]);
     }
 
     private int dp(float value) {
@@ -2042,7 +2052,9 @@ public class Rack extends Fragment {
             }
             MainActivity.toast("Preset renamed to " + name);
         });
-        builder.show();
+        AlertDialog d = builder.create();
+        d.show();
+        MainActivity.colorDialogButtons(d);
     }
 
     private void showQuickSaveDialog() {
@@ -2057,11 +2069,15 @@ public class Rack extends Fragment {
         final EditText nameInput = new EditText(getContext());
         nameInput.setSingleLine(true);
         nameInput.setHint("Preset name");
+        nameInput.setTextColor(android.graphics.Color.parseColor("#E6E6E6"));
+        nameInput.setHintTextColor(android.graphics.Color.parseColor("#A1A1AA"));
         nameInput.setText(mainActivity.patchName != null ? mainActivity.patchName.getText().toString() : "");
 
         final EditText descInput = new EditText(getContext());
         descInput.setSingleLine(true);
         descInput.setHint("Description (optional)");
+        descInput.setTextColor(android.graphics.Color.parseColor("#E6E6E6"));
+        descInput.setHintTextColor(android.graphics.Color.parseColor("#A1A1AA"));
 
         layout.addView(nameInput);
         layout.addView(descInput, new LinearLayout.LayoutParams(
@@ -2115,7 +2131,9 @@ public class Rack extends Fragment {
                 MainActivity.toast("Failed to save preset.");
             }
         });
-        builder.show();
+        AlertDialog d = builder.create();
+        d.show();
+        MainActivity.colorDialogButtons(d);
     }
 
     private void saveCurrentChainToScene() {

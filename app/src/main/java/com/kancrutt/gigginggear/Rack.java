@@ -760,16 +760,15 @@ public class Rack extends Fragment {
             while (keys.hasNext()) {
                 String key = keys.next();
                 try {
-                    if (blacklist.has(key) && ! enableBlacklisted) {
-                        Log.d(TAG, String.format ("[lv2] blacklisted: %s", key));
-                        continue;
-                    }
-
                     if (plugins.get(key) instanceof JSONObject) {
 //                        Log.d(TAG, "onCreate: key " + key);
                         JSONObject object = plugins.getJSONObject(key);
                         // do something with jsonObject here
                         String name = object.optString("name", "");
+                        if (blacklist != null && blacklist.has(name) && ! enableBlacklisted) {
+                            Log.d(TAG, String.format ("[lv2] blacklisted: %s", name));
+                            continue;
+                        }
                         String id = object.optString("id", "0");
                         String desc = object.optString("desc", "");
                         mainActivity.pluginDialogAdapter.addItem(Integer.parseInt(key), name, Integer.parseInt(id), desc);
@@ -792,8 +791,8 @@ public class Rack extends Fragment {
                         String name = object.optString("name", "");
                         String desc = object.optString("desc", "");
                         String id = object.optString("id", "0");
-                        if (blacklist.has(id) && ! enableBlacklisted) {
-                            Log.d(TAG, String.format ("[ladspa] blacklisted: %s", key));
+                        if (blacklist != null && blacklist.has(name) && ! enableBlacklisted) {
+                            Log.d(TAG, String.format ("[ladspa] blacklisted: %s", name));
                             continue;
                         }
 //                        Log.d(TAG, "[LV2 plugin]: " + name + ": " + id);

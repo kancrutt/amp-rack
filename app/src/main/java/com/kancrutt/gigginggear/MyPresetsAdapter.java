@@ -320,29 +320,44 @@ public class MyPresetsAdapter extends RecyclerView.Adapter<MyPresetsAdapter.View
             final Map<String, Object> clickTarget = presets.get(clickPos);
             if (clickTarget == null) return;
             final String targetName = value(clickTarget, "name", "Untitled");
-            final String clickId;
-            if (clickTarget.containsKey("id") && clickTarget.get("id") != null) {
-                clickId = clickTarget.get("id").toString();
-            } else if (clickTarget.containsKey("name") && clickTarget.get("name") != null) {
-                clickId = clickTarget.get("name").toString();
-            } else {
-                clickId = null;
-            }
+            // ID-only addressing: display names are not unique, so falling back
+            // to the name here deleted (or failed) the wrong file. A row without
+            // an id cannot be deleted honestly — abort loudly instead.
+            Object rawId = clickTarget.get("id");
+            final String clickId = (rawId != null && !rawId.toString().isEmpty())
+                    ? rawId.toString() : null;
 
             AlertDialog.Builder builder = MainActivity.dialogBuilder(mainActivity);
             builder.setTitle("Delete this preset?");
             builder.setMessage("Delete \"" + targetName + "\"? This cannot be undone.");
             builder.setPositiveButton("Delete", (dialog, which) -> {
+                if (clickId == null) {
+                    Log.e(TAG, "delete: preset row has no id, refusing (name=" + targetName + ")");
+                    MainActivity.toast("Cannot delete \"" + targetName + "\": missing id");
+                    return;
+                }
+                if (localPresetManager == null) {
+                    Log.e(TAG, "delete: localPresetManager null, refusing (id=" + clickId + ")");
+                    MainActivity.toast("Cannot delete \"" + targetName + "\": storage unavailable");
+                    return;
+                }
                 boolean fileDeleted = false;
-                if (clickId != null && localPresetManager != null) {
+                try {
+                    fileDeleted = localPresetManager.deletePreset(clickId);
+                } catch (Exception e) {
+                    Log.e(TAG, "delete failed", e);
+                }
+                if (!fileDeleted) {
+                    // Never fake success: the row stays (refresh below reloads it)
+                    // and the user gets a failure toast instead of a lying "Deleted".
+                    Log.e(TAG, "deletePreset failed for id=" + clickId + " (name=" + targetName + ")");
+                    MainActivity.toast("Delete failed — preset kept");
                     try {
-                        fileDeleted = localPresetManager.deletePreset(clickId);
+                        if (mainActivity != null) mainActivity.refreshPresetLists();
                     } catch (Exception e) {
-                        Log.e(TAG, "delete failed", e);
+                        Log.w(TAG, "post-delete refresh failed", e);
                     }
-                    if (!fileDeleted) {
-                        Log.w(TAG, "deletePreset returned false for id=" + clickId);
-                    }
+                    return;
                 }
                 // Remove the visible row by identity first, fall back to click pos.
                 int visiblePos = presets.indexOf(clickTarget);

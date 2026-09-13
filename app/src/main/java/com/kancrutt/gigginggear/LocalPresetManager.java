@@ -98,30 +98,53 @@ public class LocalPresetManager {
     }
 
     /**
-     * Delete preset by ID.
+     * Delete preset by ID. Primary path is the <id>.json file itself; the fallback
+     * matches the STORED "id" only — never the display name (names are not unique).
+     * Every miss is logged loudly; silent false deletes are a UI-level lie.
      */
     public boolean deletePreset(String id) {
+        if (id == null || id.isEmpty()) {
+            Log.w(TAG, "deletePreset: refused null/empty id");
+            return false;
+        }
         File file = new File(presetsDir, id + ".json");
         if (file.exists()) {
-            return file.delete();
+            boolean ok = file.delete();
+            if (!ok) Log.w(TAG, "deletePreset: file.delete() failed for " + file.getAbsolutePath());
+            return ok;
         }
-        // Fallback: legacy saves may lack a stable id — delete any preset whose
-        // stored "id" or "name" matches, so user deletes always stick.
+        // Fallback: filename stem drifted from the stored id (copied/renamed files).
         File[] files = presetsDir.listFiles((d, n) -> n.toLowerCase().endsWith(".json"));
         if (files != null) {
             for (File f : files) {
-                try (FileInputStream fis = new FileInputStream(f)) {
-                    byte[] data = new byte[(int) f.length()];
-                    int read = fis.read(data);
-                    if (read <= 0) continue;
-                    JSONObject o = new JSONObject(new String(data, StandardCharsets.UTF_8));
-                    if (id.equals(o.optString("id")) || id.equals(o.optString("name"))) {
-                        return f.delete();
+                try {
+                    JSONObject o = new JSONObject(readFully(f));
+                    if (id.equals(o.optString("id"))) {
+                        boolean ok = f.delete();
+                        if (!ok) Log.w(TAG, "deletePreset: file.delete() failed for " + f.getAbsolutePath());
+                        return ok;
                     }
-                } catch (Exception ignored) {}
+                } catch (Exception e) {
+                    Log.w(TAG, "deletePreset: skipping unreadable " + f.getName(), e);
+                }
             }
         }
+        Log.w(TAG, "deletePreset: no preset file with id=" + id);
         return false;
+    }
+
+    /** Fully-draining read: a single InputStream.read() is NOT guaranteed to fill. */
+    private static String readFully(File f) throws IOException {
+        try (FileInputStream fis = new FileInputStream(f)) {
+            byte[] data = new byte[(int) f.length()];
+            int off = 0;
+            while (off < data.length) {
+                int r = fis.read(data, off, data.length - off);
+                if (r < 0) break;
+                off += r;
+            }
+            return new String(data, 0, off, StandardCharsets.UTF_8);
+        }
     }
 
     /**
@@ -134,7 +157,16 @@ public class LocalPresetManager {
             if (read <= 0) return null;
             String jsonStr = new String(data, StandardCharsets.UTF_8);
             JSONObject json = new JSONObject(jsonStr);
-            return jsonToPreset(json);
+            Preset p = jsonToPreset(json);
+            // Files predating stable ids (legacy saves) carry no usable "id":
+            // derive it from the filename stem so delete-by-id always resolves
+            // to this exact file instead of a fresh random UUID per load.
+            if (!json.has("id") || json.optString("id").isEmpty()) {
+                String n = file.getName();
+                p.id = (n.toLowerCase().endsWith(".json") && n.length() > 5)
+                        ? n.substring(0, n.length() - 5) : n;
+            }
+            return p;
         } catch (Exception e) {
             Log.e(TAG, "Error loading preset file: " + file.getName(), e);
             return null;

@@ -8,4 +8,8 @@
          definition site of R.id.fab consumed by MainActivity:1785 (null-guarded).
          Runtime behavior unchanged: layout was never inflated, lookup stays null. -->
     <item name="fab" type="id"/>
+    <!-- Transplanted from deleted orphan dialog_plugin_detail.xml (audit G4): sole
+         definition site of R.id.detail_badge_pill consumed by MainActivity:3659,4671.
+         Runtime behavior unchanged: dialog layout was never inflated, lookup stays null. -->
+    <item name="detail_badge_pill" type="id"/>
 </resources>

@@ -536,6 +536,13 @@
     "desc": "Guitarix Compressor Pedal",
     "library": "libmonocompressor.so"
   },
+  "7700": {
+    "name": "C* Noisegate - Attenuating hum and noise",
+    "id": 2602,
+    "desc": "Attenuating hum and noise. This effect plugin attenuates the signal when it is deemed to be background noise.",
+    "plugin": 0,
+    "library": "libNoisegate.so"
+  },
   "7900": {
     "name": "LFO Phaser",
     "id": 1217,
@@ -971,6 +978,13 @@
     "id": 1982,
     "plugin": 1,
     "library": "libvlevel-ladspa.so"
+  },
+  "14300": {
+    "name": "Vocoder",
+    "id": 1337,
+    "plugin": 0,
+    "desc": "Makes a human voice sound synthetic; often used to speak like a robot, with a metallic and monotonous voice.  Using a human voice as the formant and an instrument as the carrier, creates an effect of an instrument speaking.",
+    "library": "libvocoder_1337.so"
   },
   "14500": {
     "name": "VyNil (Vinyl Effect)",

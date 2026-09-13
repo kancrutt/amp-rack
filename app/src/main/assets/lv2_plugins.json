@@ -132,6 +132,13 @@
     "index": 21,
     "library": "rkrlv2.so"
   },
+  "15043": {
+    "name": "rkr NoiseGate",
+    "id": 5020,
+    "desc": "Based on Gate, Steve Harris LADSPA plugin.",
+    "index": 43,
+    "library": "rkrlv2.so"
+  },
   "15006": {
     "name": "rkr Harmonizer (no midi)",
     "id": 5021,
@@ -265,6 +272,13 @@
     "desc": "Multi-band tremolo effect allowing 2 LFOs to modulate volume of any combination of 4 frequency bands.",
     "library": "rkrlv2.so"
   },
+  "15029": {
+    "name": "rkr Vocoder",
+    "id": 5044,
+    "desc": "32 band vocoder. This type of effect is well known for creating robot-like voices in popular music. The input is divided into frequency bands and each band's volume is controlled by an auxiliary input's frequency curve such that the output signal is filtered to sound like the aux signal.",
+    "index": 29,
+    "library": "rkrlv2.so"
+  },
   "15014": {
     "name": "rkr WahWah",
     "desc": "Wah effect controllable by the input volume envelope or by LFO.",
@@ -342,12 +356,6 @@
     "desc": "Delay with feedback saturation and time/pitch modulation",
     "library": "mda-DubDelay.so"
   },
-  "16100": {
-    "name": "MDA DX10",
-    "id": 6011,
-    "index": 0,
-    "library": "mda-DX10.so"
-  },
   "16200": {
     "name": "MDA Dynamics",
     "id": 6012,
@@ -361,12 +369,6 @@
     "index": 0,
     "desc": "Stereo image adjustment and M-S matrix",
     "library": "mda-Image.so"
-  },
-  "16500": {
-    "name": "MDA JX10",
-    "id": 6015,
-    "index": 0,
-    "library": "mda-JX10.so"
   },
   "16600": {
     "name": "MDA Leslie",
@@ -431,13 +433,6 @@
     "index": 0,
     "library": "mda-RoundPan.so"
   },
-  "17600": {
-    "name": "MDA Shepard",
-    "id": 6026,
-    "desc": "Continuously rising/falling tone generator.",
-    "index": 0,
-    "library": "mda-Shepard.so"
-  },
   "17700": {
     "name": "MDA Splitter",
     "id": 6027,
@@ -458,6 +453,13 @@
     "desc": "High resolution vocoder. ",
     "index": 0,
     "library": "mda-TalkBox.so"
+  },
+  "18100": {
+    "name": "MDA TestTone",
+    "id": 6031,
+    "index": 0,
+    "desc": "Signal generator with pink and white noise, impulses and sweeps",
+    "library": "mda-TestTone.so"
   },
   "18200": {
     "name": "MDA ThruZero",
@@ -654,6 +656,13 @@
     "index": 0,
     "library": "libGxShakaTube.lv2.so"
   },
+  "21300": {
+    "name": "GxSloopyBlue",
+    "id": 7027,
+    "index": 0,
+    "desc": "Overdrive pedal simulation",
+    "library": "libGxSloopyBlue.lv2.so"
+  },
   "21400": {
     "name": "Gx_slowgear_",
     "id": 7028,
@@ -730,6 +739,13 @@
     "index": 0,
     "desc": "The ValveCaster is a little tube boost pedal simulation. It adds some overdrive and tube compression along with boosting the signal",
     "library": "libGxValveCaster.lv2.so"
+  },
+  "22600": {
+    "name": "Gx_voxbass_",
+    "id": 7040,
+    "desc": "Analog Simulation of the 1984 (*) Vox Venue Bass 100 Pre Amp Section",
+    "index": 0,
+    "library": "libGxVBassPreAmp.lv2.so"
   },
   "22700": {
     "name": "Gx_vfm_",
@@ -853,6 +869,13 @@
     "desc": "Cabinet Simulation",
     "index": 0,
     "library": "libGxCabSim.lv2.so"
+  },
+  "24800": {
+    "name": "Gx_denoiser2_",
+    "id": 8019,
+    "index": 0,
+    "desc": "cascaded moving average filter to suppress input noise ",
+    "library": "libGxDenoiser2.lv2.so"
   },
   "24900": {
     "name": "Gx_DistortionPlus_",

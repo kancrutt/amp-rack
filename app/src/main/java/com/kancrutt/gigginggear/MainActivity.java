@@ -1846,7 +1846,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     int finalI = i;
                     int finalPlugin = plugin;
                     int pluginID = finalI * 100 + finalPlugin ;
-                    if (blacklist != null && blacklist.has(String.valueOf(pluginID)))
+                    if (blacklist != null && blacklist.has(name))
                         continue;
 
                     if (pluginDialogAdapter != null)

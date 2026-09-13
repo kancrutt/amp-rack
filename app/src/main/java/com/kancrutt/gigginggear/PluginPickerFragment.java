@@ -227,7 +227,8 @@ public class PluginPickerFragment extends BottomSheetDialogFragment {
                 if (MainActivity.isUnsupportedSynth(pName)) continue;
 
                 // Blacklist check
-                if (blacklist != null && blacklist.has(pName) && !enableBlacklisted) {
+                String pNameKey = pName != null ? pName.toLowerCase().trim() : "";
+                if (blacklist != null && blacklist.has(pNameKey) && !enableBlacklisted) {
                     Log.d(TAG, String.format ("[plugin picker] blacklisted: %s", pName));
                     continue;
                 }

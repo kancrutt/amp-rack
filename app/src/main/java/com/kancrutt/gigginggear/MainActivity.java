@@ -1531,6 +1531,8 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             return;
         }
         try { AudioEngine.deletePlugin(slot); } catch (Exception e) { Log.e(TAG, "deletePlugin failed", e); return; }
+        // Clear inline parameter editor so deleted block's parameters don't linger
+        populateInlineParameterEditor(PARAM_EDITOR_CLEAR, "");
         shiftT3kMetaOnDelete(slot);
         if (signalChainCanvas != null) {
             signalChainCanvas.clearT3kBadges();
@@ -1842,7 +1844,8 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 SubMenu subMenu = addPluginMenu.getMenu().addSubMenu(AudioEngine.getLibraryName(i));
                 for (int plugin = 0; plugin < AudioEngine.getPlugins(i); plugin++) {
                     String name = AudioEngine.getPluginName(i, plugin);
-                    if (blacklist != null && blacklist.has(name)) {
+                    String nameKey = name != null ? name.toLowerCase().trim() : "";
+                    if (blacklist != null && blacklist.has(nameKey)) {
                         Log.d(TAG, String.format("[menu] blacklisted: %s", name));
                         continue;
                     }
@@ -5236,7 +5239,8 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             int ret = -1;
             // Blacklist check: skip loading blacklisted plugins from presets
             JSONObject blacklist = ConnectGuitar.loadJSONFromAssetFile(this, "blacklist.json");
-            if (blacklist != null && blacklist.has(name)) {
+            String nameKey = name != null ? name.toLowerCase().trim() : "";
+            if (blacklist != null && blacklist.has(nameKey)) {
                 Log.d(TAG, String.format("[loadPreset] blacklisted: %s", name));
                 // Skip this plugin, don't add it to chain
                 continue;

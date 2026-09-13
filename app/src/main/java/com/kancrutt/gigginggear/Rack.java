@@ -412,6 +412,9 @@ public class Rack extends Fragment {
                 if (node != null && node.id >= 0) {
                     try {
                         AudioEngine.deletePlugin(node.id);
+                        if (mainActivity != null) {
+                            mainActivity.populateInlineParameterEditor(MainActivity.PARAM_EDITOR_CLEAR, "");
+                        }
                         signalChainCanvas.postDelayed(() -> {
                             signalChainCanvas.loadFromActivePlugins();
                             if (mainActivity.dataAdapter != null) mainActivity.dataAdapter.notifyDataSetChanged();
@@ -737,7 +740,8 @@ public class Rack extends Fragment {
                     int uniqueID = AudioEngine.getPluginUniqueID(i, plugin);
 
                     // Skip blacklisted plugins in plugin dialog
-                    if (blacklist != null && blacklist.has(name) && !enableBlacklisted) {
+                    String nameKey = name != null ? name.toLowerCase().trim() : "";
+                    if (blacklist != null && blacklist.has(nameKey) && !enableBlacklisted) {
                         Log.d(TAG, String.format("[lv2] blacklisted: %s", name));
                         continue;
                     }
@@ -771,7 +775,8 @@ public class Rack extends Fragment {
                         JSONObject object = plugins.getJSONObject(key);
                         // do something with jsonObject here
                         String name = object.optString("name", "");
-                        if (blacklist != null && blacklist.has(name) && ! enableBlacklisted) {
+                        String nameKey = name != null ? name.toLowerCase().trim() : "";
+                        if (blacklist != null && blacklist.has(nameKey) && ! enableBlacklisted) {
                             Log.d(TAG, String.format ("[lv2] blacklisted: %s", name));
                             continue;
                         }
@@ -797,7 +802,8 @@ public class Rack extends Fragment {
                         String name = object.optString("name", "");
                         String desc = object.optString("desc", "");
                         String id = object.optString("id", "0");
-                        if (blacklist != null && blacklist.has(name) && ! enableBlacklisted) {
+                        String nameKey = name != null ? name.toLowerCase().trim() : "";
+                        if (blacklist != null && blacklist.has(nameKey) && ! enableBlacklisted) {
                             Log.d(TAG, String.format ("[ladspa] blacklisted: %s", name));
                             continue;
                         }

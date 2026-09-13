@@ -5237,7 +5237,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             if (blacklist != null && blacklist.has(name)) {
                 Log.d(TAG, String.format("[loadPreset] blacklisted: %s", name));
                 // Skip this plugin, don't add it to chain
-                plugin++;
                 continue;
             }
             if (!lazyLoad)

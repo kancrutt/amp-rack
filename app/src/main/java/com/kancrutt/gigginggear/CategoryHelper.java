@@ -153,7 +153,7 @@ public class CategoryHelper {
         OVERRIDES.put("zoom", Category.DISTORTION); // TTL: Distortion pedal from early 80s
         OVERRIDES.put("saturater", Category.MODULATION);
         OVERRIDES.put("shimmizita", Category.REVERB); // TTL: Reverb pedal
-        OVERRIDES.put("pushpull", Category.PITCH); // canonical plugin map policy
+        OVERRIDES.put("pushpull", Category.DISTORTION); // Guitarix pushpull distortion
         OVERRIDES.put("mobeemodule", Category.MODULATION);
         OVERRIDES.put("moduloso", Category.MODULATION);
         OVERRIDES.put("tonebender", Category.DISTORTION);

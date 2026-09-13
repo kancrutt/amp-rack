@@ -3575,7 +3575,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         AudioEngine.toggleMixer(sharedPreferences.getBoolean("toggleMixer", true));
         Log.i(TAG, "loadActivePreset: loading preset:\n" + preset);
 
-        if (preset != null) {
+        if (preset != null && !preset.trim().isEmpty()) {
             Log.d(TAG, "loadActivePreset: " + preset);
             // saveActivePreset now stores a schema-v1 snapshot ("plugins").
             // Route it through the Map loader (model files, T3K meta,
@@ -3594,9 +3594,17 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             if (!routed) loadPreset(preset);
             // Last-used preset: chain restored above, repaint its stored label.
             restoreTopBarLabel();
-        } else {
-            Log.d(TAG, "loadActivePreset: active preset is null or empty");
-            // Clean install (no last-used snapshot): default = preset no. 1.
+        }
+        // Heal degraded starts: blank/garbage snapshot, or a snapshot that restored
+        // nothing (e.g. legacy "{}" persisted from an empty chain, or prefs carried
+        // over an update). An empty restore is equivalent to no snapshot: the
+        // product default is factory preset no. 1, never a stuck "CLEAN" label.
+        // Unknown count (-1, engine query failed) keeps prior behavior: no action.
+        int restoredPlugins = -1;
+        try { restoredPlugins = AudioEngine.getActivePlugins(); }
+        catch (Exception e) { Log.w(TAG, "loadActivePreset: plugin count unavailable", e); }
+        if (restoredPlugins == 0) {
+            Log.i(TAG, "loadActivePreset: empty restore -> factory preset no. 1");
             loadFactoryPresetByIndex(0);
         }
         ensureDefaultChainHasAmp();

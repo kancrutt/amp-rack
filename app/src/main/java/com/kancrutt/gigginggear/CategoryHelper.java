@@ -355,6 +355,7 @@ public class CategoryHelper {
         OVERRIDES.put("mdaepiano", Category.PITCH); // e-piano synth; cf. "epiano"
         OVERRIDES.put("mdajx10", Category.PITCH); // JX-style synth; cf. "jx10"
         OVERRIDES.put("mdapiano", Category.PITCH); // piano synth; cf. "piano"
+        OVERRIDES.put("mdatesttone", Category.UTILITY); // signal generator; cf. "testtone"
         // Guitarix odd-one-out (norm: "Gx_vstb_" -> "vstb")
         OVERRIDES.put("vstb", Category.DISTORTION); // libGxSuppaToneBender: Tone Bender pedal sim
         // "the infamous X" family (norm keeps the prefix: "theinfamousewham")

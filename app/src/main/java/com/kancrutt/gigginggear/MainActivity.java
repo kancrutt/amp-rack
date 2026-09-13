@@ -334,6 +334,9 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     public Handler handler;
     public boolean tunerEnabled = false;
     public boolean tunerMuted = false;
+    // Output volume stashed while the tuner overlay mute is ON (-1 = not muted).
+    // Mute is output-volume-only; the pitch feed (setTunerEnabled) stays on.
+    public float tunerPreMuteVolume = -1f;
     public View [] tunerViews = null;
 
     enum RequestCode {
@@ -7106,9 +7109,22 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         View mute = tunerViews[4];
         mute.setOnClickListener(v -> {
             tunerMuted = !tunerMuted;
-            AudioEngine.setTunerEnabled(!tunerMuted);
+            // Mute silences OUTPUT only. Pitch analysis must keep running while the
+            // overlay is open, so this must NEVER call setTunerEnabled(false) here:
+            // that starves Meter::tunerBuffer and freezes chord + cents display.
+            try {
+                if (tunerMuted) {
+                    try { tunerPreMuteVolume = AudioEngine.getOutputVolume(); }
+                    catch (Exception e) { tunerPreMuteVolume = 1.0f; }
+                    AudioEngine.setOutputVolume(0f);
+                } else {
+                    float restore = tunerPreMuteVolume >= 0f ? tunerPreMuteVolume : 1.0f;
+                    AudioEngine.setOutputVolume(restore);
+                    tunerPreMuteVolume = -1f;
+                }
+            } catch (Exception e) { Log.w(TAG, "tuner mute toggle failed", e); }
             ((MaterialButton) mute).setText(tunerMuted ? "MUTE AUDIO: ON" : "MUTE AUDIO: OFF");
-            ((MaterialButton) mute).setStrokeColor(ColorStateList.valueOf(tunerMuted ? 0xFF3B30 : 0x00E676));
+            ((MaterialButton) mute).setStrokeColor(ColorStateList.valueOf(tunerMuted ? 0xFFFF3B30 : 0xFF00E676));
         });
 
         ImageButton closeBtn = tunerLayout.findViewById(R.id.tuner_close);
@@ -7120,6 +7136,13 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     private void closeTunerOverlay (FrameLayout overlay) {
         overlay.removeAllViews();
         overlay.setVisibility(View.GONE);
+        // Leaving while muted must not trap the output at zero: restore stashed volume.
+        if (tunerMuted && tunerPreMuteVolume >= 0f) {
+            try { AudioEngine.setOutputVolume(tunerPreMuteVolume); }
+            catch (Exception e) { Log.w(TAG, "tuner close: volume restore failed", e); }
+        }
+        tunerMuted = false;
+        tunerPreMuteVolume = -1f;
         tunerEnabled = false;
         AudioEngine.setTunerEnabled(false);
         tunerViews = null;

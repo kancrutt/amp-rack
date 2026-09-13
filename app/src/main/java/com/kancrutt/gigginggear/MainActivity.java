@@ -2945,6 +2945,8 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         int plug = pluginID - (library * 100);
         Log.d(TAG, "addPluginToRack: loading from " + sharedLibraries.length + " LADSPA and " + sharedLibrariesLV2.length + " LV2 plugins");
         Log.d(TAG, "Adding plugin: " + library + ": " + plug);
+        Log.i(TAG, "LOADPLUGIN id-path library=" + library + " idx=" + plug);
+        if (!chainHasRoom("id:" + pluginID)) return;
         int ret = -1;
         try {
             if (lazyLoad == false)
@@ -6912,6 +6914,23 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         }
     }
 
+    /** Chain capacity: mirrors native FullDuplexPass MAX_PLUGINS=10. Publishing more
+     *  overruns fixed DSP arrays -> native force-close. All UI add paths refuse loudly. */
+    public static final int MAX_CHAIN_BLOCKS = 10;
+
+    /** Refuse the add when the chain is full (native would overrun DSP arrays).
+     *  Returns true when there is room. */
+    boolean chainHasRoom(String pluginName) {
+        int n = 0;
+        try { n = AudioEngine.getActivePlugins(); } catch (Exception e) { Log.w(TAG, "chainHasRoom query failed", e); }
+        if (n >= MAX_CHAIN_BLOCKS) {
+            Log.w(TAG, "chain full (" + n + " blocks), refusing " + pluginName);
+            toast("Chain full (" + MAX_CHAIN_BLOCKS + " blocks max) — remove one first");
+            return false;
+        }
+        return true;
+    }
+
     public void addPluginByName(String pluginName) {
 //        Log.d(TAG, "addPluginByName: " + pluginName);
 //        Log.d(TAG, "addPluginByName: " + availablePlugins.toString());
@@ -6935,6 +6954,10 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
                     if (pluginName.equals(name)) {
                         Log.d(TAG, "addPluginByName: found plugin " + name);
+                        // Crash-triage trace: last LOADPLUGIN line before a SIGSEGV names
+                        // the culprit even though native dies before any "loaded ok".
+                        Log.i(TAG, "LOADPLUGIN ladspa name=\"" + name + "\" lib=" + lib + " idx=" + plugin);
+                        if (!chainHasRoom(name)) return;
                         // Native drops unloadable plugins silently: only touch
                         // UI state when the chain actually grew, or UI/engine
                         // slots desync (stale indices, blank editors).
@@ -6989,6 +7012,8 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
                     if (pluginName.equals(name)) {
                         Log.d(TAG, "addPluginByNameLV2: found plugin " + name);
+                        Log.i(TAG, "LOADPLUGIN lv2 name=\"" + name + "\" lib=" + lib + " idx=" + plugin);
+                        if (!chainHasRoom(name)) return;
                         int before = AudioEngine.getActivePlugins();
                         AudioEngine.addPluginLazyLV2(lib, plugin);
                         if (AudioEngine.getActivePlugins() <= before) {

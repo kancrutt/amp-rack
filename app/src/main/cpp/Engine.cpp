@@ -410,6 +410,12 @@ void Engine::onErrorAfterClose(oboe::AudioStream *oboeStream,
          oboe::convertToText(error));
 }
 void Engine::addPluginToRackLazy(char* library, int pluginIndex, SharedLibrary::PluginType _type) {
+    // Fixed DSP arrays hold MAX_PLUGINS blocks (FullDuplexPass.h): publishing more
+    // overruns them -> native force-close. Refuse loudly instead.
+    if ((int) activePlugins.size() >= MAX_PLUGINS) {
+        LOGE("addPluginToRackLazy: chain full (%d blocks max), refusing %s:%d", MAX_PLUGINS, library, pluginIndex);
+        return;
+    }
     SharedLibrary * sharedLibrary = new SharedLibrary (library, _type);
     sharedLibrary -> vm = vm ;
 
@@ -509,6 +515,12 @@ void Engine::buildPluginChain () {
         if (p->handle == nullptr || p->descriptor == nullptr) {
             LOGE("buildPluginChain: skipping unloadable plugin");
             continue;
+        }
+        // Backstop: never write past the fixed DSP arrays even if a caller
+        // bypassed the add-time cap (stale preset, JNI misuse).
+        if (mFullDuplexPass.activePlugins >= MAX_PLUGINS) {
+            LOGE("buildPluginChain: chain exceeds %d blocks, dropping extras", MAX_PLUGINS);
+            break;
         }
         mFullDuplexPass.inputPorts [mFullDuplexPass.activePlugins] = p->inputPort ;
         mFullDuplexPass.outputPorts [mFullDuplexPass.activePlugins] = p->outputPort ;
@@ -648,6 +660,10 @@ void Engine::addPluginToRack (int libraryIndex, int pluginIndex) {
     }
     if (pluginIndex < 0 || pluginIndex >= (int) libraries.at(libraryIndex)->descriptors.size()) {
         LOGF ("pluginIndex %d out of range [0,%d)", pluginIndex, (int) libraries.at(libraryIndex)->descriptors.size()) ;
+        return ;
+    }
+    if ((int) activePlugins.size() >= MAX_PLUGINS) {
+        LOGE("addPluginToRack: chain full (%d blocks max), refusing %d:%d", MAX_PLUGINS, libraryIndex, pluginIndex);
         return ;
     }
 

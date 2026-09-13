@@ -399,12 +399,12 @@ Java_com_kancrutt_gigginggear_AudioEngine_setPluginControl(JNIEnv *env, jclass c
 
     LOGD("[%d] setting control %s to %f", control, engine->activePlugins.at(plugin)->pluginControls.at(control)->name, value);
     auto* controlPtr = engine->activePlugins.at(plugin)->pluginControls.at(control);
-    LOGI("PARAM_TRACE native_set plugin=%d control=%d raw=%f before=%f min=%f max=%f unit=%s",
-         plugin, control, value, controlPtr->getValue(), controlPtr->getMin(),
-         controlPtr->getMax(), controlPtr->unit.c_str());
+    // LOGI("PARAM_TRACE native_set plugin=%d control=%d raw=%f before=%f min=%f max=%f unit=%s",
+    //      plugin, control, value, controlPtr->getValue(), controlPtr->getMin(),
+    //      controlPtr->getMax(), controlPtr->unit.c_str());
     controlPtr->setValue(value);
-    LOGI("PARAM_TRACE native_written plugin=%d control=%d raw=%f",
-         plugin, control, controlPtr->getValue());
+    // LOGI("PARAM_TRACE native_written plugin=%d control=%d raw=%f",
+    //      plugin, control, controlPtr->getValue());
 }
 extern "C"
 JNIEXPORT jint JNICALL
@@ -1311,8 +1311,8 @@ Java_com_kancrutt_gigginggear_AudioEngine_getActivePluginValue(JNIEnv *env, jcla
 
     auto* controlPtr = engine->activePlugins.at(plugin)->pluginControls.at(control);
     float val = controlPtr->getValue();
-    LOGI("PARAM_TRACE native_get plugin=%d control=%d raw=%f min=%f max=%f unit=%s",
-         plugin, control, val, controlPtr->getMin(), controlPtr->getMax(), controlPtr->unit.c_str());
+    // LOGI("PARAM_TRACE native_get plugin=%d control=%d raw=%f min=%f max=%f unit=%s",
+    //      plugin, control, val, controlPtr->getMin(), controlPtr->getMax(), controlPtr->unit.c_str());
     OUT
     return val ;
 }

@@ -239,10 +239,10 @@ PluginControl::PluginControl(const LADSPA_Descriptor *descriptor, int _port, uns
     if (def) sel = *def; else sel = default_value;
     val = sel;
 
-    LOGI("PARAM_TRACE LADSPA source plugin=%lu port=%d name=%s min=%f max=%f default=%f hint=0x%x log=%d integer=%d toggle=%d unit_source=none unit=none",
-         descriptor->UniqueID, _port, name ? name : "", min, max, default_value,
-         (unsigned int)ladspaPortRangeHintDescriptor, isLogarithmic ? 1 : 0,
-         isInteger ? 1 : 0, LADSPA_IS_HINT_TOGGLED(ladspaPortRangeHintDescriptor) ? 1 : 0);
+    // LOGI("PARAM_TRACE LADSPA source plugin=%lu port=%d name=%s min=%f max=%f default=%f hint=0x%x log=%d integer=%d toggle=%d unit_source=none unit=none",
+    //      descriptor->UniqueID, _port, name ? name : "", min, max, default_value,
+    //      (unsigned int)ladspaPortRangeHintDescriptor, isLogarithmic ? 1 : 0,
+    //      isInteger ? 1 : 0, LADSPA_IS_HINT_TOGGLED(ladspaPortRangeHintDescriptor) ? 1 : 0);
 
     LOGD("[plugin] %s: found control %s <%f - %f> default value %f", descriptor->Name, name, lower_bound, upper_bound, default_value);
     OUT ;

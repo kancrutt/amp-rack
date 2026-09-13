@@ -313,15 +313,25 @@ public class MyPresetsAdapter extends RecyclerView.Adapter<MyPresetsAdapter.View
 
         holder.delete.setOnClickListener(v -> {
             // TEMP-DBG triage (remove after device roundtrip): total-silence tap?
-            Log.d(TAG, "DBG del tap pos=" + holder.getAdapterPosition());
-            MainActivity.toast("DBG del tap");
+            final int dbgPos = holder.getAdapterPosition();
+            final int dbgSize = presets != null ? presets.size() : -1;
+            Log.d(TAG, "DBG del tap pos=" + dbgPos + " size=" + dbgSize);
+            MainActivity.toast("DBG del tap pos=" + dbgPos + "/" + dbgSize);
             // Capture everything at click time: re-querying getAdapterPosition()
             // inside the dialog callback can return NO_POSITION (silent no-op —
             // the "delete does nothing" symptom).
-            final int clickPos = holder.getAdapterPosition();
-            if (clickPos < 0 || clickPos >= presets.size()) return;
+            final int clickPos = dbgPos;
+            if (clickPos < 0 || presets == null || clickPos >= presets.size()) {
+                Log.w(TAG, "DBG del ABORT pos=" + clickPos + " size=" + dbgSize);
+                MainActivity.toast("DBG del ABORT stale-pos");
+                return;
+            }
             final Map<String, Object> clickTarget = presets.get(clickPos);
-            if (clickTarget == null) return;
+            if (clickTarget == null) {
+                Log.w(TAG, "DBG del ABORT null-target pos=" + clickPos);
+                MainActivity.toast("DBG del ABORT null-target");
+                return;
+            }
             final String targetName = value(clickTarget, "name", "Untitled");
             // ID-only addressing: display names are not unique, so falling back
             // to the name here deleted (or failed) the wrong file. A row without

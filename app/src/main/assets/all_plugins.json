@@ -68,7 +68,7 @@
   "800": {
     "name": "C* CabinetIII - Simplistic loudspeaker cabinet emulation",
     "id": 2601,
-    "desc": "A loudspeaker cabinet emulation implemented as two sets of 31st-order IIR filters precomputed (using Prony's method) for fs of 44.1 and 48 kHz",
+    "desc": "A loudspeaker cabinet emulation implemented as two sets of 31st-order IIR filters precomputed (using Prony's method) for fs of 44.1\u200aand 48\u200akHz",
     "plugin": 0,
     "library": "libCabIII.so"
   },
@@ -87,7 +87,7 @@
     "library": "libchebstortion_1430.so"
   },
   "1200": {
-    "name": "C* ChorusI - Mono chorus\/flanger",
+    "name": "C* ChorusI - Mono chorus/flanger",
     "id": 1767,
     "plugin": 0,
     "desc": "A standard mono chorus with optional feedback. The parameter range suits subtle effects as well as all-out flanging.",
@@ -137,13 +137,6 @@
     "desc": "This stereo version of Compress applies uniform compression to both channels in proportion to their combined power.",
     "plugin": 1,
     "library": "libCompress.so"
-  },
-  "2000": {
-    "name": "Constant Signal Generator",
-    "id": 1909,
-    "plugin": 0,
-    "desc": "This plugin add an output DC offset at the given amplitude to the input signal. It has no real use other than for debugging and in modular synths",
-    "library": "libconst_1909.so"
   },
   "2100": {
     "name": "Crossover distortion",
@@ -226,13 +219,6 @@
     "desc": "Guitarix distortion pedal",
     "library": "libdistortion.so"
   },
-  "3200": {
-    "name": "Audio Divider (Suboctave Generator)",
-    "id": 1186,
-    "desc": "Reduces the period of the signal by the factor given, and makes it a square wave in the process. Has some amplitude tracking capability, but not really useful on complex signals.",
-    "plugin": 0,
-    "library": "libdivider_1186.so"
-  },
   "3300": {
     "name": "DJ EQ (mono)",
     "desc": "3 band equalizer",
@@ -278,14 +264,14 @@
   "3701": {
     "name": "C* Eq10X2 - Stereo 10-band equaliser",
     "id": 2594,
-    "desc": "Stereo 10-band equaliser. The controls of this stereo version of Eq apply to both channels. ",
+    "desc": "Stereo 10-band equaliser. The controls of this stereo version of Eq apply to both channels.\u2002",
     "plugin": 1,
     "library": "libEq.so"
   },
   "3702": {
     "name": "C* Eq4p - 4-band parametric shelving equaliser",
     "id": 2608,
-    "desc": "4-band parametric shelving equaliser. Four adjustable biquad filters in series, in vector arithmetic implementation.  The default setup is an identity filter with a mode configuration of lowshelve, band, band, hishelve, all at zero gain.",
+    "desc": "4-band parametric shelving equaliser. Four adjustable biquad filters in series, in vector arithmetic implementation.\u2002 The default setup is an identity filter with a mode configuration of lowshelve, band, band, hishelve, all at zero gain.",
     "plugin": 2,
     "library": "libEq.so"
   },
@@ -385,13 +371,6 @@
     "plugin": 0,
     "desc": "Brick hard limiter with residue mixer.",
     "library": "libhard_limiter_1413.so"
-  },
-  "5200": {
-    "name": "Harmonic generator",
-    "desc": "Allows you to add harmonics and remove the fundamental from any audio signal.",
-    "id": 1220,
-    "plugin": 0,
-    "library": "libharmonic_gen_1220.so"
   },
   "5300": {
     "name": "Hilbert transformer",
@@ -495,13 +474,6 @@
     "plugin": 1,
     "library": "libinv_tube.so"
   },
-  "6400": {
-    "name": "Karaoke",
-    "id": 1409,
-    "desc": "Attempts to strip the vocals from a stereo signal.",
-    "plugin": 0,
-    "library": "libkaraoke_1409.so"
-  },
   "6600": {
     "name": "Artificial latency",
     "id": 1914,
@@ -510,7 +482,7 @@
     "library": "liblatency_1914.so"
   },
   "6700": {
-    "name": "L\/C\/R Delay",
+    "name": "L/C/R Delay",
     "id": 1436,
     "plugin": 0,
     "desc": "This is a left/centre/right delay with feedback",
@@ -563,20 +535,6 @@
     "plugin": 0,
     "desc": "Guitarix Compressor Pedal",
     "library": "libmonocompressor.so"
-  },
-  "7600": {
-    "name": "Multivoice Chorus",
-    "id": 1201,
-    "dsec": "This is an implementation of a Multivoice (as opposed to Multiscale) chorus algorithm. Its uses a novel, sinc based noise interpolation method to produce a subtle modulation law which makes it possible to get away with larger numbers of voices without the metallic, artificial sound common in chorus effects.",
-    "plugin": 0,
-    "library": "libmultivoice_chorus_1201.so"
-  },
-  "7700": {
-    "name": "C* Noisegate - Attenuating hum and noise",
-    "id": 2602,
-    "desc": "Attenuating hum and noise. This effect plugin attenuates the signal when it is deemed to be background noise.",
-    "plugin": 0,
-    "library": "libNoisegate.so"
   },
   "7900": {
     "name": "LFO Phaser",
@@ -767,17 +725,10 @@
     "plugin": 0,
     "library": "libsatan_maximiser_1408.so"
   },
-  "10300": {
-    "name": "C* Saturate - Various static nonlinearities, 8x oversampled",
-    "id": 1771,
-    "plugin": 0,
-    "desc": "Various static nonlinearities, 8x oversampled. Please note that this plugin embodies a very basic building block of audio DSP, not an elaborate effect that will be pleasing to hear right away.  To turn saturation into a musically useful effect it is usually combined with some sort of filtering and dynamics modulation",
-    "library": "libSaturate.so"
-  },
   "10301": {
     "name": "C* Spice - Not an exciter",
     "id": 2603,
-    "desc": "Not an exciter. This effect plugin is useful when more bass register definition or more treble presence is called for and generic equalisation does not work without also emphasising noise or raising the signal's total level.  A common application is refreshing of material that has been subjected to low-fidelity analog transmission",
+    "desc": "Not an exciter. This effect plugin is useful when more bass register definition or more treble presence is called for and generic equalisation does not work without also emphasising noise or raising the signal's total level.\u2002 A common application is refreshing of material that has been subjected to low-fidelity analog transmission",
     "plugin": 1,
     "library": "libSaturate.so"
   },
@@ -808,13 +759,6 @@
     "desc": "Sorts and mixes blocks of the input signal to give a bumpy ramp effect.",
     "plugin": 0,
     "library": "libsifter_1210.so"
-  },
-  "10700": {
-    "name": "Sine + cosine oscillator",
-    "desc": "This is a simple oscillator that outputs sinewaves with a 90 degree phase shift between them.",
-    "id": 1881,
-    "plugin": 0,
-    "library": "libsin_cos_1881.so"
   },
   "10800": {
     "name": "Single band parametric",
@@ -871,7 +815,7 @@
     "library": "libtap_autopan.so"
   },
   "11800": {
-    "name": "TAP Chorus\/Flanger",
+    "name": "TAP Chorus/Flanger",
     "id": 2159,
     "desc": "This plugin is an implementation capable of creating traditional Chorus and Flanger effects, spiced up a bit to make use of stereo processing. It sounds best on guitar and synth tracks.",
     "plugin": 0,
@@ -906,7 +850,7 @@
     "library": "libtape_delay_1211.so"
   },
   "12300": {
-    "name": "TAP Equalizer\/BW",
+    "name": "TAP Equalizer/BW",
     "desc": "This plugin is an 8-band equalizer with adjustable band center frequencies. It allows you to make precise adjustments to the tonal coloration of your tracks. ",
     "id": 2151,
     "plugin": 0,
@@ -925,13 +869,6 @@
     "id": 2145,
     "plugin": 0,
     "library": "libtap_limiter.so"
-  },
-  "12600": {
-    "name": "TAP Pink\/Fractal Noise",
-    "id": 2155,
-    "desc": "It adds pink noise to the incoming signal using a one-dimensional random fractal line generated by the Midpoint Displacement Method, which is a computationally cheap method suitable for generating random fractals.",
-    "plugin": 0,
-    "library": "libtap_pinknoise.so"
   },
   "12700": {
     "name": "TAP Pitch Shifter",
@@ -1035,32 +972,11 @@
     "plugin": 1,
     "library": "libvlevel-ladspa.so"
   },
-  "14300": {
-    "name": "Vocoder",
-    "id": 1337,
-    "plugin": 0,
-    "desc": "Makes a human voice sound synthetic; often used to speak like a robot, with a metallic and monotonous voice.  Using a human voice as the formant and an instrument as the carrier, creates an effect of an instrument speaking.",
-    "library": "libvocoder_1337.so"
-  },
-  "14400": {
-    "name": "Vocoder",
-    "id": 1441,
-    "desc": "Vocoder aims to replace the carrier of your voice with another carrier from another source. Thus, it changes the sound of the voice but not the message when you speak. ",
-    "plugin": 0,
-    "library": "libvocoder.so"
-  },
   "14500": {
     "name": "VyNil (Vinyl Effect)",
     "id": 1905,
     "plugin": 0,
     "library": "libvynil_1905.so"
-  },
-  "14600": {
-    "name": "Wave Terrain Oscillator",
-    "id": 1412,
-    "plugin": 0,
-    "desc": "Inputs x and y move the cursor around on a 2D landscape \"wavetable\" that is used to generate the output. The function used is  z = (x - y) * (x - 1) * (x + 1) * (y - 1) * (y + 1).",
-    "library": "libwave_terrain_1412.so"
   },
   "14800": {
     "name": "Crossfade",

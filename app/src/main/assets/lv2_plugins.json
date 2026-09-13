@@ -132,13 +132,6 @@
     "index": 21,
     "library": "rkrlv2.so"
   },
-  "15043": {
-    "name": "rkr NoiseGate",
-    "id": 5020,
-    "desc": "Based on Gate, Steve Harris LADSPA plugin.",
-    "index": 43,
-    "library": "rkrlv2.so"
-  },
   "15006": {
     "name": "rkr Harmonizer (no midi)",
     "id": 5021,
@@ -258,13 +251,6 @@
     "index": 33,
     "library": "rkrlv2.so"
   },
-  "15023": {
-    "name": "rkr Synthfilter",
-    "id": 5040,
-    "index": 23,
-    "desc": "A filter like what can be found in synthesizers. Up to 12 lowpass + 12 highpass filters with resonance. Cutoff frequency is controllable by LFO or volume envelope.",
-    "library": "rkrlv2.so"
-  },
   "15016": {
     "name": "rkr Valve",
     "id": 5041,
@@ -277,13 +263,6 @@
     "id": 5042,
     "index": 24,
     "desc": "Multi-band tremolo effect allowing 2 LFOs to modulate volume of any combination of 4 frequency bands.",
-    "library": "rkrlv2.so"
-  },
-  "15029": {
-    "name": "rkr Vocoder",
-    "id": 5044,
-    "desc": "32 band vocoder. This type of effect is well known for creating robot-like voices in popular music. The input is divided into frequency bands and each band's volume is controlled by an auxiliary input's frequency curve such that the output signal is filtered to sound like the aux signal.",
-    "index": 29,
     "library": "rkrlv2.so"
   },
   "15014": {
@@ -376,12 +355,6 @@
     "desc": "Compressor / Limiter / Gate",
     "library": "mda-Dynamics.so"
   },
-  "16300": {
-    "name": "MDA ePiano",
-    "id": 6013,
-    "index": 0,
-    "library": "mda-EPiano.so"
-  },
   "16400": {
     "name": "MDA Image",
     "id": 6014,
@@ -429,12 +402,6 @@
     "index": 0,
     "desc": "Soft distortion. Possible uses include adding body to drum loops, fuzz guitar, and that 'standing outside a nightclub' sound. This plug does not simulate valve distortion, and any attempt to process organ sounds through it will be extremely unrewarding!",
     "library": "mda-Overdrive.so"
-  },
-  "17100": {
-    "name": "MDA Piano",
-    "id": 6021,
-    "index": 0,
-    "library": "mda-Piano.so"
   },
   "17200": {
     "name": "MDA RePsycho!",
@@ -485,26 +452,12 @@
     "index": 0,
     "library": "mda-Stereo.so"
   },
-  "17900": {
-    "name": "MDA SubSynth",
-    "id": 6029,
-    "index": 0,
-    "desc": "Several low frequency enhancement methods. More bass than you could ever need!\n\nBe aware that you may be adding low frequency content outside the range of your monitor speakers.  To avoid clipping, follow with a limiter plug-in (this can also give some giant hip-hop drum sounds!).",
-    "library": "mda-SubSynth.so"
-  },
   "18000": {
     "name": "MDA TalkBox",
     "id": 6030,
     "desc": "High resolution vocoder. ",
     "index": 0,
     "library": "mda-TalkBox.so"
-  },
-  "18100": {
-    "name": "MDA TestTone",
-    "id": 6031,
-    "index": 0,
-    "desc": "Signal generator with pink and white noise, impulses and sweeps",
-    "library": "mda-TestTone.so"
   },
   "18200": {
     "name": "MDA ThruZero",
@@ -525,20 +478,6 @@
     "id": 6034,
     "index": 0,
     "library": "mda-Transient.so"
-  },
-  "18500": {
-    "name": "MDA VocInput",
-    "id": 6035,
-    "index": 0,
-    "desc": "Pitch tracking oscillator for generating vocoder carrier input",
-    "library": "mda-VocInput.so"
-  },
-  "18600": {
-    "name": "MDA Vocoder",
-    "id": 6036,
-    "desc": "Switchable 8 or 16 band vocoder. 16-band vocoder for applying the spectrum of one sound (the modulator, usually a voice or rhythm part) to the waveform of another (the carrier, usually a synth pad or sawtooth wave).",
-    "index": 0,
-    "library": "mda-Vocoder.so"
   },
   "18700": {
     "name": "Gx_AxisFace_",
@@ -715,13 +654,6 @@
     "index": 0,
     "library": "libGxShakaTube.lv2.so"
   },
-  "21300": {
-    "name": "GxSloopyBlue",
-    "id": 7027,
-    "index": 0,
-    "desc": "Overdrive pedal simulation",
-    "library": "libGxSloopyBlue.lv2.so"
-  },
   "21400": {
     "name": "Gx_slowgear_",
     "id": 7028,
@@ -792,26 +724,12 @@
     "index": 0,
     "library": "libGxUltraCab.lv2.so"
   },
-  "22400": {
-    "name": "GxUVox720k",
-    "id": 7038,
-    "desc": "Analog simulation of a classic solid state amp as LV2 plugin",
-    "index": 0,
-    "library": "libGxUVox720k.lv2.so"
-  },
   "22500": {
     "name": "Gx_valvecaster_",
     "id": 7039,
     "index": 0,
     "desc": "The ValveCaster is a little tube boost pedal simulation. It adds some overdrive and tube compression along with boosting the signal",
     "library": "libGxValveCaster.lv2.so"
-  },
-  "22600": {
-    "name": "Gx_voxbass_",
-    "id": 7040,
-    "desc": "Analog Simulation of the 1984 (*) Vox Venue Bass 100 Pre Amp Section",
-    "index": 0,
-    "library": "libGxVBassPreAmp.lv2.so"
   },
   "22700": {
     "name": "Gx_vfm_",
@@ -840,18 +758,6 @@
     "index": 0,
     "desc": "This lo-fi delay subtracts a downsampled (aliased) delayed signal from the original. Makes gritty slapback sounds or surprisingly warm textures.",
     "library": "bentdelay.so"
-  },
-  "23100": {
-    "name": "casynth",
-    "id": 8002,
-    "index": 0,
-    "library": "casynth.so"
-  },
-  "23200": {
-    "name": "the infamous cellular automaton synth",
-    "id": 8003,
-    "index": 0,
-    "library": "casynth.so"
   },
   "23300": {
     "name": "the infamous cheap distortion",
@@ -947,13 +853,6 @@
     "desc": "Cabinet Simulation",
     "index": 0,
     "library": "libGxCabSim.lv2.so"
-  },
-  "24800": {
-    "name": "Gx_denoiser2_",
-    "id": 8019,
-    "index": 0,
-    "desc": "cascaded moving average filter to suppress input noise ",
-    "library": "libGxDenoiser2.lv2.so"
   },
   "24900": {
     "name": "Gx_DistortionPlus_",
@@ -1506,13 +1405,6 @@
     "id": 8099,
     "index": 0,
     "library": "libgnuitar-distort2.lv2.so"
-  },
-  "32900": {
-    "name": "Looper",
-    "id": 8100,
-    "desc": "Looper pedal",
-    "index": 0,
-    "library": "liblooper.so"
   },
   "33000": {
     "name": "Neural Amp Modeler",

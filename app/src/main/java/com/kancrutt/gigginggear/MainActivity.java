@@ -1842,12 +1842,14 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 SubMenu subMenu = addPluginMenu.getMenu().addSubMenu(AudioEngine.getLibraryName(i));
                 for (int plugin = 0; plugin < AudioEngine.getPlugins(i); plugin++) {
                     String name = AudioEngine.getPluginName(i, plugin);
+                    if (blacklist != null && blacklist.has(name)) {
+                        Log.d(TAG, String.format("[menu] blacklisted: %s", name));
+                        continue;
+                    }
                     MenuItem menuItem = subMenu.add(name);
                     int finalI = i;
                     int finalPlugin = plugin;
                     int pluginID = finalI * 100 + finalPlugin ;
-                    if (blacklist != null && blacklist.has(name))
-                        continue;
 
                     if (pluginDialogAdapter != null)
                         pluginDialogAdapter.addItem(finalI * 100 + finalPlugin, name);

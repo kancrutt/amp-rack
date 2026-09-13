@@ -736,6 +736,12 @@ public class Rack extends Fragment {
                     String name = AudioEngine.getPluginName(i, plugin);
                     int uniqueID = AudioEngine.getPluginUniqueID(i, plugin);
 
+                    // Skip blacklisted plugins in plugin dialog
+                    if (blacklist != null && blacklist.has(name) && !enableBlacklisted) {
+                        Log.d(TAG, String.format("[lv2] blacklisted: %s", name));
+                        continue;
+                    }
+
                     int finalI = i;
                     int finalPlugin = plugin;
 

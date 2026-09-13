@@ -5232,6 +5232,14 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             }
 
             int ret = -1;
+            // Blacklist check: skip loading blacklisted plugins from presets
+            JSONObject blacklist = ConnectGuitar.loadJSONFromAssetFile(this, "blacklist.json");
+            if (blacklist != null && blacklist.has(name)) {
+                Log.d(TAG, String.format("[loadPreset] blacklisted: %s", name));
+                // Skip this plugin, don't add it to chain
+                plugin++;
+                continue;
+            }
             if (!lazyLoad)
                 AudioEngine.addPluginByName(name);
             else

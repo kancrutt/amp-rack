@@ -217,6 +217,9 @@ public class PluginPickerFragment extends BottomSheetDialogFragment {
                 if (obj == null) continue;
                 String pName = obj.optString("name", "");
                 if (pName.isEmpty() || loadedPluginNames.contains(pName)) continue;
+                // MIDI-only synths can never sound in a guitar chain (no audio
+                // input to feed them) — hide instead of offering a crash/toast.
+                if (MainActivity.isUnsupportedSynth(pName)) continue;
 
                 CategoryHelper.Category pCat = CategoryHelper.getCategory(pName);
                 if (pCat == cat) {

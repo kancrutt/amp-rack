@@ -205,7 +205,16 @@ Plugin::Plugin (const LADSPA_Descriptor * _descriptor, unsigned long _sampleRate
         if (descriptor->activate) {
             descriptor->activate(handle);
         }
-        loadOk = true;
+        // A chain block must pass audio through: without a primary audio input
+        // AND output the DAG wires null buffers and the DSP dereferences them
+        // (SIGSEGV inside the plugin — e.g. synth/generator plugins like MDA
+        // ePiano). Refuse to publish instead of crashing the audio thread.
+        if (inputPort == -1 || outputPort == -1) {
+            LOGE("[%s] no audio in/out pair (in=%d out=%d), refusing to publish",
+                 descriptor->Name, inputPort, outputPort);
+        } else {
+            loadOk = true;
+        }
     } else /* if (type == SharedLibrary::LV2 ) */ {
         //~ LOGD("[LV2] waiting for shared library pointer ...") ;
         lv2Descriptor = (LV2_Descriptor *) descriptor ;
@@ -429,7 +438,14 @@ void Plugin::load () {
     // Full port wiring completed: safe to publish to the audio thread.
     // (JSON-failure and null-handle paths return early above with loadOk
     // false, so unloadable plugins never reach the chain.)
-    loadOk = true;
+    // Same audio in/out requirement as LADSPA above: generator/synth plugins
+    // without an audio input pair would crash the DSP on null buffers.
+    if (inputPort == -1 || outputPort == -1) {
+        LOGE("[LV2] %s has no audio in/out pair (in=%d out=%d), refusing to publish",
+             lv2_name.c_str(), inputPort, outputPort);
+    } else {
+        loadOk = true;
+    }
     lv2ConnectWorkers();
     OUT
 }

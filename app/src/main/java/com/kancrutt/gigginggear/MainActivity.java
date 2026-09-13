@@ -6920,6 +6920,28 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     public static final int MAX_SERIES_BLOCKS = 10;
     public static final int MAX_PARALLEL_BLOCKS = 24;
 
+    /** MIDI-only synths / signal generators: they expose no audio input, so the
+     *  engine can never feed them (native refuses plugins with no audio in/out
+     *  pair — MDA ePiano SIGSEGVed the audio thread before that guard existed).
+     *  Hidden from browse and refused here with an explanatory toast. */
+    static final java.util.Set<String> UNSUPPORTED_SYNTHS = new java.util.HashSet<>(java.util.Arrays.asList(
+            "MDA ePiano", "MDA Piano", "MDA DX10", "MDA JX10",
+            "MDA Shepard", "MDA TestTone",
+            "Constant Signal Generator",
+            "the infamous cellular automaton synth", "casynth"));
+
+    static boolean isUnsupportedSynth(String pluginName) {
+        if (pluginName == null) return false;
+        if (UNSUPPORTED_SYNTHS.contains(pluginName)) return true;
+        try {
+            String n = PluginNaming.norm(pluginName);
+            for (String s : UNSUPPORTED_SYNTHS) {
+                if (n.equals(PluginNaming.norm(s))) return true;
+            }
+        } catch (Exception ignored) {}
+        return false;
+    }
+
     /** Refuse the add when the chain is full (native would overrun DSP arrays).
      *  Returns true when there is room. */
     boolean chainHasRoom(String pluginName) {
@@ -6944,6 +6966,11 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     }
 
     public void addPluginByName(String pluginName) {
+        if (isUnsupportedSynth(pluginName)) {
+            Log.w(TAG, "addPluginByName: refusing MIDI-only synth " + pluginName);
+            toast(pluginName + " needs MIDI input — not supported in a guitar chain");
+            return;
+        }
 //        Log.d(TAG, "addPluginByName: " + pluginName);
 //        Log.d(TAG, "addPluginByName: " + availablePlugins.toString());
         JSONObject plugins = availablePlugins;
@@ -7002,6 +7029,11 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     }
 
     public void addPluginByNameLV2(String pluginName) {
+        if (isUnsupportedSynth(pluginName)) {
+            Log.w(TAG, "addPluginByNameLV2: refusing MIDI-only synth " + pluginName);
+            toast(pluginName + " needs MIDI input — not supported in a guitar chain");
+            return;
+        }
 //        Log.d(TAG, "addPluginByName: " + pluginName);
         if (availablePluginsLV2 != null) Log.d(TAG, "addPluginByName: " + availablePluginsLV2.toString());
         JSONObject plugins = availablePluginsLV2;

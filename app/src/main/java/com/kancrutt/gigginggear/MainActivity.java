@@ -1832,7 +1832,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             });
         }
 
-        JSONObject blacklist = ConnectGuitar.loadJSONFromAssetFile(this, "assets/blacklist.json");
+        JSONObject blacklist = ConnectGuitar.loadJSONFromAssetFile(this, "blacklist.json");
         Log.d(TAG, String.format ("blacklist: %s", blacklist != null ? blacklist.toString() : "empty"));
 
         int libraries = AudioEngine.getSharedLibraries();

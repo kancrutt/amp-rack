@@ -4,4 +4,8 @@
     <item name="top_left_zone" type="id"/>
     <item name="top_right_zone" type="id"/>
     <item name="top_sr_text" type="id"/>
+    <!-- Transplanted from deleted orphan activity_files.xml (audit G2): sole
+         definition site of R.id.fab consumed by MainActivity:1785 (null-guarded).
+         Runtime behavior unchanged: layout was never inflated, lookup stays null. -->
+    <item name="fab" type="id"/>
 </resources>

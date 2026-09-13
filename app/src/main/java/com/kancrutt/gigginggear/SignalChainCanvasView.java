@@ -114,6 +114,10 @@ public class SignalChainCanvasView extends View {
     public interface OnWireDeleteListener {
         void onWireDelete(Edge edge);
     }
+    public interface OnParallelDropListener {
+        /** A trunk block was dropped off the series row: wrap it in SPLIT/MERGE. */
+        void onParallelDrop(int slotIndex);
+    }
 
     private final List<Node> nodes = new ArrayList<>();
     private final List<Edge> edges = new ArrayList<>();
@@ -136,6 +140,7 @@ public class SignalChainCanvasView extends View {
     private OnDeleteNodeListener deleteNodeListener;
     private OnEdgeCreatedListener edgeCreatedListener;
     private OnWireDeleteListener wireDeleteListener;
+    private OnParallelDropListener parallelDropListener;
 
     private Node dragNode;
     private float lastX, lastY;
@@ -156,6 +161,34 @@ public class SignalChainCanvasView extends View {
 
     private Node outputAnchor = null;
     private Node inputAnchor = null;
+
+    // Phone-class scrollable canvas (R.bool.canvas_phone_scroll: true below
+    // 600dp smallestWidth, false in values-sw600dp). Every phone branch below
+    // is gated on this flag — tablet always takes the original code path.
+    private boolean phoneScroll = false;
+    /** Phone: full scrollable content size (series + branch rows, full chain width). */
+    private float contentWPx = 0f;
+    private float contentHPx = 0f;
+    /** Phone: vertical pitch of canvas rows + whether a SPLIT/MERGE pair exists. */
+    private float contentRowPitchPx = 0f;
+    private boolean lastHadParallel = false;
+
+    private float density() {
+        return getResources().getDisplayMetrics().density;
+    }
+
+    private boolean readPhoneScrollMode() {
+        try {
+            return getResources().getBoolean(R.bool.canvas_phone_scroll);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /** Phone: content height computed at load (0 = unknown / tablet N/A). */
+    public float getPhoneContentHPx() {
+        return phoneScroll ? contentHPx : 0f;
+    }
 
     // TONE3000 compact T3K mark — per spec §16/25: compact T3K in signal-chain block
     // Badge set is keyed by stable pluginId (AudioEngine.getActivePluginID), not by
@@ -209,7 +242,45 @@ public class SignalChainCanvasView extends View {
     public SignalChainCanvasView(Context ctx, AttributeSet attrs) { super(ctx, attrs); init(); }
     public SignalChainCanvasView(Context ctx, AttributeSet attrs, int defStyle) { super(ctx, attrs, defStyle); init(); }
 
+    /** Visible viewport height of the phone scroll card (parent chain:
+     *  canvas -> HorizontalScrollView -> NestedScrollView). Falls back to the
+     *  signal_chain_card_height dimen = the card's exact height. */
+    private float viewportHPx() {
+        try {
+            android.view.ViewParent p = getParent();
+            if (p instanceof android.view.View) {
+                android.view.ViewParent pp = ((android.view.View) p).getParent();
+                if (pp instanceof android.view.View) {
+                    int h = ((android.view.View) pp).getHeight();
+                    if (h > 0) return h;
+                }
+            }
+        } catch (Exception ignore) {}
+        try {
+            // Phone reads the sw-independent card height; tablet keeps the
+            // historical w-ladder value (160/190dp).
+            return getResources().getDimensionPixelSize(phoneScroll
+                    ? R.dimen.signal_chain_card_height
+                    : R.dimen.signal_chain_height);
+        } catch (Exception e) {
+            return 85 * density();
+        }
+    }
+
+    private float viewportWPx() {
+        try {
+            android.view.ViewParent p = getParent();
+            if (p instanceof android.view.View) {
+                int w = ((android.view.View) p).getWidth();
+                if (w > 0) return w;
+            }
+        } catch (Exception ignore) {}
+        if (getWidth() > 0) return getWidth();
+        return 380 * density();
+    }
+
     private void init() {
+        phoneScroll = readPhoneScrollMode();
         paintNodeBody.setColor(NODE_BG);
         paintNodeBorder.setColor(NODE_BORDER);
         paintNodeBorder.setStyle(Paint.Style.STROKE);
@@ -268,6 +339,7 @@ public class SignalChainCanvasView extends View {
     public void setOnDeleteNodeListener(OnDeleteNodeListener l) { this.deleteNodeListener = l; }
     public void setOnEdgeCreatedListener(OnEdgeCreatedListener l) { this.edgeCreatedListener = l; }
     public void setOnWireDeleteListener(OnWireDeleteListener l) { this.wireDeleteListener = l; }
+    public void setOnParallelDropListener(OnParallelDropListener l) { this.parallelDropListener = l; }
 
     private int getCategoryColor(String pluginName) {
         return CategoryHelper.getColor(pluginName);
@@ -372,10 +444,42 @@ public class SignalChainCanvasView extends View {
         float nodeHDp = (totalBlocks >= 6) ? 62f : (totalBlocks >= 5 ? 68f : 72f);
         float nodeW = nodeWDp * density;
         float nodeH = nodeHDp * density;
+        if (phoneScroll) {
+            // Phone compact blocks: the card shows a single center row, so
+            // blocks shrink and the freed vertical space goes to the parameter
+            // panel below. Tablet keeps full-size blocks.
+            nodeWDp = 54f;
+            nodeHDp = 56f;
+            nodeW = nodeWDp * density;
+            nodeH = nodeHDp * density;
+        }
 
-        // Guarantee 3 rows fit top-to-bottom: shrink node + glyph when canvas
-        // is too short for the default height (S23 landscape ~85dp).
-        if (getHeight() > 0) {
+        // Phone scrollable canvas: fixed 3-row content when a SPLIT/MERGE pair
+        // creates branch rows (series row centered = home view, branches
+        // above/below via v-scroll), single viewport-fitted row otherwise.
+        // Blocks are never shrunk to fit — the view scrolls instead.
+        // Tablet keeps the original shrink-to-fit-3-rows behavior.
+        boolean hasParallel = false;
+        if (phoneScroll) {
+            for (int i = 0; i < count; i++) {
+                String nm = null;
+                try { nm = AudioEngine.getActivePluginName(i); } catch (Exception ignore) {}
+                if (nm != null) {
+                    String nl = nm.toLowerCase();
+                    if (nl.contains("split") || nl.contains("merge")) { hasParallel = true; break; }
+                }
+            }
+            float vH = viewportHPx();
+            // Always 3 rows on phone: the empty upper/lower rows are the drop
+            // zones for the drag-to-parallel gesture (series home view stays
+            // centered). Dashed guides hint at them while dragging.
+            float rowPitch = nodeH + 12f * density;
+            contentRowPitchPx = rowPitch;
+            lastHadParallel = hasParallel;
+            contentHPx = Math.max(vH, 3f * rowPitch + 28f * density);
+        } else if (getHeight() > 0) {
+            // Guarantee 3 rows fit top-to-bottom: shrink node + glyph when canvas
+            // is too short for the default height (S23 landscape ~85dp).
             float maxH = getHeight() / 3f - 4f * density;
             if (nodeH > maxH && maxH > 30f * density) {
                 float ratio = maxH / nodeH;
@@ -389,7 +493,10 @@ public class SignalChainCanvasView extends View {
         float spacing = Math.max(6 * density, Math.min(32 * density, dynamicSpacing));
 
         float xCursor = 8 * density;
-        float yCenter = getHeight() > 0 ? getHeight() / 2f : 48f * density;
+        // Phone: series row sits at the vertical center of the scrollable
+        // content (= the centered "home" view). Tablet: viewport center.
+        float yCenter = phoneScroll ? contentHPx / 2f
+                : (getHeight() > 0 ? getHeight() / 2f : 48f * density);
 
         // 1) INPUT anchor: smaller visual marker, fixed to far left
         float anchorDim = 24 * density;
@@ -474,7 +581,21 @@ public class SignalChainCanvasView extends View {
 
         // 3) OUTPUT anchor: preserve custom position like plugin blocks,
         // otherwise every reload resets OUT 1744 -> 1630 (see log 19:57:05)
-        float outX = viewW - anchorDim - 48 * density;
+        float outX;
+        if (phoneScroll) {
+            // Phone: OUT sits after the last block so long chains h-scroll
+            // instead of squeezing. Short chains pin OUT near the right
+            // viewport edge so IN->OUT still spans the home view.
+            float maxRight = inputNode.x + inputNode.width;
+            for (Node n : nodes) {
+                float r = n.x + n.width;
+                if (r > maxRight) maxRight = r;
+            }
+            float vW = Math.max(viewportWPx(), viewW);
+            outX = Math.max(vW - anchorDim - 48 * density, maxRight + spacing);
+        } else {
+            outX = viewW - anchorDim - 48 * density;
+        }
         float outY = yCenter - anchorDim / 2f;
         if (oldNodes.containsKey(-200)) {
             outX = oldNodes.get(-200).x;
@@ -489,13 +610,31 @@ public class SignalChainCanvasView extends View {
         nodeMap.put(outputNode.id, outputNode);
         outputAnchor = outputNode;
 
-        // Safety clamp: all nodes inside canvas bounds (fixes dangling off-canvas lines)
-        float strictFabR = 105 * density; // Generous margin so it never overlaps the FAB
-        if (getWidth() > 0 && getHeight() > 0) {
+        if (phoneScroll) {
+            // Content width spans the full chain (viewport at minimum).
+            float vW = Math.max(viewportWPx(), viewW);
+            float maxR = outX + anchorDim;
+            for (Node n : nodes) {
+                float r = n.x + n.width;
+                if (r > maxR) maxR = r;
+            }
+            contentWPx = Math.max(vW, maxR + 16 * density);
+            // Clamp into scrollable content bounds (not the viewport).
             for (Node n : nodes) {
                 if (n.nodeType == NodeType.INPUT) continue; // Keep INPUT exactly at left edge
-                n.x = Math.max(inputNode.x + inputNode.width + spacing, Math.min(n.x, getWidth() - n.width - strictFabR));
-                n.y = Math.max(0, Math.min(n.y, getHeight() - n.height));
+                n.x = Math.max(inputNode.x + inputNode.width + spacing,
+                        Math.min(n.x, Math.max(inputNode.x, contentWPx - n.width - 16 * density)));
+                n.y = Math.max(0, Math.min(n.y, Math.max(0, contentHPx - n.height)));
+            }
+        } else {
+            // Safety clamp: all nodes inside canvas bounds (fixes dangling off-canvas lines)
+            float strictFabR = 105 * density; // Generous margin so it never overlaps the FAB
+            if (getWidth() > 0 && getHeight() > 0) {
+                for (Node n : nodes) {
+                    if (n.nodeType == NodeType.INPUT) continue; // Keep INPUT exactly at left edge
+                    n.x = Math.max(inputNode.x + inputNode.width + spacing, Math.min(n.x, getWidth() - n.width - strictFabR));
+                    n.y = Math.max(0, Math.min(n.y, getHeight() - n.height));
+                }
             }
         }
 
@@ -847,6 +986,12 @@ public class SignalChainCanvasView extends View {
                     dragStarted = false;
                     if (listener != null) listener.onNodeSelected(hit);
                     dragNode = hit;
+                    if (phoneScroll) {
+                        // Block drag owns this gesture: stop the scroll
+                        // parents from stealing it. Empty-space touches keep
+                        // scrolling (the fallthrough below stays interceptible).
+                        try { getParent().requestDisallowInterceptTouchEvent(true); } catch (Exception ignore) {}
+                    }
                     invalidate();
                     return true;
                 }
@@ -859,6 +1004,9 @@ public class SignalChainCanvasView extends View {
                         portSourceNode = n;
                         dragCurrentX = tx;
                         dragCurrentY = ty;
+                        if (phoneScroll) {
+                            try { getParent().requestDisallowInterceptTouchEvent(true); } catch (Exception ignore) {}
+                        }
                         invalidate();
                         return true;
                     }
@@ -868,6 +1016,9 @@ public class SignalChainCanvasView extends View {
                         portSourceNode = n;
                         dragCurrentX = tx;
                         dragCurrentY = ty;
+                        if (phoneScroll) {
+                            try { getParent().requestDisallowInterceptTouchEvent(true); } catch (Exception ignore) {}
+                        }
                         invalidate();
                         return true;
                     }
@@ -899,11 +1050,15 @@ public class SignalChainCanvasView extends View {
                         float dy = ty - lastY;
                         float nx = dragNode.x + dx;
                         float ny = dragNode.y + dy;
-                        // Clamp: don't cross input node, don't overlap "+" button
+                        // Clamp: don't cross input node, don't overlap "+" button.
+                        // Phone clamps into scrollable content bounds; tablet
+                        // keeps the viewport clamp.
+                        float boundW = (phoneScroll && contentWPx > 0) ? contentWPx : getWidth();
+                        float boundH = (phoneScroll && contentHPx > 0) ? contentHPx : getHeight();
                         float fabR = 105f * getResources().getDisplayMetrics().density;
                         float minX = (inputAnchor != null) ? (inputAnchor.x + inputAnchor.width + 12f * getResources().getDisplayMetrics().density) : 0;
-                        nx = Math.max(minX, Math.min(nx, getWidth() - dragNode.width - fabR));
-                        ny = Math.max(0, Math.min(ny, getHeight() - dragNode.height));
+                        nx = Math.max(minX, Math.min(nx, boundW - dragNode.width - fabR));
+                        ny = Math.max(0, Math.min(ny, boundH - dragNode.height));
                         dragNode.x = nx;
                         dragNode.y = ny;
 
@@ -916,6 +1071,9 @@ public class SignalChainCanvasView extends View {
 
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_CANCEL:
+                if (phoneScroll) {
+                    try { getParent().requestDisallowInterceptTouchEvent(false); } catch (Exception ignore) {}
+                }
                 if (draggingPort && portSourceNode != null) {
                     Node target = findNearestPort(dragCurrentX, dragCurrentY, draggingOutput, portSourceNode);
                     if (target != null) {
@@ -965,10 +1123,23 @@ public class SignalChainCanvasView extends View {
                             }
                         }
                     } while (overlap);
-                    // Clamp snap ke dalam bounds canvas
-                    dragNode.x = Math.max(0, Math.min(dragNode.x, getWidth() - dragNode.width));
-                    dragNode.y = Math.max(0, Math.min(dragNode.y, getHeight() - dragNode.height));
-                    syncGraphToAudioEngine();
+                    // Clamp snap ke dalam bounds canvas (phone: content bounds)
+                    float snapW = (phoneScroll && contentWPx > 0) ? contentWPx : getWidth();
+                    float snapH = (phoneScroll && contentHPx > 0) ? contentHPx : getHeight();
+                    dragNode.x = Math.max(0, Math.min(dragNode.x, snapW - dragNode.width));
+                    dragNode.y = Math.max(0, Math.min(dragNode.y, snapH - dragNode.height));
+                    // Drag-to-parallel: a trunk block dropped off the series row
+                    // is wrapped in a real SPLIT/MERGE pair (explicit routing
+                    // blocks — the dragged position itself never implies a route,
+                    // same decoupling as manual SPLIT insert). The wrap path
+                    // rebuilds + re-syncs the graph itself, so skip the plain sync.
+                    boolean wrapped = false;
+                    if (row != 0 && !dragNode.isRouting() && dragNode.branch == 0
+                            && parallelDropListener != null) {
+                        parallelDropListener.onParallelDrop(dragNode.id);
+                        wrapped = true;
+                    }
+                    if (!wrapped) syncGraphToAudioEngine();
                 }
 
                 dragNode = null;
@@ -1017,13 +1188,42 @@ public class SignalChainCanvasView extends View {
                 if (xy != null && xy.length >= 2) {
                     n.x = xy[0];
                     n.y = xy[1];
+                    if (phoneScroll) {
+                        // Restored (possibly cross-form-factor) positions must
+                        // stay inside the scrollable content; grow the content
+                        // to fit instead of stranding blocks off-scroll.
+                        n.x = Math.max(0, n.x);
+                        n.y = Math.max(0, n.y);
+                        contentWPx = Math.max(contentWPx, n.x + n.width + 16 * density());
+                        contentHPx = Math.max(contentHPx, n.y + n.height + 16 * density());
+                    }
                 }
             }
         }
+        if (phoneScroll) requestLayout(); // re-measure if content grew above
         invalidate();
     }
 
     @Override protected void onMeasure(int widthSpec, int heightSpec) {
+        if (phoneScroll) {
+            // Phone: inside the scroll parents the specs are UNSPECIFIED, so
+            // measure to the full content size. EXACT specs (fillViewport
+            // stretch when content is smaller) are honored as-is. Tablet
+            // never reaches here (flag false in values-sw600dp).
+            int wMode = MeasureSpec.getMode(widthSpec);
+            int hMode = MeasureSpec.getMode(heightSpec);
+            float d = density();
+            int w = (wMode == MeasureSpec.UNSPECIFIED)
+                    ? Math.round(contentWPx > 0 ? contentWPx : 380 * d)
+                    : MeasureSpec.getSize(widthSpec);
+            int h = (hMode == MeasureSpec.UNSPECIFIED)
+                    ? Math.round(contentHPx > 0 ? contentHPx : viewportHPx())
+                    : MeasureSpec.getSize(heightSpec);
+            if (w <= 0) w = Math.round(380 * d);
+            if (h <= 0) h = Math.round(viewportHPx());
+            setMeasuredDimension(w, h);
+            return;
+        }
         int w = MeasureSpec.getSize(widthSpec);
         int h = MeasureSpec.getSize(heightSpec);
         setMeasuredDimension(w, h);
@@ -1043,7 +1243,11 @@ public class SignalChainCanvasView extends View {
                 inputAnchor.y = yCenter;
             }
             if (outputAnchor != null) {
-                outputAnchor.x = w - anchorDim - fabReserved;
+                // Phone: OUT.x lives in scrollable content coords (set at
+                // load); only re-center vertically. Tablet path unchanged.
+                if (!phoneScroll) {
+                    outputAnchor.x = w - anchorDim - fabReserved;
+                }
                 outputAnchor.y = yCenter;
             }
             invalidate();
@@ -1063,8 +1267,31 @@ public class SignalChainCanvasView extends View {
             inputAnchor.y = yCenter;
         }
         if (outputAnchor != null && getWidth() > 0) {
-            outputAnchor.x = getWidth() - anchorDim - fabReserved;
+            // Phone: OUT.x lives in scrollable content coords (set at load);
+            // only re-center vertically. Tablet path unchanged.
+            if (!phoneScroll) {
+                outputAnchor.x = getWidth() - anchorDim - fabReserved;
+            }
             outputAnchor.y = yCenter;
+        }
+
+        // Phone drag-to-parallel affordance: while a block is being dragged in
+        // a series-only chain, hint at the upper/lower drop rows with dashed
+        // guides. Purely visual — routing still comes from SPLIT/MERGE blocks.
+        if (phoneScroll && !lastHadParallel && dragNode != null && dragStarted
+                && contentRowPitchPx > 0 && getWidth() > 0) {
+            float cy = getHeight() / 2f;
+            Paint guide = new Paint(Paint.ANTI_ALIAS_FLAG);
+            guide.setColor(Color.argb(90, 255, 138, 0));
+            guide.setStyle(Paint.Style.STROKE);
+            guide.setStrokeWidth(2f * density);
+            guide.setPathEffect(new android.graphics.DashPathEffect(
+                    new float[]{10f * density, 8f * density}, 0));
+            float gw = Math.max(getWidth(), contentWPx);
+            for (int s = -1; s <= 1; s += 2) {
+                float gy = cy + s * contentRowPitchPx;
+                canvas.drawLine(0, gy, gw, gy, guide);
+            }
         }
 
         for (Edge e : edges) {

@@ -1,7 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <dimen name="fab_margin">16dp</dimen>
-    <dimen name="signal_chain_height">85dp</dimen>
+    <!-- Phone fallback: single compact center row (56dp blocks) -->
+    <dimen name="signal_chain_height">64dp</dimen>
+    <!-- Phone canvas card height, resolved orientation-independently:
+         sw<600 phones always read this ladder (base/w360/w400/w480).
+         Tablets read layout-sw600dp + historical signal_chain_height.
+         A separate name is REQUIRED: signal_chain_height also lives in
+         values-w600dp (160dp), which wrongly matches phones in landscape
+         (S23 landscape width 825dp >= 600). Telemetry proof: 454px/160dp. -->
+    <dimen name="signal_chain_card_height">64dp</dimen>
     <dimen name="param_gear_col_width">115dp</dimen>
     <dimen name="rack_top_bar_height">40dp</dimen>
 
@@ -43,4 +51,14 @@
     <!-- Signal block node dimensions -->
     <dimen name="gg_glass_block_min_width">72dp</dimen>
     <dimen name="gg_glass_block_min_height">40dp</dimen>
+
+    <!-- Drum sample list rows (track_file.xml). Base values/ = phone-class:
+         taller touch targets + more breathing room, funded by the regrouped
+         Loop/Load/Skip row. Tablet overrides in values-sw600dp keep the
+         confirmed 48dp rows untouched. -->
+    <dimen name="track_row_min_height">60dp</dimen>
+    <dimen name="track_row_button_height">56dp</dimen>
+    <dimen name="track_row_margin_v">8dp</dimen>
+    <dimen name="track_row_delete_width">48dp</dimen>
+    <dimen name="track_row_delete_height">56dp</dimen>
 </resources>

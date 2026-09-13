@@ -397,7 +397,9 @@ public class Rack extends Fragment {
         hiddenRv.setLayoutParams(new ViewGroup.LayoutParams(0, 0));
         mainActivity.recyclerView = hiddenRv;
         mainActivity.recyclerView.setAdapter(mainActivity.dataAdapter);
-        ((FrameLayout) view.findViewById(R.id.signalChainCanvas).getParent()).addView(hiddenRv);
+        // Canvas card by id: on phone the canvas sits inside scroll parents,
+        // so getParent() is no longer the card FrameLayout.
+        ((FrameLayout) view.findViewById(R.id.signal_chain_card)).addView(hiddenRv);
 
         if (signalChainCanvas != null) {
             signalChainCanvas.setOnNodeSelectedListener(node -> {
@@ -418,6 +420,9 @@ public class Rack extends Fragment {
                         Log.e(TAG, "deletePlugin failed for index " + node.id, e);
                     }
                 }
+            });
+            signalChainCanvas.setOnParallelDropListener(slot -> {
+                if (mainActivity != null) mainActivity.wrapBlockInParallel(slot);
             });
             signalChainCanvas.setOnWireDeleteListener(edge -> {
                 if (edge == null) return;
@@ -559,7 +564,9 @@ public class Rack extends Fragment {
         }
 
         TextView topPresetDisplay = view.findViewById(R.id.top_preset_display);
-        updateTopBarPresetDisplay(1, "CLEAN");
+        // persist=false: pre-bind paint only — must not clobber the stored
+        // last-used label (read back after binding / after chain restore).
+        updateTopBarPresetDisplay(1, "CLEAN", false);
         ImageButton presetPrevBtn = view.findViewById(R.id.preset_prev);
         ImageButton presetNextBtn = view.findViewById(R.id.preset_next);
         if (presetPrevBtn != null) {
@@ -696,10 +703,12 @@ public class Rack extends Fragment {
         mainActivity.loadActivePreset();
 
         SignalChainCanvasView finalCanvas = signalChainCanvas;
+        final View finalRootView = view;
         view.postDelayed(() -> {
             try {
                 if (finalCanvas != null) {
                     finalCanvas.loadFromActivePlugins();
+                    centerCanvasHomeView(finalRootView, finalCanvas);
                 }
                 if (AudioEngine.getActivePlugins() > 0) {
                     String name0 = null;
@@ -1140,6 +1149,13 @@ public class Rack extends Fragment {
         mainActivity.patchDesc = patchDesc;
         mainActivity.patchNo = null; // replaced by per-selection top_preset_display update
         // skip syncTopBarPresetInfo here; updateTopBarPresetDisplay() handles it on node selection
+        // Startup re-sync (clean-install "004 Brit" bug): the (1, "CLEAN") update at
+        // view creation ran BEFORE patchName was bound, so syncTopBarPresetInfo()
+        // early-returned on null patchName and the XML placeholder stuck forever.
+        // Re-fire now that the binding exists via the stored last-used label
+        // (falls back to "1. CLEAN" when prefs are absent). Idempotent: the chain
+        // restore path paints the same stored label.
+        if (mainActivity != null) mainActivity.restoreTopBarLabel();
 
         if (patchDesc != null) {
             patchDesc.setOnClickListener(new View.OnClickListener() {
@@ -1964,6 +1980,52 @@ public class Rack extends Fragment {
     }
 
     private View topBarForCollapse;
+
+    /** Phone-class scrollable canvas: default "home" view = the series row
+     *  (IN -&gt; OUT) centered in the viewport. Runs once per Board creation
+     *  (tag on the scroller); later chain rebuilds preserve the user's scroll
+     *  position instead of yanking it back. Tablet no-op: the bool is false
+     *  in values-sw600dp and layout-sw600dp has no canvas_vscroll. */
+    private void centerCanvasHomeView(final View rootView, final SignalChainCanvasView canvas) {
+        boolean phoneScroll;
+        try {
+            phoneScroll = getResources().getBoolean(R.bool.canvas_phone_scroll);
+        } catch (Exception e) {
+            return;
+        }
+        if (!phoneScroll || rootView == null || canvas == null) return;
+        final View vscroll = rootView.findViewById(R.id.canvas_vscroll);
+        if (vscroll == null || vscroll.getTag() != null) return;
+        vscroll.post(new Runnable() {
+            int tries = 0;
+            @Override public void run() {
+                try {
+                    int ch = canvas.getHeight();
+                    int vh = vscroll.getHeight();
+                    float needH = 0f;
+                    try { needH = canvas.getPhoneContentHPx(); } catch (Exception ignore) {}
+                    if ((vh <= 0 || ch <= 0) && tries < 20) {
+                        tries++;
+                        vscroll.postDelayed(this, 100);
+                        return;
+                    }
+                    // Content computed TALL (branches exist) but the view isn't
+                    // laid out that tall yet -> wait for the layout pass instead
+                    // of tagging "centered" while stuck at the top (S23 bug).
+                    if (needH > vh && ch <= vh && tries < 20) {
+                        tries++;
+                        vscroll.postDelayed(this, 100);
+                        return;
+                    }
+                    if (ch > vh && vh > 0) {
+                        ((androidx.core.widget.NestedScrollView) vscroll).scrollTo(0, (ch - vh) / 2);
+                    }
+                    android.util.Log.d("CanvasHome", "centered ch=" + ch + " vh=" + vh + " needH=" + needH);
+                    vscroll.setTag("centered");
+                } catch (Exception ignore) {}
+            }
+        });
+    }
 
     /**
      * Collapse top-bar elements in defined priority order based on REAL measured

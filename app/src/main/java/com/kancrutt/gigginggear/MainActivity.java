@@ -2997,6 +2997,85 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     static final int ROUTING_ID_SPLIT = 900100;
     static final int ROUTING_ID_MERGE = 900200;
 
+    /**
+     * Drag-to-parallel: wrap the trunk block at {@code slot} in a real
+     * SPLIT/MERGE pair (SPLIT before it, MERGE after it). Called when a block
+     * is dropped off the series row on the canvas.
+     *
+     * Architecture note: the dragged POSITION never implies routing — this
+     * inserts the same explicit routing blocks as the Add-Block menu, then
+     * the standard auto-wire + graph sync runs. The wrapped block always lands
+     * in the upper branch (first slot after SPLIT alternates up); delete the
+     * SPLIT/MERGE pair to return to series.
+     */
+    public void wrapBlockInParallel(int slot) {
+        try {
+            int count = 0;
+            try { count = AudioEngine.getActivePlugins(); } catch (Exception ignore) {}
+            if (slot < 0 || slot >= count) {
+                toast("Drop a block off the center row to branch it");
+                return;
+            }
+            String name = "block";
+            float stepX = 68 * getResources().getDisplayMetrics().density;
+            float oldX = 0, oldY = 0;
+            boolean found = false;
+            if (signalChainCanvas != null) {
+                for (SignalChainCanvasView.Node n : signalChainCanvas.getNodes()) {
+                    if (n != null && n.id == slot) {
+                        name = n.name != null ? n.name : name;
+                        oldX = n.x;
+                        oldY = n.y;
+                        stepX = (n.width > 0 ? n.width : 56 * getResources().getDisplayMetrics().density)
+                                + 12 * getResources().getDisplayMetrics().density;
+                        found = true;
+                        break;
+                    }
+                }
+            }
+            if (!found) {
+                if (signalChainCanvas != null) signalChainCanvas.loadFromActivePlugins();
+                return;
+            }
+            // Engine: SPLIT takes the block's slot, block shifts +1, MERGE lands +2.
+            int n1 = AudioEngine.insertRoutingBlock(slot, true);
+            if (n1 <= 0) { toast("Could not create branch"); return; }
+            int n2 = AudioEngine.insertRoutingBlock(slot + 2, false);
+            if (n2 <= 0) { toast("Could not create branch"); return; }
+            if (dataAdapter != null) {
+                dataAdapter.insertItem(ROUTING_ID_SPLIT, slot);
+                dataAdapter.insertItem(ROUTING_ID_MERGE, slot + 2);
+            }
+            if (signalChainCanvas != null) {
+                // Keep the user's layout: left part untouched, everything from
+                // the wrapped block shifts right by two cells; SPLIT takes the
+                // block's old cell. Applied post-rebuild via pending positions.
+                java.util.Map<String, float[]> before = signalChainCanvas.captureNodePositions();
+                java.util.Map<String, float[]> next = new java.util.HashMap<>();
+                for (java.util.Map.Entry<String, float[]> e : before.entrySet()) {
+                    int k;
+                    try { k = Integer.parseInt(e.getKey()); } catch (Exception ignore) { continue; }
+                    if (k < 0) continue; // anchors re-seat themselves
+                    float[] xy = e.getValue();
+                    if (xy == null || xy.length < 2) continue;
+                    if (k < slot) next.put(e.getKey(), xy);
+                    else next.put(String.valueOf(k + 2), new float[]{xy[0] + 2 * stepX, xy[1]});
+                }
+                next.put(String.valueOf(slot), new float[]{oldX, oldY});
+                next.put(String.valueOf(slot + 1), new float[]{oldX + stepX, oldY});
+                next.put(String.valueOf(slot + 2), new float[]{oldX + 2 * stepX, oldY});
+                signalChainCanvas.setPendingCustomPositions(next);
+                signalChainCanvas.loadFromActivePlugins();
+                signalChainCanvas.selectNode(slot + 1);
+                if (dataAdapter != null) dataAdapter.notifyDataSetChanged();
+            }
+            toast("Parallel: " + name + " -> upper branch (SPLIT + MERGE added)");
+        } catch (Throwable t) {
+            Log.e(TAG, "wrapBlockInParallel failed", t);
+            toast("Could not create branch");
+        }
+    }
+
     void loadPlugins() {
         if (AudioEngine.getTotalPlugins() != 0)
             return;
@@ -3489,8 +3568,12 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 Log.w(TAG, "loadActivePreset: snapshot parse failed, legacy load", e);
             }
             if (!routed) loadPreset(preset);
+            // Last-used preset: chain restored above, repaint its stored label.
+            restoreTopBarLabel();
         } else {
             Log.d(TAG, "loadActivePreset: active preset is null or empty");
+            // Clean install (no last-used snapshot): default = preset no. 1.
+            loadFactoryPresetByIndex(0);
         }
         ensureDefaultChainHasAmp();
         
@@ -3502,6 +3585,49 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 }
             }, 100);
         });
+    }
+
+    /** Repaint the top-bar preset label from the persisted last-used name/number.
+     *  Written on every preset select/nav (Rack.updateTopBarPresetDisplay, persist=true);
+     *  read here at startup and after chain restores. Order-independent: no-op while
+     *  patchName is unbound (Rack re-fires after binding), idempotent afterwards. */
+    public void restoreTopBarLabel() {
+        try {
+            android.content.SharedPreferences sp = getPreferences(MODE_PRIVATE);
+            String name = sp.getString("topPresetName", "CLEAN");
+            int num = sp.getInt("topPresetNumber", 1);
+            if (patchName != null && name != null) patchName.setText(name);
+            syncTopBarPresetInfo(Math.max(1, num));
+        } catch (Exception ignore) {}
+    }
+
+    /** Load the Nth factory preset (sorted asset order = preset list order:
+     *  index 0 = preset no. 1). Used for the clean-install default. Persists the
+     *  label BEFORE painting so a late view binding converges on the same label. */
+    void loadFactoryPresetByIndex(int index) {
+        try {
+            String[] files = getAssets().list("factory_presets");
+            if (files == null) return;
+            java.util.Arrays.sort(files);
+            java.util.ArrayList<String> jsons = new java.util.ArrayList<>();
+            for (String f : files) if (f.endsWith(".json")) jsons.add(f);
+            if (index < 0 || index >= jsons.size()) return;
+            org.json.JSONObject jo = ConnectGuitar.loadJSONFromAssetFile(this, "factory_presets/" + jsons.get(index));
+            if (jo == null) return;
+            java.util.Map<?, ?> map = new com.google.gson.Gson().fromJson(jo.toString(), java.util.HashMap.class);
+            if (map == null) return;
+            Object nm = map.get("name");
+            String label = nm != null ? nm.toString() : "PRESET";
+            try {
+                getPreferences(MODE_PRIVATE).edit()
+                        .putString("topPresetName", label)
+                        .putInt("topPresetNumber", index + 1).apply();
+            } catch (Exception ignore) {}
+            loadPreset((Map) map);
+            restoreTopBarLabel();
+        } catch (Exception e) {
+            Log.w(TAG, "loadFactoryPresetByIndex failed", e);
+        }
     }
 
     public void ensureDefaultChainHasAmp() {

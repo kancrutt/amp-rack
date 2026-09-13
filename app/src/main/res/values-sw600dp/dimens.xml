@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- True tablets only (smallestWidth >= 600dp, any orientation).
+         NOTE: sw600dp, NOT w600dp — w600dp also matches phones in landscape. -->
+    <!-- Drum sample rows stay exactly at the confirmed sizes.
+         Phones use the taller base values/ variants. -->
+    <dimen name="track_row_min_height">48dp</dimen>
+    <dimen name="track_row_button_height">48dp</dimen>
+    <dimen name="track_row_margin_v">6dp</dimen>
+    <dimen name="track_row_delete_width">44dp</dimen>
+    <dimen name="track_row_delete_height">48dp</dimen>
+</resources>

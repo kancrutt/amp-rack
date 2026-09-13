@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- True tablets only (smallestWidth >= 600dp, any orientation):
+         keep the fixed-fit canvas exactly as confirmed.
+         NOTE: sw600dp, NOT w600dp — w600dp also matches phones in landscape
+         (width 825dp on S23 landscape), which wrongly forced the tablet UI. -->
+    <bool name="canvas_phone_scroll">false</bool>
+</resources>

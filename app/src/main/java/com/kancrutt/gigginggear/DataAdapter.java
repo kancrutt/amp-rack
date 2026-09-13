@@ -239,6 +239,13 @@ public class DataAdapter extends RecyclerView.Adapter<DataAdapter.ViewHolder> {
         notifyItemInserted(index);
     }
 
+    /** Insert at an arbitrary slot (mirrors Engine.insertRoutingBlock shift). */
+    void insertItem(int pluginID, int index) {
+        int at = Math.max(0, Math.min(index, plugins.size()));
+        plugins.add(at, pluginID);
+        notifyItemInserted(at);
+    }
+
     void setSelectedModel(int plugin, int model) {
         selectedModels.put(plugin, model);
     }

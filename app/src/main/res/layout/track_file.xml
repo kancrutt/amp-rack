@@ -5,18 +5,18 @@
     android:layout_width="match_parent"
     android:layout_marginStart="10dp"
     android:layout_marginEnd="10dp"
-    android:layout_marginTop="6dp"
-    android:layout_marginBottom="6dp"
+    android:layout_marginTop="@dimen/track_row_margin_v"
+    android:layout_marginBottom="@dimen/track_row_margin_v"
     android:background="@drawable/gg_card_bg"
     android:gravity="center_vertical"
-    android:minHeight="48dp"
+    android:minHeight="@dimen/track_row_min_height"
     android:paddingStart="4dp"
     android:paddingEnd="4dp"
     android:layout_height="wrap_content">
 
     <Button
         android:layout_width="0dp"
-        android:layout_height="48dp"
+        android:layout_height="@dimen/track_row_button_height"
         android:layout_weight="1"
         android:drawableLeft="@drawable/ic_track_waveform"
         android:drawablePadding="10dp"
@@ -29,8 +29,8 @@
         android:background="@color/fui_transparent"
         android:id="@+id/track_file_button"/>
     <ImageButton
-        android:layout_width="44dp"
-        android:layout_height="48dp"
+        android:layout_width="@dimen/track_row_delete_width"
+        android:layout_height="@dimen/track_row_delete_height"
         android:id="@+id/track_delete_file"
         android:src="@drawable/ic_baseline_delete_forever_24"
         app:tint="@color/gg_danger"

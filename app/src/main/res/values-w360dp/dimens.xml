@@ -1,6 +1,8 @@
 <resources>
     <!-- S23-class narrow phones (smallestWidth ~360dp) -->
-    <dimen name="signal_chain_height">82dp</dimen>
+    <!-- Single compact center row (56dp blocks): freed space goes to param panel -->
+    <dimen name="signal_chain_height">64dp</dimen>
+    <dimen name="signal_chain_card_height">64dp</dimen>
     <dimen name="param_gear_col_width">108dp</dimen>
     <dimen name="rack_top_bar_height">38dp</dimen>
     <dimen name="knob_size_large">46dp</dimen>

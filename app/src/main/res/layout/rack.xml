@@ -107,7 +107,7 @@
                     android:fontFamily="@font/plus_jakarta_sans"
                     android:maxEms="20"
                     android:maxLines="1"
-                    android:text="004 Brit MegaGuitar"
+                    android:text="1. CLEAN"
                     android:textColor="@color/gg_glass_text_primary"
                     android:textSize="12sp"
                     android:textStyle="bold" />
@@ -188,8 +188,9 @@
         <!-- Upper Half: Signal Chain Canvas — floating rounded glassy card,
              same model as the header (glass_topbar_bg: 14dp + 1dp stroke) -->
         <FrameLayout
+            android:id="@+id/signal_chain_card"
             android:layout_width="match_parent"
-            android:layout_height="@dimen/signal_chain_height"
+            android:layout_height="@dimen/signal_chain_card_height"
             android:layout_marginStart="10dp"
             android:layout_marginTop="8dp"
             android:layout_marginEnd="10dp"
@@ -198,12 +199,31 @@
             android:paddingStart="8dp"
             android:paddingEnd="8dp">
 
-            <com.kancrutt.gigginggear.SignalChainCanvasView
-                android:id="@+id/signalChainCanvas"
+            <!-- Phone-class only: the canvas content is taller/wider than this
+                 viewport when SPLIT/MERGE branches (or long chains) exist, so it
+                 scrolls vertically to the branch rows and horizontally along the
+                 chain. Tablet (layout-sw600dp) keeps the bare fixed-fit canvas. -->
+            <androidx.core.widget.NestedScrollView
+                android:id="@+id/canvas_vscroll"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:paddingStart="4dp"
-                android:paddingEnd="52dp" />
+                android:scrollbars="vertical">
+
+                <HorizontalScrollView
+                    android:id="@+id/canvas_hscroll"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:fillViewport="true"
+                    android:scrollbars="horizontal">
+
+                    <com.kancrutt.gigginggear.SignalChainCanvasView
+                        android:id="@+id/signalChainCanvas"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:paddingStart="4dp"
+                        android:paddingEnd="52dp" />
+                </HorizontalScrollView>
+            </androidx.core.widget.NestedScrollView>
 
             <!-- Square rounded "+" button at far right -->
             <com.google.android.material.button.MaterialButton

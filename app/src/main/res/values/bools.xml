@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Phone-class breakpoint (< 600dp smallestWidth): Board canvas is
+         vertically + horizontally scrollable, series row centered by default.
+         Tablet (values-sw600dp) overrides this to false and keeps the
+         fixed-fit canvas Hery confirmed. -->
+    <bool name="canvas_phone_scroll">true</bool>
+</resources>

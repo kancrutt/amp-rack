@@ -1,6 +1,9 @@
 <resources>
     <!-- Large phones / small tablets (~480-599dp smallestWidth) -->
-    <dimen name="signal_chain_height">100dp</dimen>
+    <!-- Single compact center row (56dp blocks): freed space goes to param panel -->
+    <dimen name="signal_chain_height">72dp</dimen>
+    <!-- Also serves landscape phones (width 825dp -> closest w-bucket w480). -->
+    <dimen name="signal_chain_card_height">72dp</dimen>
     <dimen name="param_gear_col_width">130dp</dimen>
     <dimen name="rack_top_bar_height">42dp</dimen>
     <dimen name="knob_size_large">58dp</dimen>

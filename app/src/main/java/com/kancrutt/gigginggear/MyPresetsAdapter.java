@@ -312,24 +312,15 @@ public class MyPresetsAdapter extends RecyclerView.Adapter<MyPresetsAdapter.View
         });
 
         holder.delete.setOnClickListener(v -> {
-            // TEMP-DBG triage (remove after device roundtrip): total-silence tap?
-            final int dbgPos = holder.getAdapterPosition();
-            final int dbgSize = presets != null ? presets.size() : -1;
-            Log.d(TAG, "DBG del tap pos=" + dbgPos + " size=" + dbgSize);
-            MainActivity.toast("DBG del tap pos=" + dbgPos + "/" + dbgSize);
-            // Capture everything at click time: re-querying getAdapterPosition()
-            // inside the dialog callback can return NO_POSITION (silent no-op —
-            // the "delete does nothing" symptom).
-            final int clickPos = dbgPos;
-            if (clickPos < 0 || presets == null || clickPos >= presets.size()) {
-                Log.w(TAG, "DBG del ABORT pos=" + clickPos + " size=" + dbgSize);
-                MainActivity.toast("DBG del ABORT stale-pos");
-                return;
-            }
-            final Map<String, Object> clickTarget = presets.get(clickPos);
+            // The delete target is the map bound to THIS row at bind time — never
+            // holder.getAdapterPosition(): stale holders report NO_POSITION (-1) at
+            // tap time (proven on device: pos=-1/size=1 = total silence), and a
+            // position re-query can address the wrong row after a list reload.
+            // Row content always equals the bound map, so identity is exact.
+            final Map<String, Object> clickTarget = preset;
             if (clickTarget == null) {
-                Log.w(TAG, "DBG del ABORT null-target pos=" + clickPos);
-                MainActivity.toast("DBG del ABORT null-target");
+                Log.e(TAG, "delete: unbound row, refusing");
+                MainActivity.toast("Cannot delete: row not ready, try again");
                 return;
             }
             final String targetName = value(clickTarget, "name", "Untitled");
@@ -356,10 +347,7 @@ public class MyPresetsAdapter extends RecyclerView.Adapter<MyPresetsAdapter.View
                 }
                 boolean fileDeleted = false;
                 try {
-                    Log.d(TAG, "DBG del confirm id=" + clickId);
                     fileDeleted = localPresetManager.deletePreset(clickId);
-                    Log.d(TAG, "DBG del result=" + fileDeleted + " id=" + clickId);
-                    MainActivity.toast("DBG del result=" + fileDeleted);
                 } catch (Exception e) {
                     Log.e(TAG, "delete failed", e);
                 }
@@ -375,11 +363,9 @@ public class MyPresetsAdapter extends RecyclerView.Adapter<MyPresetsAdapter.View
                     }
                     return;
                 }
-                // Remove the visible row by identity first, fall back to click pos.
-                int visiblePos = presets.indexOf(clickTarget);
-                if (visiblePos < 0) {
-                    visiblePos = (clickPos >= 0 && clickPos < presets.size()) ? clickPos : -1;
-                }
+                // Remove the visible row by identity (the bound map): no position
+                // logic anywhere — holder positions are untrustworthy by design now.
+                int visiblePos = presets != null ? presets.indexOf(clickTarget) : -1;
                 if (visiblePos >= 0) {
                     presets.remove(visiblePos);
                 }
@@ -399,7 +385,6 @@ public class MyPresetsAdapter extends RecyclerView.Adapter<MyPresetsAdapter.View
                 MainActivity.toast("Deleted " + targetName);
             });
             builder.setNegativeButton("Cancel", null);
-            Log.d(TAG, "DBG del dialog show id=" + clickId);
             builder.show();
         });
     }

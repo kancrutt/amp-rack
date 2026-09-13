@@ -153,8 +153,7 @@ public class PluginPickerFragment extends BottomSheetDialogFragment {
                 CategoryHelper.Category.PITCH,
                 CategoryHelper.Category.WAH,
                 CategoryHelper.Category.UTILITY,
-                CategoryHelper.Category.GATE,
-                CategoryHelper.Category.SPLIT
+                CategoryHelper.Category.GATE
         };
 
         final String[] catLabels = {

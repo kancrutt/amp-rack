@@ -5950,8 +5950,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 CategoryHelper.Category.PITCH,
                 CategoryHelper.Category.WAH,
                 CategoryHelper.Category.UTILITY,
-                CategoryHelper.Category.GATE,
-                CategoryHelper.Category.SPLIT
+                CategoryHelper.Category.GATE
         };
 
         final String[] catLabels = {

@@ -1,7 +1,8 @@
 <resources>
     <string name="app_name">Giggin\' Gear</string>
-    <string name="app_version">Giggin\' Gear v1.0</string>
-    <string name="build_id">731</string>
+    <string name="attribution_audio">Audio processing</string>
+    <string name="app_version">Giggin\' Gear v1.1</string>
+    <string name="build_id">123</string>
     <string name="onboard_description">
         [new] Video Recorder\n\n
         Welcome to Version 5: \n\n

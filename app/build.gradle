@@ -10,8 +10,8 @@ android {
         applicationId "com.kancrutt.gigginggear"
         minSdk 24
         targetSdk 35
-        versionCode 122
-        versionName '5.96'
+        versionCode 123
+        versionName '1.1'
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         externalNativeBuild {
@@ -24,7 +24,6 @@ android {
         vectorDrawables {
             useSupportLibrary true
         }
-        versionNameSuffix '-Raptor'
         // TONE3000 publishable client_id (safe for client). Set via -PTONE3000_CLIENT_ID=xxx or env TONE3000_CLIENT_ID.
         // Secret key (t3k_cs_...) MUST NOT be set here — server-only.
         buildConfigField "String", "TONE3000_CLIENT_ID", "\"" + (project.findProperty("TONE3000_CLIENT_ID") ?: System.getenv("TONE3000_CLIENT_ID") ?: "") + "\""

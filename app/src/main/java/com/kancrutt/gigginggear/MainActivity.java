@@ -3847,6 +3847,12 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 gainSlider.setValueFrom(0f);
                 gainSlider.setValueTo(gainMax);
                 gainSlider.setStepSize(0.05f);
+                // Match the in-app slider style (BPM dialog): white on dark.
+                gainSlider.setTrackActiveTintList(android.content.res.ColorStateList.valueOf(Color.parseColor("#FFFFFF")));
+                gainSlider.setTrackInactiveTintList(android.content.res.ColorStateList.valueOf(Color.parseColor("#444444")));
+                gainSlider.setThumbTintList(android.content.res.ColorStateList.valueOf(Color.parseColor("#FFFFFF")));
+                gainSlider.setTrackHeight(16);
+                gainSlider.setThumbRadius(16);
                 float initGain;
                 try {
                     initGain = (position == -100 ? AudioEngine.getInputVolume() : AudioEngine.getOutputVolume());

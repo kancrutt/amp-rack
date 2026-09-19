@@ -3840,35 +3840,41 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 labelView.setGravity(Gravity.CENTER);
                 if (jakartaFont != null) labelView.setTypeface(jakartaFont, android.graphics.Typeface.BOLD);
                 
-                // IN/OUT gain uses a horizontal Slider (0-4x input, 0-1x
-                // output): easier to set precisely than a rotary knob here.
-                final float gainMax = position == -100 ? 4f : 1f;
-                Slider gainSlider = new Slider(this);
-                gainSlider.setValueFrom(0f);
-                gainSlider.setValueTo(gainMax);
-                gainSlider.setStepSize(0.05f);
-                gainSlider.setTickVisible(false);
-                // Match the in-app slider style (BPM dialog): white on dark.
-                gainSlider.setTrackActiveTintList(android.content.res.ColorStateList.valueOf(Color.parseColor("#FFFFFF")));
-                gainSlider.setTrackInactiveTintList(android.content.res.ColorStateList.valueOf(Color.parseColor("#444444")));
-                gainSlider.setThumbTintList(android.content.res.ColorStateList.valueOf(Color.parseColor("#FFFFFF")));
-                gainSlider.setTrackHeight(16);
-                gainSlider.setThumbRadius(16);
-                float initGain;
+                // IN/OUT gain uses the same pill SeekBar as the top bar
+                // master volume (rounded #2E323B track, white progress,
+                // transparent thumb). Integer percent: 0-400 input, 0-100 out.
+                final int gainSeekMax = position == -100 ? 400 : 100;
+                android.widget.SeekBar gainSeek = new android.widget.SeekBar(this);
+                android.graphics.drawable.GradientDrawable gTrack = new android.graphics.drawable.GradientDrawable();
+                gTrack.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+                float gCornerPx = 7f * density;
+                gTrack.setCornerRadius(gCornerPx);
+                gTrack.setColor(android.graphics.Color.parseColor("#2E323B"));
+                RoundedProgressDrawable gProgress = new RoundedProgressDrawable(
+                        android.graphics.Color.WHITE, gCornerPx);
+                android.graphics.drawable.LayerDrawable gLayer = new android.graphics.drawable.LayerDrawable(
+                        new android.graphics.drawable.Drawable[]{gTrack, gProgress});
+                gLayer.setId(0, android.R.id.background);
+                gLayer.setId(1, android.R.id.progress);
+                gainSeek.setProgressDrawable(gLayer);
+                gainSeek.setThumb(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+                gainSeek.setPadding(0, 0, 0, 0);
+                gainSeek.setMax(gainSeekMax);
+                int initPct;
                 try {
-                    initGain = (position == -100 ? AudioEngine.getInputVolume() : AudioEngine.getOutputVolume());
-                } catch (Exception ignored) { initGain = 1f; }
-                if (initGain < 0f) initGain = 0f;
-                if (initGain > gainMax) initGain = gainMax;
-                gainSlider.setValue(initGain);
+                    initPct = Math.round((position == -100 ? AudioEngine.getInputVolume() : AudioEngine.getOutputVolume()) * 100f);
+                } catch (Exception ignored) { initPct = 100; }
+                if (initPct < 0) initPct = 0;
+                if (initPct > gainSeekMax) initPct = gainSeekMax;
+                gainSeek.setProgress(initPct);
                 LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(
                         Math.round(200 * density), ViewGroup.LayoutParams.WRAP_CONTENT);
                 slp.gravity = Gravity.CENTER;
-                gainSlider.setLayoutParams(slp);
+                gainSeek.setLayoutParams(slp);
 
                 float valSizePx = 12.5f * density;
                 TextView valView = new TextView(this);
-                valView.setText(String.format(java.util.Locale.US, "%.0f%%", initGain * 100f));
+                valView.setText(String.format(java.util.Locale.US, "%.0f%%", (float) initPct));
                 valView.setTextColor(Color.parseColor("#FFFFFF"));
                 valView.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, valSizePx);
                 valView.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
@@ -3877,25 +3883,30 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 valView.setFocusable(true);
                 if (jakartaFont != null) valView.setTypeface(jakartaFont, android.graphics.Typeface.BOLD);
 
-                gainSlider.addOnChangeListener((slider, value, fromUser) -> {
-                    if (position == -100) {
-                        try { AudioEngine.setInputVolume(value); } catch (Exception ignored) {}
-                        // Mirror to mixer slider + prefs: otherwise the next
-                        // Rack view recreation re-pushes the stale persisted
-                        // value and silently wipes the slider-set gain.
-                        try {
-                            if (inputVolume != null) inputVolume.setValue(value);
-                            defaultSharedPreferences.edit().putFloat("inputVolume", value).apply();
-                        } catch (Exception ignored) {}
-                    } else {
-                        try { AudioEngine.setOutputVolume(value); } catch (Exception ignored) {}
+                gainSeek.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
+                    @Override public void onProgressChanged(android.widget.SeekBar sb, int progress, boolean fromUser) {
+                        float g = progress / 100f;
+                        if (position == -100) {
+                            try { AudioEngine.setInputVolume(g); } catch (Exception ignored) {}
+                            // Mirror to mixer slider + prefs: otherwise the
+                            // next Rack view recreation re-pushes the stale
+                            // persisted value and silently wipes the set gain.
+                            try {
+                                if (inputVolume != null) inputVolume.setValue(g);
+                                defaultSharedPreferences.edit().putFloat("inputVolume", g).apply();
+                            } catch (Exception ignored) {}
+                        } else {
+                            try { AudioEngine.setOutputVolume(g); } catch (Exception ignored) {}
+                        }
+                        valView.setText(String.format(java.util.Locale.US, "%.0f%%", (float) progress));
                     }
-                    valView.setText(String.format(java.util.Locale.US, "%.0f%%", value * 100f));
+                    @Override public void onStartTrackingTouch(android.widget.SeekBar sb) {}
+                    @Override public void onStopTrackingTouch(android.widget.SeekBar sb) {}
                 });
 
                 View.OnClickListener manualInputClick = v -> {
-                    showManualValueInputDialog(position == -100 ? "Input Trim" : "Main Out", gainSlider.getValue() * 100f, 0f, position == -100 ? 400f : 100f, "%", newVal -> {
-                        gainSlider.setValue(newVal / 100f);
+                    showManualValueInputDialog(position == -100 ? "Input Trim" : "Main Out", (float) gainSeek.getProgress(), 0f, (float) gainSeekMax, "%", newVal -> {
+                        gainSeek.setProgress(Math.round(newVal));
                         valView.setText(String.format(java.util.Locale.US, "%.0f%%", newVal));
                     });
                 };
@@ -3903,7 +3914,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 labelView.setOnClickListener(manualInputClick);
 
                 knobCell.addView(labelView);
-                knobCell.addView(gainSlider);
+                knobCell.addView(gainSeek);
                 knobCell.addView(valView);
                 
                 if (levelContainer != null) levelContainer.addView(knobCell);

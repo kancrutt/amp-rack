@@ -6,7 +6,100 @@ import android.media.AudioManager;
 import android.os.Build;
 import android.util.Log;
 
+import java.util.HashMap;
+import java.util.Map;
+
 public class AudioEngine {
+    private static final long THROTTLE_INTERVAL_MS = 250;
+    private static final Map<String, Long> lastCallTime = new HashMap<>();
+    private static final Map<String, Float> lastCallValue = new HashMap<>();
+    // Measurement stats
+    private static int totalCalls = 0;
+    private static int nativeCalls = 0;
+    private static int throttledCalls = 0;
+    private static long firstCallTime = 0;
+    private static long lastCallTimeMs = 0;
+    private static long minNativeIntervalMs = Long.MAX_VALUE;
+
+    private static synchronized float getWithThrottle(int plugin, int control, boolean passive) {
+        String key = plugin + "," + control;
+        if (passive) {
+            long now = System.currentTimeMillis();
+            if (firstCallTime == 0) firstCallTime = now;
+            lastCallTimeMs = now;
+            totalCalls++;
+            Long last = lastCallTime.get(key);
+            if (last != null && now - last < THROTTLE_INTERVAL_MS) {
+                Float cached = lastCallValue.get(key);
+                if (cached != null) {
+                    throttledCalls++;
+                    return cached;
+                }
+            }
+            lastCallTime.put(key, now);
+            nativeCalls++;
+            // Track minimum interval between native calls
+            if (lastCallTimeMs > 0) {
+                long interval = now - lastCallTimeMs;
+                if (interval < minNativeIntervalMs) minNativeIntervalMs = interval;
+            }
+            lastCallTimeMs = now;
+            float val = getActivePluginValue(plugin, control);
+            lastCallValue.put(key, val);
+            return val;
+        } else {
+            totalCalls++;
+            nativeCalls++;
+            long now = System.currentTimeMillis();
+            if (lastCallTimeMs > 0) {
+                long interval = now - lastCallTimeMs;
+                if (interval < minNativeIntervalMs) minNativeIntervalMs = interval;
+            }
+            lastCallTimeMs = now;
+            return getActivePluginValue(plugin, control);
+        }
+    }
+
+    public static synchronized void resetThrottleStats() {
+        totalCalls = 0;
+        nativeCalls = 0;
+        throttledCalls = 0;
+        firstCallTime = 0;
+        lastCallTimeMs = 0;
+        minNativeIntervalMs = Long.MAX_VALUE;
+    }
+
+    public static synchronized String getThrottleStats() {
+        if (firstCallTime == 0) return "no calls yet";
+        long elapsedMs = lastCallTimeMs - firstCallTime;
+        if (elapsedMs <= 0) elapsedMs = 1;
+        double callsPerSec = totalCalls * 1000.0 / elapsedMs;
+        double nativePerSec = nativeCalls * 1000.0 / elapsedMs;
+        long minInterval = (minNativeIntervalMs == Long.MAX_VALUE) ? 0 : minNativeIntervalMs;
+        return String.format(
+            "total=%d native=%d throttled=%d elapsed=%.0fs calls/s=%.1f native/s=%.1f min_interval=%dms",
+            totalCalls, nativeCalls, throttledCalls, elapsedMs / 1000.0,
+            callsPerSec, nativePerSec, minInterval
+        );
+    }
+
+    public static float getActivePluginValueThrottled(int plugin, int control) {
+        return getWithThrottle(plugin, control, true);
+    }
+
+    public static void clearThrottleCache() {
+        lastCallTime.clear();
+        lastCallValue.clear();
+    }
+
+    public static synchronized void addNativeCallInterval(long now) {
+        // Track minimum interval between native calls
+    }
+
+    public static void printThrottleStats() {
+        Log.d("AudioEngine", "THROTTLE_STATS=" + getThrottleStats());
+    }
+
     public static native void loadLibrary (String filename);
     public static native void loadPlugins ();
     public static native int getSharedLibraries ();
@@ -76,6 +169,7 @@ public class AudioEngine {
     public static native void setExternalStoragePath (String path) ;
     public static native void setRecordingActive (boolean active) ;
     public static native void setOpusBitRate (int bitrate);
+    public static native void setAttributionTag (String tag);
 
     public static native boolean create() ;
     public static native boolean wasLowLatency ();

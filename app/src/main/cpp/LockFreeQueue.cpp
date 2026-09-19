@@ -7,7 +7,7 @@
 
 LockFreeQueue<AudioBuffer *, LOCK_FREE_SIZE> LockFreeQueueManager::lockFreeQueue;
 std::thread LockFreeQueueManager::fileWriteThread  ;
-bool LockFreeQueueManager::ready = false;
+std::atomic<bool> LockFreeQueueManager::ready = false;
 void (* LockFreeQueueManager::functions [MAX_FUNCTIONS])(AudioBuffer *) ;
 AudioBuffer * LockFreeQueueManager::pAudioBuffer [SPARE_BUFFERS]; 
 int  LockFreeQueueManager::buffer_counter ;
@@ -15,11 +15,28 @@ int  LockFreeQueueManager::buffer_counter ;
 void LockFreeQueueManager::init (int _buffer_size) {
     IN
     if (buffer_size < _buffer_size) {
+        // The consumer thread (main()) may be inside updateMeterOutput()
+        // reading one of these pool buffers right now. Freeing under it is a
+        // use-after-free SIGSEGV. Stop + join the worker first (it only
+        // sleeps/pops, so join waits out at most one 100ms slice), then free.
+        if (thread_started) {
+            ready = false ;
+            AudioBuffer * drain ;
+            while (lockFreeQueue.pop(drain)) { }
+            if (fileWriteThread.joinable()) {
+                fileWriteThread.join();
+                fileWriteThread = std::thread();
+            }
+            thread_started = false;
+        }
         if (pAudioBuffer[0] != nullptr) {
             for (int i = 0; i < SPARE_BUFFERS; i++) {
-                free(pAudioBuffer[i]->data);
-                free(pAudioBuffer[i]->raw);
-                free(pAudioBuffer[i]);
+                if (pAudioBuffer[i] != nullptr) {
+                    free(pAudioBuffer[i]->data);
+                    free(pAudioBuffer[i]->raw);
+                    free(pAudioBuffer[i]);
+                    pAudioBuffer[i] = nullptr;
+                }
             }
         }
 
@@ -80,7 +97,9 @@ void LockFreeQueueManager::process (float * raw, float * data, int samplesToProc
         return;
     }
 
+    if (pAudioBuffer[buffer_counter] == nullptr) return;
     int toProcess = std::min(samplesToProcess, buffer_size);
+    if (toProcess <= 0) return;
     for (int i = 0 ; i < toProcess ; i ++) {
         pAudioBuffer [buffer_counter]->raw [i] = raw [i] ;
         pAudioBuffer [buffer_counter]->data [i] = data [i] ;

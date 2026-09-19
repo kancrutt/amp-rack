@@ -15,6 +15,7 @@ jfloatArray Engine::pushSamples = nullptr;
 bool Engine::lockFreeThreadAttached = false ;
 std::string Engine::mainActivityClassName = "";
 std::string Engine::pushSamplesMethodName = "";
+std::string Engine::attributionTag = "";
 static jobject gClassLoader;
 static jmethodID gFindClassMethod;
 
@@ -310,7 +311,13 @@ oboe::AudioStreamBuilder *Engine::setupCommonStreamParameters(
             ->setSharingMode(oboe::SharingMode::Exclusive)
             ->setInputPreset(oboe::VoicePerformance)
 //            ->setPerformanceMode(static_cast<oboe::PerformanceMode>(lowLatency));
-            ->setPerformanceMode(oboe::PerformanceMode::LowLatency);
+            ->setPerformanceMode(oboe::PerformanceMode::LowLatency)
+            ->setUsage(oboe::Usage::Media)
+            ->setContentType(oboe::ContentType::Music)
+            ->setPackageName("com.kancrutt.gigginggear");
+    if (!Engine::attributionTag.empty()) {
+        builder->setAttributionTag(Engine::attributionTag);
+    }
     return builder;
 }
 

@@ -116,9 +116,17 @@ int Meter::autoincrease_callback(vringbuffer_t *vrb, bool first_call, int readin
 
 int Meter::updateMeterOutput (AudioBuffer * buffer) {
 //    LOGD("HIT");
+    // Defensive guards: this runs on the LockFreeQueue worker thread and has
+    // crashed here (SIGSEGV) when handed a stale/freed/corrupt buffer after
+    // engine stop/start cycles. Never trust the pointer or header blindly.
+    if (buffer == nullptr) return 0;
     float * data = buffer->data ;
     float * raw = buffer -> raw ;
+    if (data == nullptr || raw == nullptr) return 0;
     int samples = buffer -> pos ;
+    // Legit bursts are a few hundred frames; anything at/above this bound is
+    // a torn/corrupt header — reading it would fault out of bounds.
+    if (samples <= 0 || samples > 8192) return 0;
 
     /*
     if (! enabled) {

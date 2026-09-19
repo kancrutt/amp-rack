@@ -73,12 +73,9 @@ import android.media.AudioAttributes;
 import android.media.AudioDeviceInfo;
 import android.media.AudioFormat;
 import android.media.AudioManager;
-import android.media.AudioRecord;
-import android.media.AudioTrack;
 import android.media.MediaCodecInfo;
 import android.media.MediaCodecList;
 import android.media.MediaPlayer;
-import android.media.MediaRecorder;
 import android.media.midi.MidiDevice;
 import android.media.midi.MidiDeviceInfo;
 import android.media.midi.MidiManager;
@@ -494,7 +491,15 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                         continue;
                     }
 
-                    switch (frag.getTag()) {
+                    // getTag() may be null for fragments added without a tag
+                    // (switch on null throws NPE -> "Unable to start activity").
+                    String fragTag = frag.getTag();
+                    if (fragTag == null) {
+                        Log.d(TAG, "onCreate: skipping untagged fragment " + frag);
+                        continue;
+                    }
+
+                    switch (fragTag) {
                         case "qp":
                             quickPatch = (QuickPatch) frag;
                             break;
@@ -547,7 +552,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
         hashCommands = new HashCommands(this);
         hashCommands.setMainActivity(this);
-        hashCommands.add (this, "AudioRecordTest");
         hashCommands.add (this, "pluginsCrashTest");
         hashCommands.add (this, "resetMIDI");
         hashCommands.add (this, "printMidi");
@@ -1113,6 +1117,39 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         super.onNewIntent(intent);
         setIntent(intent);
         handleTone3000Callback(intent);
+    }
+
+    /** Rotation / screen-size change handled WITHOUT recreating the activity.
+     *  The audio engine (Oboe streams) must persist untouched; only the UI
+     *  re-fits. */
+    @Override
+    public void onConfigurationChanged(android.content.res.Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        try {
+            Log.d(TAG, "onConfigurationChanged: newConfig=" + newConfig);
+            int newWidth = getWindowManager().getDefaultDisplay().getWidth();
+            int newHeight = getWindowManager().getDefaultDisplay().getHeight();
+            deviceWidth = newWidth;
+            deviceHeight = newHeight;
+
+            ImageView wallpaper = findViewById(R.id.wallpaper);
+            if (wallpaper != null) {
+                applyWallpaper(context, getWindow(), getResources(), wallpaper, newWidth, newHeight);
+            }
+
+            // UI-only re-layout; no engine create/delete, no stream reopen.
+            if (rack != null && rack.isAdded()) {
+                rack.onConfigurationReapplied();
+            }
+            if (signalChainCanvas != null) {
+                signalChainCanvas.post(() -> {
+                    signalChainCanvas.requestLayout();
+                    signalChainCanvas.invalidate();
+                });
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "onConfigurationChanged failed", t);
+        }
     }
 
     // ---- TONE3000 callback handling (deep-link) ----
@@ -2008,6 +2045,18 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         applyWallpaper(context, getWindow(), getResources(), findViewById(R.id.wallpaper), getWindowManager().getDefaultDisplay().getWidth(), getWindowManager().getDefaultDisplay().getHeight()); //finally
 //        recreate();
         Log.d(TAG, "lifecycle: resumed");
+        // Start foreground service for microphone attribution before audio engine.
+        // Gated on RECORD_AUDIO: starting the service without the permission
+        // makes onCreate bail without startForeground(), which the system
+        // punishes with ForegroundServiceDidNotStartInTimeException (dead
+        // process on fresh install). The grant callback starts it on arrival.
+        if (isRecordPermissionGranted()) {
+            startAudioForegroundService();
+        }
+        if (android.os.Build.VERSION.SDK_INT >= 31) {
+            String tag = getAttributionTag();
+            if (tag != null) AudioEngine.setAttributionTag(tag);
+        }
         // Restore chain state when resuming (tab switch / app backgrounding)
         // Ensure engine exists before native calls in onResume
         AudioEngine.create();
@@ -2078,7 +2127,13 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     protected void onPause() {
         super.onPause();
         Log.d(TAG, "lifecycle: paused");
+        // Stop file-recording trigger, but KEEP the mic foreground service
+        // alive: the engine keeps capturing in background, and dropping the
+        // mic FGS makes AppOps silence the record track (op 27), which zeroes
+        // the live guitar input. The service is stopped in onDestroy instead.
+        AudioEngine.setRecordingActive(false);
         saveActivePreset();
+        AudioEngine.clearThrottleCache();
     }
 
     @Override
@@ -2086,6 +2141,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         super.onStop();
         Log.d(TAG, "lifecycle: stopped");
         saveActivePreset();
+        AudioEngine.clearThrottleCache();
     }
 
     @Override
@@ -2093,8 +2149,19 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         super.onDestroy();
         Log.d(TAG, "lifecycle: destroyed");
         stopEffect();
+        stopService(new Intent(this, AudioForegroundService.class));
         saveActivePreset();
         AudioEngine.delete();
+        AudioEngine.clearThrottleCache();
+    }
+
+    private void startAudioForegroundService() {
+        Intent fg = new Intent(this, AudioForegroundService.class);
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            startForegroundService(fg);
+        } else {
+            startService(fg);
+        }
     }
 
     public void toggleEffect(boolean isPlaying) {
@@ -2714,6 +2781,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                         .show();
             } else {
                 // Permission was granted, start live effect
+                startAudioForegroundService();
                 toggleEffect(false);
             }
         }
@@ -3772,25 +3840,28 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 labelView.setGravity(Gravity.CENTER);
                 if (jakartaFont != null) labelView.setTypeface(jakartaFont, android.graphics.Typeface.BOLD);
                 
-                int knobDimPx = Math.round(52 * density); // knob_size_large
-                RotarySeekbar rKnob = new RotarySeekbar(this);
-                rKnob.setShowKnob(true);
-                rKnob.setMinValue(0f);
-                rKnob.setMaxValue(position == -100 ? 200f : 100f);
-                // Currently AudioEngine doesn't have an input/output getter, we track state or initialize to 100
+                // IN/OUT gain uses a horizontal Slider (0-4x input, 0-1x
+                // output): easier to set precisely than a rotary knob here.
+                final float gainMax = position == -100 ? 4f : 1f;
+                Slider gainSlider = new Slider(this);
+                gainSlider.setValueFrom(0f);
+                gainSlider.setValueTo(gainMax);
+                gainSlider.setStepSize(0.05f);
                 float initGain;
                 try {
-                    initGain = (position == -100 ? AudioEngine.getInputVolume() : AudioEngine.getOutputVolume()) * 100f;
-                } catch (Exception ignored) { initGain = 100f; }
-                rKnob.setValue(initGain);
-                rKnob.mKnobColor = CategoryHelper.getColor(position == -100 ? "input" : "output");
-                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(knobDimPx, knobDimPx);
-                lp.gravity = Gravity.CENTER;
-                rKnob.setLayoutParams(lp);
-                
+                    initGain = (position == -100 ? AudioEngine.getInputVolume() : AudioEngine.getOutputVolume());
+                } catch (Exception ignored) { initGain = 1f; }
+                if (initGain < 0f) initGain = 0f;
+                if (initGain > gainMax) initGain = gainMax;
+                gainSlider.setValue(initGain);
+                LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(
+                        Math.round(200 * density), ViewGroup.LayoutParams.WRAP_CONTENT);
+                slp.gravity = Gravity.CENTER;
+                gainSlider.setLayoutParams(slp);
+
                 float valSizePx = 12.5f * density;
                 TextView valView = new TextView(this);
-                valView.setText(String.format(java.util.Locale.US, "%.0f%%", initGain));
+                valView.setText(String.format(java.util.Locale.US, "%.0f%%", initGain * 100f));
                 valView.setTextColor(Color.parseColor("#FFFFFF"));
                 valView.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, valSizePx);
                 valView.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
@@ -3799,36 +3870,42 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 valView.setFocusable(true);
                 if (jakartaFont != null) valView.setTypeface(jakartaFont, android.graphics.Typeface.BOLD);
 
-                rKnob.setOnValueChangedListener((source, value) -> {
+                gainSlider.addOnChangeListener((slider, value, fromUser) -> {
                     if (position == -100) {
-                        try { AudioEngine.setInputVolume(value / 100f); } catch (Exception ignored) {}
+                        try { AudioEngine.setInputVolume(value); } catch (Exception ignored) {}
+                        // Mirror to mixer slider + prefs: otherwise the next
+                        // Rack view recreation re-pushes the stale persisted
+                        // value and silently wipes the slider-set gain.
+                        try {
+                            if (inputVolume != null) inputVolume.setValue(value);
+                            defaultSharedPreferences.edit().putFloat("inputVolume", value).apply();
+                        } catch (Exception ignored) {}
                     } else {
-                        try { AudioEngine.setOutputVolume(value / 100f); } catch (Exception ignored) {}
+                        try { AudioEngine.setOutputVolume(value); } catch (Exception ignored) {}
                     }
-                    valView.setText(String.format(java.util.Locale.US, "%.0f%%", value));
+                    valView.setText(String.format(java.util.Locale.US, "%.0f%%", value * 100f));
                 });
 
                 View.OnClickListener manualInputClick = v -> {
-                    showManualValueInputDialog(position == -100 ? "Input Trim" : "Main Out", rKnob.getValue(), 0f, position == -100 ? 200f : 100f, "%", newVal -> {
-                        rKnob.setValue(newVal);
-                        if (position == -100) {
-                            try { AudioEngine.setInputVolume(newVal / 100f); } catch (Exception ignored) {}
-                        } else {
-                            try { AudioEngine.setOutputVolume(newVal / 100f); } catch (Exception ignored) {}
-                        }
+                    showManualValueInputDialog(position == -100 ? "Input Trim" : "Main Out", gainSlider.getValue() * 100f, 0f, position == -100 ? 400f : 100f, "%", newVal -> {
+                        gainSlider.setValue(newVal / 100f);
                         valView.setText(String.format(java.util.Locale.US, "%.0f%%", newVal));
                     });
                 };
                 valView.setOnClickListener(manualInputClick);
                 labelView.setOnClickListener(manualInputClick);
-                rKnob.setOnKnobClickListener(k -> manualInputClick.onClick(k));
 
                 knobCell.addView(labelView);
-                knobCell.addView(rKnob);
+                knobCell.addView(gainSlider);
                 knobCell.addView(valView);
                 
                 if (levelContainer != null) levelContainer.addView(knobCell);
                 if (toneContainer != null) addEmptyPanelHint(toneContainer, "GLOBAL CONTROL");
+                // The LEVEL panel defaults to gone in layout; the normal
+                // plugin path unhides it when cells exist, but this anchor
+                // branch never did — knob attached yet invisible (F1 bug).
+                LinearLayout anchorLevelPanel = findViewById(R.id.panel_level);
+                if (anchorLevelPanel != null) anchorLevelPanel.setVisibility(View.VISIBLE);
                 
                 return;
             }
@@ -4117,7 +4194,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                          Log.d(TAG, "parameter metadata missing plugin=" + activePluginId + " port=" + nativePortIndex + " name=" + cName);
                      }
 
-                    float val = AudioEngine.getActivePluginValue(position, i);
+                    float val = AudioEngine.getActivePluginValueThrottled(position, i);
                     float minVal = 0f;
                     float maxVal = 1f;
                     int ctrlType = 0; // 0 FLOAT, 1 INT, 2 TOGGLE, 3 ATOM, 4 ENUM
@@ -6659,11 +6736,66 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         return set;
     }
 
+    private static boolean deviceIdPresent(AudioDeviceInfo[] devices, String id) {
+        if (devices == null) return false;
+        for (AudioDeviceInfo d : devices) {
+            if (String.valueOf(d.getId()).equals(id)) return true;
+        }
+        return false;
+    }
+
     void applyPreferencesDevices() {
         // Audio Devices
         String input = defaultSharedPreferences.getString("input", "-1");
         String output = defaultSharedPreferences.getString("output", "-1");
         Log.d(TAG, "applyPreferences: [devices] " + String.format("input: %s, output: %s", input, output));
+
+        // USB interface scan (PA6 etc.): log every device so the actual routing
+        // is visible in logcat, and prefer a USB capture device when the user
+        // has not chosen one explicitly. Android does not always auto-route
+        // RECORDING to a USB class device — the built-in mic can win, especially
+        // after a stream reopen.
+        AudioManager am = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+        if (am != null) {
+            AudioDeviceInfo[] inputs = am.getDevices(AudioManager.GET_DEVICES_INPUTS);
+            for (AudioDeviceInfo d : inputs) {
+                Log.d(TAG, "AUDIO_DEVICE_SCAN input id=" + d.getId()
+                        + " type=" + d.getType() + " name=" + d.getProductName());
+            }
+            AudioDeviceInfo[] outputs = am.getDevices(AudioManager.GET_DEVICES_OUTPUTS);
+            for (AudioDeviceInfo d : outputs) {
+                Log.d(TAG, "AUDIO_DEVICE_SCAN output id=" + d.getId()
+                        + " type=" + d.getType() + " name=" + d.getProductName());
+            }
+            // Replug resilience: stored device IDs go stale when USB
+            // re-enumerates (ids 2991 -> 3055 -> 3069 observed across replugs).
+            // A stored id that no longer exists must fall back to automatic
+            // selection instead of opening a dead id. Never hardcode ids.
+            if (!"-1".equals(input) && !deviceIdPresent(inputs, input)) {
+                Log.w(TAG, "applyPreferencesDevices: stored input id " + input
+                        + " is gone (replug?); falling back to automatic selection");
+                input = "-1";
+            }
+            if (!"-1".equals(output) && !deviceIdPresent(outputs, output)) {
+                Log.w(TAG, "applyPreferencesDevices: stored output id " + output
+                        + " is gone (replug?); falling back to system default");
+                output = "-1";
+            }
+            if ("-1".equals(input)) {
+                for (AudioDeviceInfo d : inputs) {
+                    int t = d.getType();
+                    boolean usb = (t == 4013 /* TYPE_USB_DEVICE */)
+                            || (t == 4020 /* TYPE_USB_HEADSET, API 26+ */)
+                            || (t == 4014 /* TYPE_USB_ACCESSORY */);
+                    if (usb) {
+                        Log.d(TAG, "AUDIO_DEVICE_SCAN: USB interface preferred for recording id="
+                                + d.getId() + " name=" + d.getProductName());
+                        input = String.valueOf(d.getId());
+                        break;
+                    }
+                }
+            }
+        }
 
         Log.d(TAG, "applyPreferencesDevices: " + String.format(
                 "[preferences] playback device: %s, recording device: %s",
@@ -7620,58 +7752,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         dialog.show();
     }
 
-    public void AudioRecordTest () {
-        Log.d(TAG, "AudioRecordTest: ");
-        int min = AudioRecord.getMinBufferSize(8000, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
-        AudioRecord aRecord = null;
-
-        aRecord = new AudioRecord(MediaRecorder.AudioSource.MIC, 48000,
-                AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_FLOAT, 1024*4);
-
-        AlertDialog.Builder builder = new AlertDialog.Builder(mainActivity);
-        builder.setMessage("Audio Record Test");
-        builder.setPositiveButton("Close", null);
-
-        LinearLayout linearLayout = new LinearLayout(getApplicationContext());
-        linearLayout.setOrientation(LinearLayout.HORIZONTAL);
-        TextView textView = new TextView(getApplicationContext());
-        textView.setText("Toggle record");
-        ToggleButton toggleButton = new ToggleButton(getApplicationContext());
-        linearLayout.addView(textView);
-        linearLayout.addView(toggleButton);
-        builder.setView(linearLayout);
-        int maxJitter = AudioTrack.getMinBufferSize(48000, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT);
-
-        AudioTrack track = new AudioTrack(AudioManager.MODE_IN_COMMUNICATION, 8000, AudioFormat.CHANNEL_OUT_MONO,
-                AudioFormat.ENCODING_PCM_16BIT, maxJitter, AudioTrack.MODE_STREAM);
-
-        Dialog dialog = builder.create();
-        Pitch p = new Pitch(48000);
-        AudioRecord finalARecord = aRecord;
-        CompoundButton.OnCheckedChangeListener listener = new CompoundButton.OnCheckedChangeListener() {
-            @Override
-            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-                if (isChecked) {
-                    finalARecord.startRecording();
-                    float[] lin = new float[1024*4];
-                    while (finalARecord.getRecordingState() == AudioRecord.RECORDSTATE_RECORDING) {
-                        int num = finalARecord.read(lin, 0, 1024 *4, AudioRecord.READ_NON_BLOCKING);
-                        double pitchFrequency = p.computePitchFrequency (lin);
-                        Log.d(TAG, "onCheckedChanged: " + lin [0] + " " + pitchFrequency);
-//                        break ;
-
-                    }
-                } else {
-                    finalARecord.stop();
-                }
-            }
-        } ;
-
-        toggleButton.setOnCheckedChangeListener(listener);
-        dialog.show();
-    }
-
-    // ---- restored from git HEAD (methods lost during cleanup) ----
+        // ---- restored from git HEAD (methods lost during cleanup) ----
 
     public boolean isHeadphonesPlugged(){
         AudioManager audioManager = (AudioManager)getSystemService(Context.AUDIO_SERVICE);

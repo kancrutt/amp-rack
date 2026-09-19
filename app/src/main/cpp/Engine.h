@@ -21,6 +21,7 @@ public:
     }
 
     std::string LIBRARY_PATH ;
+    static std::string attributionTag;
     Engine() ;
     ~Engine() ;
     std::string tuneLatency();

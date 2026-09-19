@@ -171,7 +171,10 @@ class LockFreeQueueManager {
     static AudioBuffer * pAudioBuffer [SPARE_BUFFERS];
     int buffer_size ;
     static int buffer_counter ;
-    static bool ready ;
+    // Shared between the audio callback thread (process()) and the lifecycle
+    // thread (init()/quit()). Plain bool was a data race (UB); atomic makes
+    // the gate well-defined without adding a lock to the hot path.
+    static std::atomic<bool> ready ;
 
     #define MAX_FUNCTIONS 10
     static void (* functions [MAX_FUNCTIONS])(AudioBuffer *) ;
@@ -191,7 +194,11 @@ public:
 
     LockFreeQueueManager () {
         functions_count = 0 ;
-        pAudioBuffer [0] = nullptr;
+        buffer_size = 0 ;
+        // NOTE: do NOT touch the static pAudioBuffer pool here. The pool is
+        // shared across Engine instances; clearing pAudioBuffer[0] corrupts
+        // the "pool allocated" record (leaks the other 127 slots and confuses
+        // init()'s realloc-or-reuse check). init()/quit() own the pool.
     }
 
     void attach();

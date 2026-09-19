@@ -13,6 +13,7 @@ static const int kOboeApiOpenSLES = 1;
 
 static Engine * engine = nullptr;
 static std::string lastLoadError;
+static std::string gAttributionTag;
 
 // ---- Zero-Trust JNI bounds guards (audit 2026-09) ----
 // Every one of these used to be a bare vector .at() that threw
@@ -58,6 +59,19 @@ Java_com_kancrutt_gigginggear_AudioEngine_create(JNIEnv *env, jclass clazz) {
     OUT ;
     return (engine != nullptr) ? JNI_TRUE : JNI_FALSE;
 }
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_kancrutt_gigginggear_AudioEngine_setAttributionTag(JNIEnv *env, jclass clazz, jstring tag) {
+    if (tag == nullptr) { gAttributionTag.clear(); Engine::attributionTag.clear(); return; }
+    const char* c = env->GetStringUTFChars(tag, nullptr);
+    if (c) {
+        gAttributionTag = c;
+        Engine::attributionTag = c;
+        env->ReleaseStringUTFChars(tag, c);
+    }
+}
+
 extern "C"
 JNIEXPORT jboolean JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_isAAudioRecommended(JNIEnv *env, jclass clazz) {
@@ -633,13 +647,13 @@ Java_com_kancrutt_gigginggear_AudioEngine_addPluginByName(JNIEnv *env, jclass cl
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_setPresetValue(JNIEnv *env, jclass clazz, jint plugin,
-                                                             jint control, jfloat value) {
+                                                              jint control, jfloat value) {
     if (engine == NULL) {
         LOGF ("engine is NULL");
         return ;
     }
 
-    IN
+    // IN/OUT removed for hot path (burst-called during preset load)
     if (!validControl(plugin, control)) {
         LOGE("setPresetValue: invalid plugin %d control %d", plugin, control);
     } else {
@@ -647,7 +661,6 @@ Java_com_kancrutt_gigginggear_AudioEngine_setPresetValue(JNIEnv *env, jclass cla
         engine->activePlugins.at(plugin)->pluginControls.at(control)->setPresetValue(value);
     }
 
-    OUT
 }
 extern "C"
 JNIEXPORT jfloat JNICALL
@@ -1295,25 +1308,23 @@ extern "C"
 JNIEXPORT jfloat JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_getActivePluginValue(JNIEnv *env, jclass clazz,
                                                                     jint plugin, jint control) {
-    IN
+    // IN removed for hot path
     if (engine == NULL) {
         LOGF ("engine is NULL");
-        OUT
+        // OUT removed
         return 0;
     }
 
-    LOGD("request plugin %d control %d", plugin, control);
+    // LOGD removed for hot path
     if (!validControl(plugin, control)) {
         LOGE("out of range request! %d %d", plugin, control);
-        OUT
+        // OUT removed
         return 0 ;
     }
 
     auto* controlPtr = engine->activePlugins.at(plugin)->pluginControls.at(control);
     float val = controlPtr->getValue();
-    // LOGI("PARAM_TRACE native_get plugin=%d control=%d raw=%f min=%f max=%f unit=%s",
-    //      plugin, control, val, controlPtr->getMin(), controlPtr->getMax(), controlPtr->unit.c_str());
-    OUT
+    // OUT removed
     return val ;
 }
 
@@ -1321,30 +1332,28 @@ extern "C"
 JNIEXPORT jfloat JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_getActivePluginValueByIndex(JNIEnv *env, jclass clazz,
                                                                      jint plugin, jint control) {
-    IN
+    // IN removed for hot path
     if (engine == NULL) {
         LOGF ("engine is NULL");
-        OUT
+        // OUT removed
         return 0;
     }
     if (!validPlugin(plugin)) {
         LOGE("getActivePluginValueByIndex: invalid plugin %d", plugin);
-        OUT
+        // OUT removed
         return 0;
     }
 
     for (int i = 0 ; i < engine->activePlugins.at(plugin)->pluginControls.size(); i ++) {
         if (engine->activePlugins.at (plugin)->pluginControls.at(i)->port == control) {
-            LOGD("found value for index %d at port %d: %f", control,
-                 engine->activePlugins.at (plugin)->pluginControls.at(i)->port,
-                 engine->activePlugins.at(plugin)->pluginControls.at(i)->getValue());
-            OUT
+            // LOGD removed for hot path
+            // OUT removed
             return engine->activePlugins.at(plugin)->pluginControls.at(i)->getValue();
         }
     }
 
     LOGE("returning default value 0!");
-    OUT
+    // OUT removed
     return 0 ;
 }
 

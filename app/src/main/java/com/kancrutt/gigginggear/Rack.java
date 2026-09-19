@@ -403,9 +403,17 @@ public class Rack extends Fragment {
 
         if (signalChainCanvas != null) {
             signalChainCanvas.setOnNodeSelectedListener(node -> {
-                if (node != null && node.id >= 0 && mainActivity.dataAdapter != null) {
-                    String pluginName = AudioEngine.getActivePluginName(node.id);
-                    mainActivity.populateInlineParameterEditor(node.id, pluginName != null ? pluginName : "");
+                // IN (-100) / OUT (-200) blocks must also open the inline
+                // editor (INPUT TRIM / MAIN OUT sliders). They were silently
+                // ignored by the old >= 0 guard, making input gain unreachable.
+                if (node != null && mainActivity.dataAdapter != null
+                        && (node.id >= 0 || node.id == -100 || node.id == -200)) {
+                    String pluginName = "";
+                    if (node.id >= 0) {
+                        String n = AudioEngine.getActivePluginName(node.id);
+                        if (n != null) pluginName = n;
+                    }
+                    mainActivity.populateInlineParameterEditor(node.id, pluginName);
                 }
             });
             signalChainCanvas.setOnDeleteNodeListener(node -> {
@@ -1132,6 +1140,10 @@ public class Rack extends Fragment {
         if (mainActivity.inputVolume != null) {
             mainActivity.inputVolume.addOnChangeListener((slider, value, fromUser) -> AudioEngine.setInputVolume(value));
             mainActivity.inputVolume.setValue(mainActivity.defaultSharedPreferences.getFloat("inputVolume", 1.0f));
+            // Initial push: restoring the slider value does not itself reach
+            // the native engine (fresh FullDuplexPass starts at 1.0). Push
+            // the persisted value explicitly so startup state is in sync.
+            AudioEngine.setInputVolume(mainActivity.defaultSharedPreferences.getFloat("inputVolume", 1.0f));
         }
         if (mainActivity.outputVolume != null) {
             mainActivity.outputVolume.addOnChangeListener((slider, value, fromUser) -> AudioEngine.setOutputVolume(value));
@@ -1372,13 +1384,22 @@ public class Rack extends Fragment {
                 mainActivity.rotarySeekbarOut = mainActivity.findViewById(R.id.rotary_output_volume);
                 mainActivity.displayIn = mainActivity.findViewById(R.id.rotary_input_display);
                 mainActivity.displayOut = mainActivity.findViewById(R.id.rotary_output_display);
-                
+
+                // Input gain supports up to 4x (F1 input-gain stage) to
+                // compensate PA6 capture level; output stays capped at 1x.
+                mainActivity.rotarySeekbarIn.setMaxValue(400f);
+                mainActivity.rotarySeekbarOut.setMaxValue(100f);
 
                 
                 mainActivity.rotarySeekbarIn.setValue(mainActivity.defaultSharedPreferences.getFloat("inputVolume", 1.0f) * 100);
                 mainActivity.rotarySeekbarOut.setValue(mainActivity.defaultSharedPreferences.getFloat("outputVolume", 1.0f)*100);
                 mainActivity.displayIn.setText(String.valueOf((int) (mainActivity.defaultSharedPreferences.getFloat("inputVolume", 1.0f)* 100)));
                 mainActivity.displayOut.setText(String.valueOf((int) (mainActivity.defaultSharedPreferences.getFloat("outputVolume", 1.0f)* 100)));
+
+                if (mainActivity.inputVolume != null) {
+                    mainActivity.inputVolume.setValueFrom(0f);
+                    mainActivity.inputVolume.setValueTo(4f);
+                }
 
                 mainActivity.rotarySeekbarIn.setVisibility(View.VISIBLE);
                 mainActivity.rotarySeekbarOut.setVisibility(View.VISIBLE);
@@ -2043,6 +2064,32 @@ public class Rack extends Fragment {
      * widths (not fixed-dp budgets). Priority: preset name + scene always visible;
      * collapse order logo -> CPU -> sample-rate. One-way: no auto-restore.
      */
+    /** Respond to a configuration change (e.g. screen rotation) that the
+     *  system delivered WITHOUT recreating the activity. Only UI layout must
+     *  re-fit: the audio engine is untouched. */
+    public void onConfigurationReapplied() {
+        try {
+            View v = getView();
+            if (v == null) return;
+            // Re-measure top bar for the new width and re-center canvas home
+            // (phone scrollable canvas only; tablet no-op).
+            topBarForCollapse = v.findViewById(R.id.routing_header_bar);
+            if (topBarForCollapse != null) {
+                topBarForCollapse.post(() -> applyTopBarCollapse());
+            }
+            SignalChainCanvasView canvas = mainActivity != null ? mainActivity.signalChainCanvas : null;
+            if (canvas != null) {
+                canvas.postDelayed(() -> {
+                    try { centerCanvasHomeView(v, canvas); } catch (Exception ignore) {}
+                    canvas.requestLayout();
+                    canvas.invalidate();
+                }, 150);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "onConfigurationReapplied failed", e);
+        }
+    }
+
     private void applyTopBarCollapse() {
         try {
             if (!isAdded() || getContext() == null) return; // fragment detached (logcat IllegalStateException)

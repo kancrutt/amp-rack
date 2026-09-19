@@ -57,6 +57,8 @@ oboe::DataCallbackResult FullDuplexStream::onAudioReady(
                                                                        numFrames,
                                                                        0 /* timeout */);
         if (!result) {
+            LOGE("[FullDuplex] input read failed during discard: %s — stopping callback",
+                 oboe::convertToText(result.error()));
             callbackResult = oboe::DataCallbackResult::Stop;
         }
         mCountCallbacksToDiscard--;
@@ -67,6 +69,8 @@ oboe::DataCallbackResult FullDuplexStream::onAudioReady(
                                                                        numFrames,
                                                                        0 /* timeout */);
         if (!result) {
+            LOGE("[FullDuplex] input read failed in steady state: %s — stopping callback",
+                 oboe::convertToText(result.error()));
             callbackResult = oboe::DataCallbackResult::Stop;
         } else {
             int32_t framesRead = result.value();

@@ -3847,6 +3847,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 gainSlider.setValueFrom(0f);
                 gainSlider.setValueTo(gainMax);
                 gainSlider.setStepSize(0.05f);
+                gainSlider.setTickVisible(false);
                 // Match the in-app slider style (BPM dialog): white on dark.
                 gainSlider.setTrackActiveTintList(android.content.res.ColorStateList.valueOf(Color.parseColor("#FFFFFF")));
                 gainSlider.setTrackInactiveTintList(android.content.res.ColorStateList.valueOf(Color.parseColor("#444444")));
@@ -5620,6 +5621,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         slider.setValueFrom(40);
         slider.setValueTo(240);
         slider.setStepSize(1);
+        slider.setTickVisible(false);
         slider.setValue(currentBpm[0]);
         slider.setTrackActiveTintList(android.content.res.ColorStateList.valueOf(Color.parseColor("#FFFFFF")));
         slider.setTrackInactiveTintList(android.content.res.ColorStateList.valueOf(Color.parseColor("#444444")));

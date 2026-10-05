@@ -62,6 +62,26 @@ public class GuitarPluginCatalogTest {
         assertFalse(GuitarPluginCatalog.isCurated(""));
     }
 
+    @Test public void blacklistOverridesCurated() throws Exception {
+        loadBundledCatalog();
+        // Bundled blacklist is empty after the octolo atom-port fix: nothing
+        // blocked, both octolo names stay curated.
+        File bl = new File("src/main/assets/blacklist.json");
+        assertTrue("blacklist asset missing at " + bl.getAbsolutePath(), bl.exists());
+        GuitarPluginCatalog.loadBlacklistFromJson(
+                new String(Files.readAllBytes(bl.toPath()), "UTF-8"));
+        assertTrue(GuitarPluginCatalog.isCurated("octolo"));
+
+        // A non-empty blacklist hides even curated names, case-insensitively;
+        // entries with value 0 are ignored.
+        GuitarPluginCatalog.loadBlacklistFromJson(
+                "{\"octolo\": 1, \"The Infamous Octolo\": 1, \"disabled\": 0}");
+        assertFalse(GuitarPluginCatalog.isCurated("octolo"));
+        assertFalse(GuitarPluginCatalog.isCurated("THE INFAMOUS OCTOLO"));
+        assertTrue(GuitarPluginCatalog.isCurated("bluesbreaker"));
+        GuitarPluginCatalog.clearForTesting();
+    }
+
     @Test public void legacyFallbackWhenAssetMissing() {
         GuitarPluginCatalog.clearForTesting();
         // Without the asset the legacy name-token heuristics must keep the

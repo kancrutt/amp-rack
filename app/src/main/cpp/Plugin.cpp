@@ -66,6 +66,25 @@ static bool lv2Meta(const std::string& uri, const std::string& symbol, PluginCon
     }
     return false;
 }
+// Serialized ttl assets come in two key conventions: short class names
+// ("AtomPort") or full RDF URIs ("http://lv2plug.in/ns/ext/atom#AtomPort").
+// Matching only the short name silently skipped atom ports in URI-keyed
+// assets, leaving the plugin's atom pointer uninitialized (garbage from
+// malloc) and crashing run() on the first audio callback (octolo SIGSEGV).
+// Accept either form; the short-name check stays first so exact keys win.
+static bool hasClassKey(const nlohmann::json &obj, const std::string &shortName) {
+    if (!obj.is_object()) return false;
+    if (obj.find(shortName) != obj.end()) return true;
+    for (auto it = obj.begin(); it != obj.end(); ++it) {
+        const std::string &k = it.key();
+        if (k.size() > shortName.size() &&
+            k.compare(k.size() - shortName.size(), shortName.size(), shortName) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
 void replaceAll(std::string& str, const std::string& from, const std::string& to) {
     if(from.empty())
         return;
@@ -333,7 +352,7 @@ void Plugin::load () {
         } else if (jsonPort.find ("OutputPort") != jsonPort.end() && jsonPort.find("ControlPort") != jsonPort.end()) {
             LOGD("[%s %d]: found possible monitor port", lv2Descriptor->URI, port);
             lv2Descriptor->connect_port(handle, port, &dummy_output_control_port);
-        } else if (jsonPort.find ("AtomPort") != jsonPort.end() && jsonPort.find ("InputPort") != jsonPort.end()) {
+        } else if (hasClassKey(jsonPort, "AtomPort") && jsonPort.find ("InputPort") != jsonPort.end()) {
             LOGD ("configuring atom control port");
             if (filePort == nullptr) {
                 int portSize = jsonPort.value("minimumSize", 8192) + sizeof(LV2_Atom_Sequence) + sizeof (LV2_Atom) + 1 ;
@@ -367,7 +386,7 @@ void Plugin::load () {
             lv2Descriptor->connect_port(handle, port, filePort);
 
             LOGD("[%s %d/%d]: found possible atom port", lv2Descriptor->URI, port, pluginIndex);
-        } else if (jsonPort.find ("AtomPort") != jsonPort.end() && jsonPort.find ("OutputPort") != jsonPort.end()) {
+        } else if (hasClassKey(jsonPort, "AtomPort") && jsonPort.find ("OutputPort") != jsonPort.end()) {
             if (notifyPort == nullptr) {
                 notifyPortSize = jsonPort.value("minimumSize", 8192) + sizeof (LV2_Atom_Sequence) + sizeof (LV2_Atom) + 1;
                 notifyPort = (LV2_Atom_Sequence *) calloc(1, (size_t) notifyPortSize);

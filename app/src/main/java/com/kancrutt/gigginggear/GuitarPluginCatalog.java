@@ -23,20 +23,31 @@ import java.util.Set;
  *    - exactly one NAM loader (NG), legacy NAM and AIDA-X stay out
  *    - exactly two IR loaders: Simple IR Loader and x42 IR convolver
  *
+ *  assets/blacklist.json is loaded first and its entries are always
+ *  rejected, in the browse list, in the add dialog and in preset load alike,
+ *  so a single guard file decides visibility everywhere (the browse list
+ *  used to ignore it, which re-exposed a crashy plugin that the dialog
+ *  still hid).
+ *
  *  If the asset is missing/corrupt the legacy name-token heuristics are
  *  used so the catalog is never empty. */
 final class GuitarPluginCatalog {
     private static final String TAG = "GuitarPluginCatalog";
     private static final String ASSET = "curated_plugins.json";
+    private static final String BLACKLIST_ASSET = "blacklist.json";
 
     /** Lowercased curated names; null until init()/loadFromJson(). */
     private static Set<String> sCuratedNames;
+    /** Lowercased blacklisted names; null until init()/loadBlacklistFromJson(). */
+    private static Set<String> sBlacklistNames;
 
     private GuitarPluginCatalog() {}
 
     /** Load the curated catalog asset. Safe to call more than once. */
     static void init(Context context) {
         if (sCuratedNames != null || context == null) return;
+        // Blacklist first: loadFromJson()/isCurated() consult it.
+        loadBlacklistAsset(context);
         try {
             InputStream is = context.getAssets().open(ASSET);
             StringBuilder sb = new StringBuilder();
@@ -50,6 +61,44 @@ final class GuitarPluginCatalog {
         } catch (Throwable t) {
             try { Log.w(TAG, "curated catalog asset unavailable, using legacy rules", t); } catch (Throwable ignored) { }
             sCuratedNames = null;
+        }
+    }
+
+    /** Read assets/blacklist.json ({"name": 1} map). Missing asset = no blacklist. */
+    private static void loadBlacklistAsset(Context context) {
+        try {
+            InputStream is = context.getAssets().open(BLACKLIST_ASSET);
+            StringBuilder sb = new StringBuilder();
+            byte[] buf = new byte[8192];
+            int r;
+            while ((r = is.read(buf)) > 0) {
+                sb.append(new String(buf, 0, r, "UTF-8"));
+            }
+            is.close();
+            loadBlacklistFromJson(sb.toString());
+        } catch (Throwable t) {
+            try { Log.w(TAG, "blacklist asset unavailable, no names blocked", t); } catch (Throwable ignored) { }
+            sBlacklistNames = null;
+        }
+    }
+
+    /** Parse blacklist JSON; package-private for unit tests. */
+    static void loadBlacklistFromJson(String json) {
+        try {
+            JSONObject root = new JSONObject(json);
+            Set<String> set = new HashSet<>();
+            java.util.Iterator<String> it = root.keys();
+            while (it.hasNext()) {
+                String k = it.next();
+                if (k == null || k.trim().isEmpty()) continue;
+                if (root.optInt(k, 0) == 0) continue;
+                set.add(k.toLowerCase(Locale.US).trim());
+            }
+            sBlacklistNames = set;
+            try { Log.i(TAG, "blacklist loaded: " + set.size() + " names"); } catch (Throwable ignored) { }
+        } catch (Throwable t) {
+            try { Log.e(TAG, "failed to parse blacklist asset", t); } catch (Throwable ignored) { }
+            sBlacklistNames = null;
         }
     }
 
@@ -75,6 +124,7 @@ final class GuitarPluginCatalog {
     /** Test helper: drop the in-memory list (back to legacy fallback). */
     static void clearForTesting() {
         sCuratedNames = null;
+        sBlacklistNames = null;
     }
 
     static boolean isCurated(String pluginName) {
@@ -96,6 +146,10 @@ final class GuitarPluginCatalog {
                 return false;
             }
         }
+
+        // Hard blacklist wins over the curated list (same guard the add
+        // dialog and preset load already apply).
+        if (sBlacklistNames != null && sBlacklistNames.contains(n)) return false;
 
         if (sCuratedNames != null) return sCuratedNames.contains(n);
 

@@ -150,13 +150,17 @@ int Meter::updateMeterOutput (AudioBuffer * buffer) {
 //        }
 
         attached_thread = gettid();
-        if (envOutput == nullptr)
+        if (envOutput == nullptr) {
             LOGF("envOutput is null");
+            return 0;
+        }
         mainActivityOutput = findClassWithEnv(envOutput, jMainActivityClassName.c_str ());
 //        mainActivityOutput = findClassWithEnv(envOutput, "com/kancrutt/gigginggear/MainActivity");
         if (mainActivityOutput == nullptr) {
             HERE
             LOGF("cannot find class mainactivityOutput!");
+            // Calling GetStaticMethodID with a null class crashes the JVM.
+            return 0;
         }
 
         setMixerMeterOutput = envOutput->GetStaticMethodID(mainActivityOutput, "setMixerMeterSwitch",
@@ -175,6 +179,13 @@ int Meter::updateMeterOutput (AudioBuffer * buffer) {
             LOGF("cannot find setTuner method!");
         }
 
+        // GetStaticMethodID leaves a pending NoSuchMethodError when it
+        // returns null; clear it or later JNI calls on this thread fail.
+        if (setMixerMeterOutput == nullptr || setTuner == nullptr
+                || pushToVideo == nullptr || setSampleRateDisplay == nullptr) {
+            envOutput->ExceptionClear();
+        }
+
         // this should never be more than this
         jfloatArray1 = envOutput->NewFloatArray(TUNER_ARRAY_SIZE);
         pushVideoSamples = envOutput->NewFloatArray(TUNER_ARRAY_SIZE);
@@ -183,7 +194,8 @@ int Meter::updateMeterOutput (AudioBuffer * buffer) {
         OUT
         return 0 ;
     } else {
-        if (tunerEnabled) {
+        if (tunerEnabled && jfloatArray1 != nullptr && mainActivityOutput != nullptr
+                && setTuner != nullptr) {
             if ((jfloatArray1_index + samples) >= TUNER_ARRAY_SIZE) {
                 envOutput->CallStaticVoidMethod(mainActivityOutput, setTuner, jfloatArray1, jfloatArray1_index, false);
                 jfloatArray1_index = 0 ;
@@ -193,7 +205,8 @@ int Meter::updateMeterOutput (AudioBuffer * buffer) {
             jfloatArray1_index += samples;
         }
 
-        if (videoRecording) {
+        if (videoRecording && pushVideoSamples != nullptr && mainActivityOutput != nullptr
+                && pushToVideo != nullptr) {
             int toPush = std::min(samples, TUNER_ARRAY_SIZE);
             envOutput->SetFloatArrayRegion(pushVideoSamples, 0, toPush,
                                           data);
@@ -261,10 +274,12 @@ int Meter::updateMeterOutput (AudioBuffer * buffer) {
             imax = raw [i] ;
     }
 
-    envOutput->CallStaticVoidMethod(mainActivityOutput, setMixerMeterOutput, (jfloat) max, false);
-    envOutput->CallStaticVoidMethod(mainActivityOutput, setMixerMeterOutput, (jfloat) imax, true);
+    if (mainActivityOutput != nullptr && setMixerMeterOutput != nullptr) {
+        envOutput->CallStaticVoidMethod(mainActivityOutput, setMixerMeterOutput, (jfloat) max, false);
+        envOutput->CallStaticVoidMethod(mainActivityOutput, setMixerMeterOutput, (jfloat) imax, true);
+    }
 
-    if (! sampleRateSet) {
+    if (! sampleRateSet && mainActivityOutput != nullptr && setSampleRateDisplay != nullptr) {
         envOutput->CallStaticVoidMethod(mainActivityOutput, setSampleRateDisplay, (jint) jack_samplerate / 1000, lowLatency);
         sampleRateSet = true ;
     }

@@ -35,6 +35,16 @@ public class Tone3000EntrySheet extends BottomSheetDialogFragment {
 
     public static Tone3000EntrySheet newInstance() { return new Tone3000EntrySheet(); }
 
+    public static Tone3000EntrySheet newInstance(@Nullable String gears) {
+        Tone3000EntrySheet sheet = new Tone3000EntrySheet();
+        if (gears != null) {
+            Bundle args = new Bundle();
+            args.putString("gears", gears);
+            sheet.setArguments(args);
+        }
+        return sheet;
+    }
+
     @NonNull
     @Override
     public Dialog onCreateDialog(@Nullable Bundle savedInstanceState) {
@@ -77,7 +87,10 @@ public class Tone3000EntrySheet extends BottomSheetDialogFragment {
                     return;
                 }
                 try {
-                    Tone3000AuthManager.AuthStart start = Tone3000AuthManager.get(requireContext()).startSelectFlow(requireContext());
+                    String gears = getArguments() != null ? getArguments().getString("gears") : null;
+                    Tone3000AuthManager.AuthStart start = gears == null
+                            ? Tone3000AuthManager.get(requireContext()).startSelectFlow(requireContext())
+                            : Tone3000AuthManager.get(requireContext()).startSelectFlow(requireContext(), gears);
                     CustomTabsIntent cti = new CustomTabsIntent.Builder().setShowTitle(true).build();
                     cti.intent.setFlags(Intent.FLAG_ACTIVITY_NO_HISTORY);
                     cti.launchUrl(requireContext(), Uri.parse(start.authorizeUrl));

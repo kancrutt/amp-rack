@@ -1,4 +1,5 @@
 #include <cassert>
+#include <thread>
 
 #include "Engine.h"
 #include "Plugin.h"
@@ -18,6 +19,7 @@ std::string Engine::pushSamplesMethodName = "";
 std::string Engine::attributionTag = "";
 static jobject gClassLoader;
 static jmethodID gFindClassMethod;
+static std::mutex activePluginsMutex;
 
 Engine::Engine () {
     // NOTE: input (mono) and output (stereo) channel counts intentionally
@@ -229,7 +231,8 @@ oboe::Result  Engine::openStreams() {
     mFullDuplexPass.setInputStream(mRecordingStream);
     mFullDuplexPass.setOutputStream(mPlayStream);
 
-    // Load LADSPA Plugin here
+    mRecordingStream->setBufferSizeInFrames(mRecordingStream->getFramesPerBurst());
+    mPlayStream->setBufferSizeInFrames(mPlayStream->getFramesPerBurst());
 
     /*
     LOGV("Checking if plugin state is null ...\n");
@@ -279,14 +282,7 @@ oboe::AudioStreamBuilder *Engine::setupPlaybackStreamParameters(
             ->setErrorCallback(this)
             ->setDeviceId(mPlaybackDeviceId)
             ->setDirection(oboe::Direction::Output)
-//            ->setSampleRate(48000)
-            /* fixme:
-             * we do this because
-             * 1. sample rate on Android is *almost always™ 48000
-             * 2. Android AAC encoder does not support sample rate > 48000
-             * 3. Even if it did, it might not be *that* much of an enhancement
-             *    in order for it to justify complex resampling in real time
-             */
+            ->setSampleRate(44100)
             ->setChannelCount(mOutputChannelCount);
 
     return setupCommonStreamParameters(builder);
@@ -308,7 +304,7 @@ oboe::AudioStreamBuilder *Engine::setupCommonStreamParameters(
             ->setChannelConversionAllowed(true)
 //            ->setSampleRateConversionQuality(oboe::SampleRateConversionQuality::Fastest)
             ->setFormatConversionAllowed(true)
-            ->setSharingMode(oboe::SharingMode::Exclusive)
+            ->setSharingMode(oboe::SharingMode::Shared)
             ->setInputPreset(oboe::VoicePerformance)
 //            ->setPerformanceMode(static_cast<oboe::PerformanceMode>(lowLatency));
             ->setPerformanceMode(oboe::PerformanceMode::LowLatency)
@@ -412,9 +408,13 @@ void Engine::onErrorBeforeClose(oboe::AudioStream *oboeStream,
  */
 void Engine::onErrorAfterClose(oboe::AudioStream *oboeStream,
                                          oboe::Result error) {
-    LOGE("%s stream Error after close: %s",
-         oboe::convertToText(oboeStream->getDirection()),
-         oboe::convertToText(error));
+    if (error == oboe::Result::ErrorDisconnected) {
+        mIsEffectOn = false;
+        std::thread([this]() {
+            std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+            setEffectOn(true);
+        }).detach();
+    }
 }
 void Engine::addPluginToRackLazy(char* library, int pluginIndex, SharedLibrary::PluginType _type) {
     // Fixed DSP arrays hold MAX_PLUGINS blocks (FullDuplexPass.h): publishing more
@@ -504,6 +504,7 @@ void Engine::discoverPlugins () {
 
 void Engine::buildPluginChain () {
     IN
+    std::lock_guard<std::mutex> pluginLock(activePluginsMutex);
     LOGD("building chain for %d plugins", activePlugins.size());
     // Rewriting the port/handle arrays while the audio callback reads them
     // produces glitch bursts on live add/delete. Hold bypass across the
@@ -517,10 +518,16 @@ void Engine::buildPluginChain () {
     for (Plugin *p: activePlugins) {
         if (p == nullptr || !p->active)
             continue;
-        // Never publish half-built plugins (null handle/descriptor): their
-        // run() would crash inside the DSP. Logged once per rebuild.
-        if (p->handle == nullptr || p->descriptor == nullptr) {
-            LOGE("buildPluginChain: skipping unloadable plugin");
+        // LADSPA and LV2 store their descriptors in different fields. The
+        // old guard checked p->descriptor unconditionally, which is null for
+        // every LV2 plugin and silently published a zero-node DSP chain: the
+        // headphone output then remained pure dry/DI for every LV2 preset.
+        bool descriptorReady = p->type == SharedLibrary::LADSPA
+                ? p->descriptor != nullptr
+                : p->lv2Descriptor != nullptr;
+        if (p->handle == nullptr || !descriptorReady) {
+            LOGE("buildPluginChain: skipping unloadable %s plugin",
+                 p->type == SharedLibrary::LADSPA ? "LADSPA" : "LV2");
             continue;
         }
         // Backstop: never write past the fixed DSP arrays even if a caller
@@ -551,6 +558,8 @@ void Engine::buildPluginChain () {
         mFullDuplexPass.handle [mFullDuplexPass.activePlugins] = p->handle ;
         mFullDuplexPass.activePlugins ++ ;
     }
+    LOGI("[CHAIN_NATIVE] published=%d slots (requested=%zu)",
+         mFullDuplexPass.activePlugins, activePlugins.size());
 
     if (mIsEffectOn) {
         LOGD("adjusting latency ...");
@@ -620,17 +629,20 @@ void Engine::rebuildDagPlan() {
     mFullDuplexPass.bypass = true;
     int n = mFullDuplexPass.activePlugins;
     std::vector<ggsolver::Edge> edges;
-    if (!hasExplicitGraph) {
-        // No explicit graph: derive from the legacy routing mode.
-        // 0 = Series -> chain 0->1->2... (seriesOnly fast path preserves baseline)
-        // 1 = Parallel -> empty edge set = every node is source AND sink (mixed)
-        if (mFullDuplexPass.routingMode == 0) {
-            for (int i = 0; i + 1 < n; i++)
-                edges.push_back({i, i + 1});
-        }
-    } else {
-        // Explicit graph wins (may be empty = all-parallel, set via JNI).
+    // SINGLE SOURCE OF TRUTH:
+    //   - Parallel execution requires an explicit SPLIT/MERGE block. Without
+    //     one the chain is PURE SERIES and the ordered block list IS the signal
+    //     order, no matter what wire graph the UI happened to persist.
+    //   - An empty/absent graph must NEVER mean all-parallel. The old code
+    //     treated hasExplicitGraph && empty as "every node is source+sink",
+    //     which made a linear on-screen chain execute COPY->RUN per node from
+    //     dry input, then MIX the outputs (the reported "series shown, parallel
+    //     run" bug).
+    if (hasRoutingBlock() && hasExplicitGraph && !graphEdges.empty()) {
         edges = graphEdges;
+    } else {
+        for (int i = 0; i + 1 < n; i++)
+            edges.push_back({i, i + 1});
     }
 
     std::string err;
@@ -646,14 +658,36 @@ void Engine::rebuildDagPlan() {
         ggsolver::buildPlan(n, fallback, plan, err);
     }
     mFullDuplexPass.setDagPlan(plan, maxSamples);
+    LOGI("[PLAN] topology=%s nodes=%d ops=%s",
+         plan.seriesOnly ? "SERIES" : "DAG", n,
+         ggsolver::planToString(plan).c_str());
     mFullDuplexPass.bypass = false;
+}
+
+// True when at least one SPLIT/MERGE routing block occupies a chain slot.
+// Parallel DAG execution is only legal in that case.
+bool Engine::hasRoutingBlock() {
+    bool hasSplit = false;
+    bool hasMerge = false;
+    for (Plugin *p : activePlugins) {
+        // Routing blocks are synthetic LADSPA descriptors; an LV2 plugin's
+        // descriptor is a reinterpret_cast, so ->Name must not be read there.
+        if (p == nullptr || p->type != SharedLibrary::LADSPA) continue;
+        if (p->descriptor == nullptr || p->descriptor->Name == nullptr) continue;
+        std::string s(p->descriptor->Name);
+        if (s.find("Giggin Gear SPLIT") != std::string::npos) hasSplit = true;
+        if (s.find("Giggin Gear MERGE") != std::string::npos) hasMerge = true;
+    }
+    return hasSplit && hasMerge;
 }
 
 void Engine::setGraphEdges(std::vector<ggsolver::Edge> edges) {
     std::lock_guard<std::mutex> chainLock(mFullDuplexPass.chainMutex);
     mFullDuplexPass.bypass = true;
     graphEdges = edges;
-    hasExplicitGraph = true;
+    // Empty graph == no explicit wiring: fall back to the ordered series chain
+    // instead of publishing a degenerate all-parallel plan.
+    hasExplicitGraph = !edges.empty();
     rebuildDagPlan();
     mFullDuplexPass.bypass = false;
 }
@@ -825,7 +859,10 @@ bool Engine::canLoadModelFile(int plugin) {
     if (plugin < 0 || plugin >= (int) activePlugins.size()) return false;
     Plugin * p = activePlugins.at(plugin);
     if (p == nullptr || p->lv2Descriptor == nullptr || p->type == SharedLibrary::LADSPA) return false;
-    return p->supportsModelFilePorts();
+    // NAM uses an LV2 atom CONTROL port rather than the legacy 99/100 pair.
+    // supportsModelFilePorts() covers the latter; filePort means the plugin
+    // declared a real atom input and is therefore loadable through patch:Set.
+    return p->supportsModelFilePorts() || p->filePort != nullptr;
 }
 
 bool Engine::setPluginFilename (std::string filename, int plugin) {
@@ -887,8 +924,6 @@ void Engine::setRoutingMode(int mode) {
     IN
     mFullDuplexPass.bypass = true ;
     mFullDuplexPass.routingMode = mode ;
-    graphEdges.clear(); // legacy toggle is authoritative until an explicit graph is set
-    hasExplicitGraph = false;
     rebuildDagPlan();
     mFullDuplexPass.bypass = false ;
     OUT
@@ -903,8 +938,8 @@ std::string Engine::tuneLatency () {
     if (! mIsEffectOn || !mRecordingStream || !mPlayStream || !latencyTuner || !latencyTunerOut)
         return std::string ("Turn on audio engine first") ;
 
-    mRecordingStream->setBufferSizeInFrames(mRecordingStream->getFramesPerBurst() * 2);
-    mPlayStream->setBufferSizeInFrames(mPlayStream->getFramesPerBurst() * 2);
+    mRecordingStream->setBufferSizeInFrames(mRecordingStream->getFramesPerBurst());
+    mPlayStream->setBufferSizeInFrames(mPlayStream->getFramesPerBurst());
 
     latencyTuner->requestReset();
     oboe::Result result = latencyTuner->tune() ;
@@ -1085,6 +1120,9 @@ jclass Engine::findClassWithEnv(JNIEnv *env, const char* name) {
 }
 
 int Engine::resetAtomPorts (AudioBuffer * buffer) {
+    // activePlugins is rebuilt by the control thread. Keep the worker from
+    // traversing the vector while a plugin is inserted, removed, or replaced.
+    std::lock_guard<std::mutex> pluginLock(activePluginsMutex);
     for (int i = 0 ; i < activePlugins.size(); i ++) {
         if (activePlugins.at(i)->notifyPort != nullptr) {
             activePlugins.at(i)->check_notify();

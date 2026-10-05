@@ -118,6 +118,12 @@ public class SignalChainCanvasView extends View {
         /** A trunk block was dropped off the series row: wrap it in SPLIT/MERGE. */
         void onParallelDrop(int slotIndex);
     }
+    public interface OnReorderListener {
+        /** The user dragged a block to a new horizontal slot: the ordered slot
+         *  list (left -> right, entries are pre-move engine slots) is the new
+         *  signal order. Block order == signal order. */
+        void onReorder(int[] orderedOldSlots);
+    }
 
     private final List<Node> nodes = new ArrayList<>();
     private final List<Edge> edges = new ArrayList<>();
@@ -141,8 +147,12 @@ public class SignalChainCanvasView extends View {
     private OnEdgeCreatedListener edgeCreatedListener;
     private OnWireDeleteListener wireDeleteListener;
     private OnParallelDropListener parallelDropListener;
+    private OnReorderListener reorderListener;
 
     private Node dragNode;
+    // Series wires are locked while a block is being dragged. Keep the wire
+    // endpoints from ACTION_DOWN instead of following the moving node.
+    private final Map<Integer, float[]> dragWirePositions = new HashMap<>();
     private float lastX, lastY;
     private int dragFromIndex = -1;
     private boolean dragStarted = false;
@@ -340,6 +350,7 @@ public class SignalChainCanvasView extends View {
     public void setOnEdgeCreatedListener(OnEdgeCreatedListener l) { this.edgeCreatedListener = l; }
     public void setOnWireDeleteListener(OnWireDeleteListener l) { this.wireDeleteListener = l; }
     public void setOnParallelDropListener(OnParallelDropListener l) { this.parallelDropListener = l; }
+    public void setOnReorderListener(OnReorderListener l) { this.reorderListener = l; }
 
     private int getCategoryColor(String pluginName) {
         return CategoryHelper.getColor(pluginName);
@@ -410,6 +421,14 @@ public class SignalChainCanvasView extends View {
         } catch (Exception ignored) {}
         // Save old nodes to preserve X/Y and selection
         Map<Integer, Node> oldNodes = new HashMap<>(nodeMap);
+        // Slot ids are not stable: reorder changes which plugin occupies each
+        // slot. Preserve visual state by the stable engine plugin id instead.
+        Map<Integer, Node> oldNodesByPluginId = new HashMap<>();
+        for (Node old : oldNodes.values()) {
+            if (old != null && !old.isAnchor()) {
+                oldNodesByPluginId.put(old.pluginId, old);
+            }
+        }
         
         nodes.clear();
         nodeMap.clear();
@@ -559,11 +578,14 @@ public class SignalChainCanvasView extends View {
             // Preserve selection AND position from previous layout, or place new block right after the last block.
             // Bypass LEDs always re-read the engine: preset restores toggle
             // natively, so a stale preserved flag would draw the wrong state.
-            if (oldNodes.containsKey(i)) {
-                n.selected = oldNodes.get(i).selected;
-                n.x = oldNodes.get(i).x;
-                n.y = oldNodes.get(i).y;
-                n.bypassed = oldNodes.get(i).bypassed;
+            Node old = oldNodesByPluginId.get(n.pluginId);
+            if (old != null) {
+                n.selected = old.selected;
+                // X is canonical slot geometry. Preserving old X after a
+                // reorder is what caused blocks to stack and wires to cross.
+                n.x = cx;
+                n.y = old.y;
+                n.bypassed = old.bypassed;
             } else if (!oldNodes.isEmpty()) {
                 // Auto-place new effect block in empty canvas space immediately to the right of the last block
                 n.x = rightmostX + spacing;
@@ -638,6 +660,33 @@ public class SignalChainCanvasView extends View {
             }
         }
 
+        // SINGLE SOURCE OF TRUTH: block order defines signal order.
+        //   - A chain WITHOUT explicit SPLIT/MERGE is PURE SERIES: the wiring is
+        //     regenerated deterministically from the ordered block list every
+        //     rebuild. Stale/accidental edges (e.g. a star topology left over
+        //     from attachAnchorEdges on a cold canvas) are discarded so the
+        //     canvas can never show one topology while the engine runs another.
+        //   - A chain WITH SPLIT/MERGE keeps its explicit branch wiring: restored
+        //     preset edges are honoured, and if none are present the deterministic
+        //     auto-wire regenerates the identical branch topology from order.
+        boolean hasSplit = false;
+        boolean hasMerge = false;
+        for (Node n : nodes) {
+            if (n == null) continue;
+            if (n.nodeType == NodeType.SPLIT) hasSplit = true;
+            if (n.nodeType == NodeType.MERGE) hasMerge = true;
+        }
+        boolean hasRoutingBlock = hasSplit && hasMerge;
+
+        if (!hasRoutingBlock) {
+            // Series topology has one immutable visual row. Persisted/custom
+            // Y coordinates are layout artifacts, never signal topology.
+            for (Node n : nodes) {
+                if (n == null || n.isAnchor()) continue;
+                n.y = yCenter - n.height / 2f;
+            }
+        }
+
         // Clean up orphaned edges (edges pointing to nodes that were deleted)
         List<Edge> validEdges = new ArrayList<>();
         for (Edge e : edges) {
@@ -648,26 +697,25 @@ public class SignalChainCanvasView extends View {
         edges.clear();
         edges.addAll(validEdges);
 
-        // ALWAYS re-attach IN/OUT anchor edges after edge cleanup — deleting a
-        // block can leave surviving blocks disconnected from the chain (e.g.
-        // the tail block loses its →OUT edge after a neighbor is removed).
-        // attachAnchorEdges is idempotent (checks hasIncoming/hasOutgoing first),
-        // so calling it even when edges exist only patches missing connections,
-        // never duplicates lines. (Previously anchors were only patched when
-        // edges.isEmpty(), leaving broken chains after partial delete.)
-        attachAnchorEdges();
+        // Wires are locked and declarative. Never restore slot-based edges:
+        // after a reorder their ids refer to different plugins and produce
+        // crossed/stacked lines. SPLIT/MERGE is the only thing that enables
+        // parallel topology; its branch edges are derived from current order.
+        edges.clear();
+        autoWireRespectingRouting(inputNode, outputNode, count);
 
-        // If NO edges exist at all (clean slate / no preset wiring), auto-wire.
-        if (edges.isEmpty()) {
-            autoWireRespectingRouting(inputNode, outputNode, count);
-        }
+        logOrderedChain(count);
 
         // Branch labels are always recomputed from block order so the two-row
         // layout stays correct even when edges were restored from a preset.
         assignBranchLabels(count);
 
         // Lay out parallel branches as two rows between each SPLIT and its MERGE.
-        layoutBranchRows(nodeH, spacing, yCenter);
+        if (hasRoutingBlock) {
+            layoutBranchRows(nodeH, spacing, yCenter);
+        } else {
+            layoutSeriesSlots();
+        }
 
         syncGraphToAudioEngine();
 
@@ -732,6 +780,28 @@ public class SignalChainCanvasView extends View {
      *     continues as a single row afterwards.
      */
     private void autoWireRespectingRouting(Node inputNode, Node outputNode, int count) {
+        boolean hasSplit = false;
+        boolean hasMerge = false;
+        for (int i = 0; i < count; i++) {
+            Node n = nodeMap.get(i);
+            if (n == null) continue;
+            if (n.nodeType == NodeType.SPLIT) hasSplit = true;
+            if (n.nodeType == NodeType.MERGE) hasMerge = true;
+        }
+        // A lone routing block is incomplete and must not create a partial
+        // parallel graph. It remains a normal series node until its matching
+        // SPLIT/MERGE counterpart is present.
+        if (!hasSplit || !hasMerge) {
+            int tail = inputNode.id;
+            for (int i = 0; i < count; i++) {
+                edges.add(new Edge(tail, i));
+                tail = i;
+                Node n = nodeMap.get(i);
+                if (n != null) n.branch = 0;
+            }
+            edges.add(new Edge(tail, outputNode.id));
+            return;
+        }
         int trunkTail = inputNode.id;   // last node on the single (non-split) path
         int upperTail = -1;             // last node on upper branch (-1 = none yet)
         int lowerTail = -1;             // last node on lower branch
@@ -817,6 +887,50 @@ public class SignalChainCanvasView extends View {
         }
     }
 
+    /** Keep every block in a deterministic non-overlapping slot after a drop.
+     *  Wires remain derived from this order; user movement never edits edges.
+     *  @param explicitOrderIds engine slot ids in the NEW left-to-right order
+     *         (drag drop), or null to lay out in the current nodes list order
+     *         (post-rebuild: list order == engine order). */
+    private void layoutSeriesSlots(java.util.List<Integer> explicitOrderIds) {
+        float d = density();
+        float spacing = 12f * d;
+        float x = inputAnchor != null ? inputAnchor.x + inputAnchor.width + spacing : 8f * d;
+        float y = phoneScroll && contentHPx > 0 ? contentHPx / 2f
+                : (getHeight() > 0 ? getHeight() / 2f : 48f * d);
+        float maxRight = x;
+        java.util.List<Node> ordered = new java.util.ArrayList<>();
+        if (explicitOrderIds != null) {
+            for (Integer id : explicitOrderIds) {
+                Node n = nodeMap.get(id);
+                if (n != null && !n.isAnchor()) ordered.add(n);
+            }
+        } else {
+            for (Node n : nodes) {
+                if (n == null || n.isAnchor()) continue;
+                ordered.add(n);
+            }
+        }
+        for (Node n : ordered) {
+            n.x = x;
+            n.y = Math.max(0f, y - n.height / 2f);
+            x += n.width + spacing;
+            maxRight = n.x + n.width;
+        }
+        if (outputAnchor != null) {
+            outputAnchor.x = Math.max(x, outputAnchor.x);
+            outputAnchor.y = Math.max(0f, y - outputAnchor.height / 2f);
+            maxRight = outputAnchor.x + outputAnchor.width;
+        }
+        if (phoneScroll) {
+            contentWPx = Math.max(contentWPx, maxRight + 16f * d);
+        }
+    }
+
+    private void layoutSeriesSlots() {
+        layoutSeriesSlots(null);
+    }
+
     private void syncGraphToAudioEngine() {
         // Strip out INPUT (-100) and OUTPUT (-200) anchors.
         // The native GraphSolver only accepts valid plugin indices (0..N-1).
@@ -841,18 +955,46 @@ public class SignalChainCanvasView extends View {
         }
     }
 
+    /** TEMPORARY verification: canonical ordered chain (block order == signal
+     *  order) as seen by the UI, so canvas order and engine [PLAN] can be
+     *  compared in one logcat capture. */
+    private void logOrderedChain(int count) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < count; i++) {
+            Node n = nodeMap.get(i);
+            if (n == null) continue;
+            if (sb.length() > 0) sb.append(',');
+            sb.append(i).append(':').append(n.name);
+        }
+        Log.i("SignalChainCanvas", "[CHAIN] ordered=" + sb);
+    }
+
     public void setGraphEdges(int[] from, int[] to) {
         edges.clear();
-        if (from != null && to != null && from.length == to.length) {
-            for (int i = 0; i < from.length; i++) {
-                edges.add(new Edge(from[i], to[i]));
-            }
+        // Normalization: a preset whose chain has NO SPLIT/MERGE must load as
+        // PURE SERIES. Legacy presets can carry an accidental parallel wire
+        // graph left over from an older canvas; restoring it would keep the
+        // "canvas parallel, engine series" mismatch alive. With no routing
+        // block, order-driven auto-wiring rebuilds the single series path.
+        boolean hasSplit = false;
+        boolean hasMerge = false;
+        for (Node n : nodes) {
+            if (n == null) continue;
+            if (n.nodeType == NodeType.SPLIT) hasSplit = true;
+            if (n.nodeType == NodeType.MERGE) hasMerge = true;
         }
-        // Engine graphs never carry INPUT (-100) / OUTPUT (-200) anchors (the
-        // native solver rejects negative ids), so explicit preset edges only
-        // cover plugin-to-plugin wiring. Re-attach anchors here so IN/OUT lines
-        // survive save -> load instead of leaving blocks floating.
-        attachAnchorEdges();
+        boolean hasRoutingBlock = hasSplit && hasMerge;
+        if (inputAnchor != null && outputAnchor != null) {
+            // Ignore persisted edges. They are slot-indexed and therefore stale
+            // after any block move; the current block order is authoritative.
+            int count = 0;
+            for (Node n : nodes) if (n != null && !n.isAnchor()) count++;
+            autoWireRespectingRouting(inputAnchor, outputAnchor, count);
+        }
+        // Push the normalized wiring to the engine: a preset's SPLIT/MERGE
+        // branch topology is authoritative; a series preset sends order-derived
+        // series edges (or none, which the engine also reads as ordered series).
+        syncGraphToAudioEngine();
         invalidate();
     }
 
@@ -986,6 +1128,17 @@ public class SignalChainCanvasView extends View {
                     dragStarted = false;
                     if (listener != null) listener.onNodeSelected(hit);
                     dragNode = hit;
+                    dragWirePositions.clear();
+                    for (Edge e : edges) {
+                        Node a = nodeMap.get(e.fromNodeId);
+                        Node b = nodeMap.get(e.toNodeId);
+                        if (a != null) {
+                            dragWirePositions.put(a.id, new float[]{a.getOutputX(), a.getOutputY()});
+                        }
+                        if (b != null) {
+                            dragWirePositions.put(b.id, new float[]{b.getInputX(), b.getInputY()});
+                        }
+                    }
                     if (phoneScroll) {
                         // Block drag owns this gesture: stop the scroll
                         // parents from stealing it. Empty-space touches keep
@@ -996,47 +1149,11 @@ public class SignalChainCanvasView extends View {
                     return true;
                 }
 
-                // Cek port (hanya kalau tepat di pinggir 20px block)
-                for (Node n : nodes) {
-                    if (isNear(n, tx, ty, true)) {
-                        draggingPort = true;
-                        draggingOutput = true;
-                        portSourceNode = n;
-                        dragCurrentX = tx;
-                        dragCurrentY = ty;
-                        if (phoneScroll) {
-                            try { getParent().requestDisallowInterceptTouchEvent(true); } catch (Exception ignore) {}
-                        }
-                        invalidate();
-                        return true;
-                    }
-                    if (isNear(n, tx, ty, false)) {
-                        draggingPort = true;
-                        draggingOutput = false;
-                        portSourceNode = n;
-                        dragCurrentX = tx;
-                        dragCurrentY = ty;
-                        if (phoneScroll) {
-                            try { getParent().requestDisallowInterceptTouchEvent(true); } catch (Exception ignore) {}
-                        }
-                        invalidate();
-                        return true;
-                    }
-                }
-                // Cek WIRE — tap di dekat garis koneksi = disconnect
-                Edge wireHit = findEdgeAt(tx, ty);
-                if (wireHit != null) {
-                    if (wireDeleteListener != null) wireDeleteListener.onWireDelete(wireHit);
-                    return true;
-                }
+                // NOTE (topology): connection lines are AUTO-GENERATED from block
+                // order + explicit SPLIT/MERGE only. Manual wire drawing and
+                // wire deletion are disabled — no port-drag, no wire tap.
                 return true;
                 case MotionEvent.ACTION_MOVE:
-                if (draggingPort) {
-                    dragCurrentX = tx;
-                    dragCurrentY = ty;
-                    invalidate();
-                    return true;
-                }
                 if (dragNode != null && !dragNode.isAnchor()) {
                     if (!dragStarted) {
                         float dx = tx - lastX;
@@ -1074,32 +1191,8 @@ public class SignalChainCanvasView extends View {
                 if (phoneScroll) {
                     try { getParent().requestDisallowInterceptTouchEvent(false); } catch (Exception ignore) {}
                 }
-                if (draggingPort && portSourceNode != null) {
-                    Node target = findNearestPort(dragCurrentX, dragCurrentY, draggingOutput, portSourceNode);
-                    if (target != null) {
-                        Edge newEdge = draggingOutput
-                                ? new Edge(portSourceNode.id, target.id)
-                                : new Edge(target.id, portSourceNode.id);
-                        boolean exists = false;
-                        for (Edge e : edges) {
-                            if (e.fromNodeId == newEdge.fromNodeId && e.toNodeId == newEdge.toNodeId) {
-                                exists = true;
-                                break;
-                            }
-                        }
-                        if (!exists) {
-                            edges.add(newEdge);
-                            syncGraphToAudioEngine();
-                            if (edgeCreatedListener != null) {
-                                edgeCreatedListener.onEdgeCreated(newEdge.fromNodeId, newEdge.toNodeId);
-                            }
-                        }
-                    }
-                    draggingPort = false;
-                    portSourceNode = null;
-                    invalidate();
-                    return true;
-                }
+                // Manual wire creation removed: lines are auto-generated from
+                // block order + explicit SPLIT/MERGE (see NOTE in ACTION_DOWN).
                 // Auto-justify snap on DROP
                 if (dragNode != null && !dragNode.isAnchor() && dragStarted) {
                     float density = getResources().getDisplayMetrics().density;
@@ -1110,39 +1203,53 @@ public class SignalChainCanvasView extends View {
                     dragNode.y = yCenter + (row * rowHeight);
                     int col = Math.round((dragNode.x - 8 * density) / colWidth);
                     if (col < 0) col = 0;
-                    dragNode.x = 8 * density + (col * colWidth);
-
-                    boolean overlap;
-                    do {
-                        overlap = false;
-                        for (Node n : nodes) {
-                            if (n != dragNode && Math.abs(n.x - dragNode.x) < 15 * density && Math.abs(n.y - dragNode.y) < 15 * density) {
-                                dragNode.x += colWidth;
-                                overlap = true;
-                                break;
-                            }
-                        }
-                    } while (overlap);
                     // Clamp snap ke dalam bounds canvas (phone: content bounds)
                     float snapW = (phoneScroll && contentWPx > 0) ? contentWPx : getWidth();
                     float snapH = (phoneScroll && contentHPx > 0) ? contentHPx : getHeight();
+                    // NOTE: vertical position is LAYOUT ONLY. It never creates a
+                    // branch — parallel routing exists solely through explicit
+                    // SPLIT/MERGE blocks (Add-Block menu). Dropping a block off
+                    // the series row therefore just moves it; topology is
+                    // unchanged.
                     dragNode.x = Math.max(0, Math.min(dragNode.x, snapW - dragNode.width));
                     dragNode.y = Math.max(0, Math.min(dragNode.y, snapH - dragNode.height));
-                    // Drag-to-parallel: a trunk block dropped off the series row
-                    // is wrapped in a real SPLIT/MERGE pair (explicit routing
-                    // blocks — the dragged position itself never implies a route,
-                    // same decoupling as manual SPLIT insert). The wrap path
-                    // rebuilds + re-syncs the graph itself, so skip the plain sync.
-                    boolean wrapped = false;
-                    if (row != 0 && !dragNode.isRouting() && dragNode.branch == 0
-                            && parallelDropListener != null) {
-                        parallelDropListener.onParallelDrop(dragNode.id);
-                        wrapped = true;
-                    }
-                    if (!wrapped) syncGraphToAudioEngine();
+                     // Build the new left-to-right order by removing the dragged
+                     // block and inserting it at the drop slot. This applies to
+                     // series and explicit SPLIT/MERGE rigs alike: the block
+                     // order is the signal order, while routing blocks alone
+                     // determine whether the plan is serial or parallel.
+                     java.util.List<Integer> order = new java.util.ArrayList<>();
+                     java.util.List<Node> others = new java.util.ArrayList<>();
+                     for (Node n : nodes) {
+                         if (n == null || n.isAnchor() || n == dragNode) continue;
+                         others.add(n);
+                     }
+                     java.util.Collections.sort(others, (a, b) -> Float.compare(a.x, b.x));
+                     for (Node n : others) order.add(n.id);
+                     int target = Math.max(0, Math.min(col, order.size()));
+                     order.add(target, dragNode.id);
+
+                     int[] newOrder = new int[order.size()];
+                     boolean orderChanged = false;
+                     for (int k = 0; k < order.size(); k++) {
+                         newOrder[k] = order.get(k);
+                         if (newOrder[k] != k) orderChanged = true;
+                     }
+                     // Reflow with the NEW order using canonical slot geometry
+                     // (same math as the rebuild). Hand-snapping the dragged
+                     // block to 8dp + col*colWidth collided with the INPUT
+                     // anchor and its neighbour: the dropped block visually
+                     // stacked on the first block at slot 0.
+                     layoutSeriesSlots(order);
+                     if (orderChanged && reorderListener != null) {
+                         reorderListener.onReorder(newOrder);
+                     } else {
+                         syncGraphToAudioEngine();
+                     }
                 }
 
                 dragNode = null;
+                dragWirePositions.clear();
                 dragFromIndex = -1;
                 invalidate();
                 return true;
@@ -1199,6 +1306,22 @@ public class SignalChainCanvasView extends View {
                     }
                 }
             }
+        }
+        // De-overlap: restored custom positions may collide (two blocks at the
+        // same x in the same row). Push the later block right so each keeps
+        // its own slot; parallel branch rows (different y) are untouched.
+        java.util.List<Node> rowNodes = new java.util.ArrayList<>();
+        for (Node n : nodes) {
+            if (n != null && !n.isAnchor()) rowNodes.add(n);
+        }
+        java.util.Collections.sort(rowNodes, (a, b) -> Float.compare(a.x, b.x));
+        float minGap = 4 * density();
+        for (int i = 1; i < rowNodes.size(); i++) {
+            Node prev = rowNodes.get(i - 1);
+            Node cur = rowNodes.get(i);
+            if (Math.abs(cur.y - prev.y) > (cur.height + prev.height) * 0.25f) continue;
+            float minNextX = prev.x + prev.width + minGap;
+            if (cur.x < minNextX) cur.x = minNextX;
         }
         if (phoneScroll) requestLayout(); // re-measure if content grew above
         invalidate();
@@ -1299,16 +1422,20 @@ public class SignalChainCanvasView extends View {
             Node b = nodeMap.get(e.toNodeId);
             if (a == null || b == null) continue;
             int wireColor = a.isAnchor() ? WIRE_COLOR : a.categoryColor;
-            drawBezierWire(canvas, a.getOutputX(), a.getOutputY(), b.getInputX(), b.getInputY(), wireColor);
+            float ax = a.getOutputX();
+            float ay = a.getOutputY();
+            float bx = b.getInputX();
+            float by = b.getInputY();
+            if (dragNode != null && dragStarted && !dragWirePositions.isEmpty()) {
+                float[] ap = dragWirePositions.get(a.id);
+                float[] bp = dragWirePositions.get(b.id);
+                if (ap != null) { ax = ap[0]; ay = ap[1]; }
+                if (bp != null) { bx = bp[0]; by = bp[1]; }
+            }
+            drawBezierWire(canvas, ax, ay, bx, by, wireColor);
         }
 
-        if (draggingPort && portSourceNode != null) {
-            int wireColor = portSourceNode.isAnchor() ? WIRE_COLOR : portSourceNode.categoryColor;
-            drawBezierWire(canvas,
-                    draggingOutput ? portSourceNode.getOutputX() : portSourceNode.getInputX(),
-                    draggingOutput ? portSourceNode.getOutputY() : portSourceNode.getInputY(),
-                    dragCurrentX, dragCurrentY, wireColor);
-        }
+        // (Manual temp-wire preview removed with manual wire drawing.)
 
         // Draw nodes and anchors
         for (Node n : nodes) {

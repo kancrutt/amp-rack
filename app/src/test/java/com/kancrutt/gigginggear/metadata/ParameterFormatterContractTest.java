@@ -11,6 +11,48 @@ public class ParameterFormatterContractTest {
                 false, false, false, null, null);
     }
 
+    private static ParameterMetadata.PortMeta named(String name, String unit, float min, float max) {
+        return new ParameterMetadata.PortMeta(name, name, 0, min, min, max, unit,
+                ParameterMetadata.ControlType.KNOB, ParameterMetadata.PluginType.FLOAT,
+                false, false, false, null, null);
+    }
+
+    @Test public void envelopeNamesAreNotPercentOnUnitlessZeroOne() {
+        // P0-2: unitless 0..1 envelope/dynamics ports must not render as %.
+        ParameterMetadata.PortMeta attack = named("Attack", "", 0, 1);
+        assertEquals(false, ParameterFormatter.isPercentScaled(attack));
+        assertEquals(false, ParameterFormatter.isPercentScaled("Attack", "", 0, 1));
+        assertEquals(false, ParameterFormatter.isPercentScaled("threshold", "", 0, 1));
+        assertEquals(false, ParameterFormatter.isPercentScaled("Release Time", "", 0, 1));
+        assertEquals(false, ParameterFormatter.isPercentScaled("Time Tracking", "", 0, 1));
+        assertEquals(false, ParameterFormatter.isPercentScaled("HOLD", "", 0, 1));
+        assertEquals(false, ParameterFormatter.isPercentScaled("Rate", "", 0, 1));
+        // Raw normalized display: no % suffix, round-trip stays in 0..1.
+        assertEquals("1", ParameterFormatter.rawToDisplay(0.75f, attack).text);
+        assertEquals("0", ParameterFormatter.rawToDisplay(0.25f, attack).text);
+        assertEquals(0.75f, ParameterFormatter.displayToRaw(0.75f, attack), 0.0001f);
+        assertEquals("Min: 0  Max: 1", ParameterFormatter.getRangeString(attack));
+        // Manual dialog and knob readout must agree (same decision function).
+        assertEquals(false, ParameterFormatter.isPercentScaled("Attack", "", 0, 1));
+    }
+
+    @Test public void semanticPerentsAndTenScaleSurviveP02() {
+        // User directive: Feedback/Mix/Wet/Depth keep percent on 0..1.
+        assertEquals(true, ParameterFormatter.isPercentScaled("Feedback", "", 0, 1));
+        assertEquals(true, ParameterFormatter.isPercentScaled("Mix", "", 0, 1));
+        assertEquals(true, ParameterFormatter.isPercentScaled("Wet", "", 0, 1));
+        assertEquals(true, ParameterFormatter.isPercentScaled("Dry", "", 0, 1));
+        assertEquals(true, ParameterFormatter.isPercentScaled(named("Depth", "", 0, 1)));
+        assertEquals("75%", ParameterFormatter.rawToDisplay(0.75f, named("Feedback", "", 0, 1)).text);
+        // Gain/drive family keeps the 0..10 face value.
+        ParameterMetadata.PortMeta drive = named("Drive", "", 0, 1);
+        assertEquals(true, ParameterFormatter.isTenScale(drive));
+        assertEquals("5", ParameterFormatter.rawToDisplay(0.5f, drive).text);
+        // A DECLARED "%" unit always wins over the name exclusion.
+        assertEquals(true, ParameterFormatter.isPercentScaled("Attack", "%", 0, 1));
+        assertEquals("50%", ParameterFormatter.rawToDisplay(0.5f, named("Attack", "%", 0, 1)).text);
+    }
+
     @Test public void rawDbAndFrequencyRemainRaw() {
         assertEquals("dB", ParameterFormatter.canonicalUnit("d B"));
         assertEquals("-60dB", ParameterFormatter.rawToDisplay(-60f, meta("dB", -60, 6)).text);
@@ -72,10 +114,24 @@ public class ParameterFormatterContractTest {
         assertEquals("%", ParameterFormatter.canonicalNativeUnit("%"));
     }
 
-    @Test public void unitlessZeroOneIsNeverPercent() {
-        assertEquals("0.5", ParameterFormatter.rawToDisplay(0.5f, meta("", 0, 1)).text);
+    @Test public void unitlessZeroOneDefaultsToPercent() {
+        assertEquals("50%", ParameterFormatter.rawToDisplay(0.5f, meta("", 0, 1)).text);
         assertEquals(false, ParameterFormatter.isPercentScaled("", 0, 1));
-        assertEquals(false, ParameterFormatter.isPercentScaled(meta("", 0, 1)));
+        assertEquals(true, ParameterFormatter.isPercentScaled(meta("", 0, 1)));
+        assertEquals(true, ParameterFormatter.isPercentScaled("Feedback", "", 0, 1));
+    }
+
+    @Test public void unitlessZeroOneTenScaleProfile() {
+        ParameterMetadata.PortMeta gain = new ParameterMetadata.PortMeta("Drive", "drive", 0, 0,
+                0, 1, "", ParameterMetadata.ControlType.KNOB,
+                ParameterMetadata.PluginType.FLOAT, false, false, false, null, null);
+        assertEquals(true, ParameterFormatter.isTenScale(gain));
+        assertEquals(false, ParameterFormatter.isPercentScaled(gain));
+        assertEquals("5", ParameterFormatter.rawToDisplay(0.5f, gain).text);
+        assertEquals("0", ParameterFormatter.rawToDisplay(0.0f, gain).text);
+        assertEquals("10", ParameterFormatter.rawToDisplay(1.0f, gain).text);
+        assertEquals(0.5f, ParameterFormatter.displayToRaw(5f, gain), 0.0001f);
+        assertEquals("Min: 0  Max: 10", ParameterFormatter.getRangeString(gain));
     }
 
     @Test public void percentZeroOneDisplaysScaled() {
@@ -88,14 +144,14 @@ public class ParameterFormatterContractTest {
 
     @Test public void rangeStringKeepsUnit() {
         assertEquals("Min: -60dB  Max: 6dB", ParameterFormatter.getRangeString(meta("dB", -60, 6)));
-        assertEquals("Min: 0  Max: 1", ParameterFormatter.getRangeString(meta("", 0, 1)));
+        assertEquals("Min: 0%  Max: 100%", ParameterFormatter.getRangeString(meta("", 0, 1)));
     }
 
     @Test public void noQuestionMarkPlaceholder() {
         // Unknown units collapse to "" and never render "?".
         assertEquals("", ParameterFormatter.canonicalUnit("frobnicate"));
-        assertEquals("0.5", ParameterFormatter.rawToDisplay(0.5f, meta("frobnicate", 0, 1)).text);
-        assertEquals("Min: 0  Max: 1", ParameterFormatter.getRangeString(meta("frobnicate", 0, 1)));
+        assertEquals("50%", ParameterFormatter.rawToDisplay(0.5f, meta("frobnicate", 0, 1)).text);
+        assertEquals("Min: 0%  Max: 100%", ParameterFormatter.getRangeString(meta("frobnicate", 0, 1)));
     }
 
     @Test public void toggleNeverBecomesPercent() {
@@ -126,14 +182,14 @@ public class ParameterFormatterContractTest {
     }
 
     @Test public void unknownUnitHasNoUserFacingPlaceholder() {
-        assertEquals("0", ParameterFormatter.rawToDisplay(0f, meta("?", 0, 1)).text);
-        assertEquals("0", ParameterFormatter.rawToDisplay(0f, meta("", 0, 1)).text);
+        assertEquals("0%", ParameterFormatter.rawToDisplay(0f, meta("?", 0, 1)).text);
+        assertEquals("0%", ParameterFormatter.rawToDisplay(0f, meta("", 0, 1)).text);
     }
 
-    @Test public void continuousUnitlessFloatKeepsFractionalValue() {
-        assertEquals("0.3", ParameterFormatter.rawToDisplay(0.25f, meta("", 0, 1)).text);
-        assertEquals("0.5", ParameterFormatter.rawToDisplay(0.5f, meta("", 0, 1)).text);
-        assertEquals("0.8", ParameterFormatter.rawToDisplay(0.75f, meta("", 0, 1)).text);
+    @Test public void continuousUnitlessFloatScaledToIntegerPercent() {
+        assertEquals("25%", ParameterFormatter.rawToDisplay(0.25f, meta("", 0, 1)).text);
+        assertEquals("50%", ParameterFormatter.rawToDisplay(0.5f, meta("", 0, 1)).text);
+        assertEquals("75%", ParameterFormatter.rawToDisplay(0.75f, meta("", 0, 1)).text);
     }
 
     @Test public void microAmpBypassContractIsToggle() {
@@ -149,5 +205,15 @@ public class ParameterFormatterContractTest {
         assertEquals("OFF", ParameterFormatter.rawToDisplay(0f, bypass).text);
         assertEquals("ON", ParameterFormatter.rawToDisplay(1f, bypass).text);
         assertEquals("0", ParameterFormatter.rawToDisplay(0f, gain).text);
+    }
+
+    @Test public void sampleRateBlankUnitRendersSlashSr() {
+        // 3.2-C: a sample-rate-relative port (blank unit, 0..1) renders "/sr".
+        ParameterMetadata.PortMeta srPort = new ParameterMetadata.PortMeta("dly", "dly", 0, 0.42f,
+                0, 1, "", ParameterMetadata.ControlType.KNOB,
+                ParameterMetadata.PluginType.FLOAT, false, false, false, true,
+                null, null);
+        assertEquals("0/sr", ParameterFormatter.rawToDisplay(0f, srPort).text);
+        assertEquals("1/sr", ParameterFormatter.rawToDisplay(1f, srPort).text);
     }
 }

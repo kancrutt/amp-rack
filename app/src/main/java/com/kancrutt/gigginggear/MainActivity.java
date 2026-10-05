@@ -678,6 +678,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         ampModels = ConnectGuitar.loadJSONFromAssetFile(this, "amps.json");
          knobsLayout = ConnectGuitar.loadJSONFromAssetFile(this, "knobs.json");
          parameterMetadata = ParameterMetadata.loadFromAsset(this);
+        GuitarPluginCatalog.init(this);
 
         Iterator<String> keys = availablePluginsLV2.keys();
 
@@ -1242,10 +1243,12 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         String fmt = tone.format != null ? tone.format.toLowerCase() : "nam";
         boolean isNam = fmt.contains("nam") || fmt.contains("aida") || model.isNam();
         boolean isIr = fmt.contains("ir") || fmt.contains("wav") || model.isIr();
-        // Determine target plugin: for NAM use active NAM block or auto-add; for IR use cab/IR
-        try {
+            // Determine target plugin: for NAM use active NAM block or auto-add; for IR use cab/IR
+            try {
             // Strategy: if user has a selected block (inline editor), use that slot; else add new
             int targetSlot = -1;
+            int replaceSlot = -1;
+            boolean addedTarget = false;
             if (dataAdapter != null) {
                 int sel = dataAdapter.getSelectedPosition();
                 int total = AudioEngine.getActivePlugins();
@@ -1255,6 +1258,23 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     if (isNam && canLoadNamModel(sel)) canUse = true;
                     if (isIr && canLoadIrModel(sel)) canUse = true;
                     if (canUse) targetSlot = sel;
+                    else if (isNam && AudioEngine.getActivePluginName(sel) != null) replaceSlot = sel;
+                }
+            }
+            if (targetSlot < 0) {
+                // Prefer an existing NAM-capable block anywhere in the chain.
+                // Do not append a second AMP/NAM block merely because the
+                // selected adapter position is stale or not selected.
+                int total = AudioEngine.getActivePlugins();
+                for (int i = 0; i < total; i++) {
+                    if (isNam && canLoadNamModel(i)) {
+                        targetSlot = i;
+                        break;
+                    }
+                    if (isIr && canLoadIrModel(i)) {
+                        targetSlot = i;
+                        break;
+                    }
                 }
             }
             if (targetSlot < 0) {
@@ -1266,20 +1286,21 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 // registered as "AIDA-X".
                 // NG (nam.so) is the only architecturally-plausible A2 loader;
                 // it clean-fails via the port guard until its atom-port load
-                // path is wired, then AIDA-X/NAM are tried.
-                String loaderName = isIr ? "Simple IR Loader" : (isA2Direct ? "Neural Amp Modeler NG" : "Neural Amp Modeler");
+                // path is wired, NG is the sole NAM loader exposed by the app.
+                String loaderName = isIr ? "Simple IR Loader" : "Neural Amp Modeler NG";
                 // addPluginByName never throws and silently ignores unknown names,
                 // so a slot is only valid when the chain actually grew. Never fall
                 // through to a stale slot — that would write the model into an
                 // unrelated block.
                 if (isIr) {
-                    String[] irCandidates = {"Simple IR Loader", "Impulse Loader", "Neural Amp Modeler"};
+                    String[] irCandidates = {"Simple IR Loader", "Impulse Loader"};
                     for (String cand : irCandidates) {
                         try {
                             int before = AudioEngine.getActivePlugins();
                             addPluginByName(cand);
                             if (AudioEngine.getActivePlugins() > before) {
                                 targetSlot = AudioEngine.getActivePlugins() - 1;
+                                addedTarget = true;
                                 break;
                             }
                         } catch (Exception ignore) {}
@@ -1289,6 +1310,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     addPluginByName(loaderName);
                     if (AudioEngine.getActivePlugins() > before)
                         targetSlot = AudioEngine.getActivePlugins() - 1;
+                    addedTarget = targetSlot >= 0;
                 }
             }
             if (targetSlot < 0 || targetSlot >= AudioEngine.getActivePlugins()) {
@@ -1296,8 +1318,9 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 return false;
             }
             if (isNam && !canLoadNamModel(targetSlot)) {
-                // loader added but not recognized — still try to set filename (native will error clearly)
-                Log.w(TAG, "target slot not NAM-capable but trying anyway: " + targetSlot);
+                Log.e(TAG, "target slot is not NAM-capable: " + targetSlot);
+                toast("Selected block cannot load NAM");
+                return false;
             }
             if (isIr && isNam) {
                 // ambiguous — treat as NAM per spec (determine from actual API metadata, not assumption)
@@ -1324,7 +1347,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 // For NAM A2, try fallback loaders: RT-Neural Generic often supports A2 when NAM doesn't
                 boolean isA2 = "2".equals(model.architectureVersion);
                 if (isNam && isA2) {
-                    String[] fallbackLoaders = new String[]{"Neural Amp Modeler NG", "AIDA-X", "Neural Amp Modeler"};
+                    String[] fallbackLoaders = new String[]{"Neural Amp Modeler NG"};
                     for (String fb : fallbackLoaders) {
                         try {
                             String curName = AudioEngine.getActivePluginName(targetSlot);
@@ -1381,17 +1404,32 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                         }
                         // clean up slot if we just added it
                         try { AudioEngine.deletePlugin(targetSlot); shiftT3kMetaOnDelete(targetSlot); } catch (Exception ignore) {}
-                        if (signalChainCanvas != null) {
-                            signalChainCanvas.clearT3kBadges();
-                            signalChainCanvas.post(() -> {
-                                signalChainCanvas.loadFromActivePlugins(true);
-                                signalChainCanvas.postDelayed(() -> signalChainCanvas.reapplyT3kBadgesFromMeta(t3kBlockMeta), 120);
-                            });
-                        }
-                        return false;
+            if (signalChainCanvas != null) {
+                signalChainCanvas.clearT3kBadges();
+                signalChainCanvas.post(() -> {
+                    signalChainCanvas.loadFromActivePlugins(true);
+                    signalChainCanvas.postDelayed(() -> reapplyT3kBadgesToCanvas(), 120);
+                });
+            }
+            return false;
                     }
                     toast("Model load failed: " + err);
                     return false;
+                }
+            }
+            // If the user selected a normal AMP block, the newly added NAM
+            // loader replaces that slot. Leaving both blocks active creates a
+            // dry AMP plus a T3K NAM block, which sounds like unprocessed DI
+            // and shows duplicate AMP cards in the canvas.
+            if (err == null && addedTarget && replaceSlot >= 0 && replaceSlot != targetSlot) {
+                int oldSlot = replaceSlot;
+                if (safeDeletePlugin(oldSlot)) {
+                    int currentLast = AudioEngine.getActivePlugins() - 1;
+                    if (currentLast >= oldSlot) {
+                        AudioEngine.movePlugin(currentLast, oldSlot);
+                        shiftT3kMetaOnMove(currentLast, oldSlot);
+                    }
+                    targetSlot = oldSlot;
                 }
             }
             // Persist TONE3000 origin metadata into the preset autosave path
@@ -1415,14 +1453,14 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             } catch (Exception e) { Log.w(TAG, "failed to persist t3k meta", e); }
 
             // Update signal chain visual — mark as T3K origin
-            final int badgeSlot = targetSlot;
             if (signalChainCanvas != null) {
                 signalChainCanvas.post(() -> {
-                    signalChainCanvas.loadFromActivePlugins();
-                    signalChainCanvas.postDelayed(() -> {
-                        try { signalChainCanvas.setT3kBadge(badgeSlot, true); } catch (Exception ignore) {}
-                        signalChainCanvas.invalidate();
-                    }, 120);
+                    // force=true: the single-flight dedup may otherwise skip
+                    // the rebuild and leave a stale slotToPluginId snapshot —
+                    // the badge then resolves to the wrong plugin id (the
+                    // "badge on the block after the amp" bug).
+                    signalChainCanvas.loadFromActivePlugins(true);
+                    signalChainCanvas.postDelayed(() -> reapplyT3kBadgesToCanvas(), 120);
                 });
             }
             if (dataAdapter != null) dataAdapter.notifyDataSetChanged();
@@ -1461,6 +1499,12 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     // Pending T3K from preset load (populated in loadSchemaV1Preset, consumed in loadPreset post)
     private final java.util.Map<Integer, JSONObject> pendingT3kLoad = new java.util.HashMap<>();
     private final java.util.Map<Integer, String> pendingT3kFile = new java.util.HashMap<>();
+    // True while loadPresetInner() rebuilds the chain from a saved preset.
+    // Fresh-add corrections (e.g. internal-bypass auto-clear) must NOT fire
+    // here: the saved controls loop re-applies the user's bypass intent
+    // after each add, and firing would clobber it for presets whose saved
+    // string doesn't cover the bypass port.
+    private boolean inPresetRestore = false;
 
     @Nullable
     JSONObject getTone3000MetaForSlot(int slot) {
@@ -1482,6 +1526,29 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
     @Nullable
     String getTone3000ModelPathForSlot(int slot) { return t3kModelPath.get(slot); }
+
+    /** Rebuild canvas T3K badges from engine truth: clear everything, then
+     *  badge every t3kBlockMeta slot that is a live, model-capable plugin.
+     *  Slot-keyed setT3kBadge resolves through the canvas slotToPluginId map,
+     *  so this MUST run after a forced canvas rebuild — a stale snapshot maps
+     *  the amp's slot to the wrong plugin id, which is what made badges stick
+     *  to the block next to the NAM amp. */
+    void reapplyT3kBadgesToCanvas() {
+        if (signalChainCanvas == null) return;
+        signalChainCanvas.clearT3kBadges();
+        int total;
+        try { total = AudioEngine.getActivePlugins(); } catch (Exception e) { return; }
+        for (Integer slotObj : new java.util.ArrayList<>(t3kBlockMeta.keySet())) {
+            if (slotObj == null) continue;
+            int slot = slotObj;
+            if (slot < 0 || slot >= total) continue;
+            try {
+                if (canLoadNamModel(slot)) signalChainCanvas.setT3kBadge(slot, true);
+                else Log.w(TAG, "reapplyT3kBadgesToCanvas: skipping non-loader slot " + slot);
+            } catch (Exception ignore) {}
+        }
+        signalChainCanvas.invalidate();
+    }
 
     /** Called when preset load finds a missing TONE3000 file. */
     void handleMissingTone3000Model(LocalPresetManager.PluginItem item, int slot) {
@@ -1579,7 +1646,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 // leaving stale nodes + stale badge map on screen.
                 signalChainCanvas.loadFromActivePlugins(true);
                 signalChainCanvas.postDelayed(() -> {
-                    signalChainCanvas.reapplyT3kBadgesFromMeta(t3kBlockMeta);
+                    reapplyT3kBadgesToCanvas();
                 }, 120);
             });
         }
@@ -2429,6 +2496,46 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             }
         }
 
+        // Local cabinet/reverb IR picker. WAV/IR files are copied as binary
+        // data and sent only to a real convolution-capable block.
+        if (resultCode == RESULT_OK && requestCode >= 6000 && requestCode < 6100) {
+            int plugin = requestCode - 6000;
+            Uri returnUri = data != null ? data.getData() : null;
+            if (returnUri == null) return;
+            try {
+                DocumentFile picked = DocumentFile.fromSingleUri(this, returnUri);
+                String name = picked != null ? picked.getName() : null;
+                if (name == null || name.trim().isEmpty()) name = "local-ir.wav";
+                File base = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+                File dir = new File(base, "IR/" + AudioEngine.getActivePluginName(plugin));
+                if (!dir.exists() && !dir.mkdirs()) throw new IOException("Cannot create IR directory");
+                File dest = new File(dir, name.replaceAll("[^A-Za-z0-9._-]", "_"));
+                try (InputStream in = getContentResolver().openInputStream(returnUri);
+                     OutputStream out = new FileOutputStream(dest)) {
+                    if (in == null) throw new IOException("Cannot open selected IR");
+                    byte[] buffer = new byte[8192];
+                    int count;
+                    while ((count = in.read(buffer)) != -1) out.write(buffer, 0, count);
+                }
+                if (!canLoadIrModel(plugin)) {
+                    toast("Selected block is not an IR/convolution loader");
+                    return;
+                }
+                String err = AudioEngine.setPluginFilename(dest.getAbsolutePath(), plugin);
+                if (err != null) {
+                    toast("IR load failed: " + err);
+                    Log.w(TAG, "local IR load failed plugin=" + plugin + " file=" + dest, new RuntimeException(err));
+                } else {
+                    toast("IR loaded: " + dest.getName());
+                    populateInlineParameterEditor(plugin, AudioEngine.getActivePluginName(plugin));
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "local IR load failed", e);
+                toast("Failed to load IR: " + e.getMessage());
+            }
+            return;
+        }
+
         if (resultCode == RESULT_OK && requestCode > 4999 && requestCode < 5020) {
             /* todo:
             1. Check if file is audio OR better plugin name
@@ -3100,6 +3207,55 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     static final int ROUTING_ID_MERGE = 900200;
 
     /**
+     * Drag-reorder: apply the canvas left-to-right order to the ENGINE chain.
+     * {@code newOrder} holds the pre-move engine slots in their new visual
+     * order. Slot order == signal order, so the engine must be permuted to
+     * match — otherwise the canvas shows one order while the audio chain runs
+     * another (the reported "drag doesn't change the sound" bug).
+     *
+     * Applied as a sequence of moveActivePlugin(from, to) calls, mirroring the
+     * existing swap-preset path and keeping T3K slot metadata aligned.
+     */
+    public void reorderChain(int[] newOrder) {
+        try {
+            if (newOrder == null || newOrder.length == 0) return;
+            int total = AudioEngine.getActivePlugins();
+            if (newOrder.length != total) {
+                Log.w(TAG, "reorderChain: order size " + newOrder.length + " != plugins " + total);
+                return;
+            }
+            AudioEngine.bypass(true);
+            // Selection permutation: cur[pos] = current occupant's original slot.
+            int[] cur = new int[total];
+            for (int i = 0; i < total; i++) cur[i] = i;
+            for (int pos = 0; pos < total; pos++) {
+                int want = newOrder[pos];            // original slot that belongs at pos
+                int at = -1;                          // where that plugin currently sits
+                for (int k = pos; k < total; k++) {
+                    if (cur[k] == want) { at = k; break; }
+                }
+                if (at < 0 || at == pos) continue;
+                AudioEngine.movePlugin(at, pos);
+                shiftT3kMetaOnMove(at, pos);
+                // Reflect the move in the working permutation.
+                int moved = cur[at];
+                for (int k = at; k > pos; k--) cur[k] = cur[k - 1];
+                cur[pos] = moved;
+            }
+            AudioEngine.bypass(false);
+            if (signalChainCanvas != null) {
+                signalChainCanvas.clearT3kBadges();
+                signalChainCanvas.loadFromActivePlugins(true);
+                signalChainCanvas.post(() -> reapplyT3kBadgesToCanvas());
+            }
+            if (dataAdapter != null) dataAdapter.notifyDataSetChanged();
+        } catch (Throwable t) {
+            Log.e(TAG, "reorderChain failed", t);
+            try { AudioEngine.bypass(false); } catch (Throwable ignore) {}
+        }
+    }
+
+    /**
      * Drag-to-parallel: wrap the trunk block at {@code slot} in a real
      * SPLIT/MERGE pair (SPLIT before it, MERGE after it). Called when a block
      * is dropped off the series row on the canvas.
@@ -3744,7 +3900,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         if (dataAdapter == null) return;
         if (dataAdapter.getItemCount() == 0 && AudioEngine.getActivePlugins() == 0) {
             Log.d(TAG, "ensureDefaultChainHasAmp: chain is empty, adding default Amp block");
-            addPluginByName("Neural Amp Modeler");
+             addPluginByName("Neural Amp Modeler NG");
         }
     }
 
@@ -3918,7 +4074,11 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 knobCell.addView(valView);
                 
                 if (levelContainer != null) levelContainer.addView(knobCell);
-                if (toneContainer != null) addEmptyPanelHint(toneContainer, "GLOBAL CONTROL");
+                // IN/OUT have no DSP controls: hide the CONTROLS panel entirely
+                // (it only ever held an empty placeholder — dead space next to
+                // the trim knob). panel_level re-weights to full width.
+                View anchorTonePanel = findViewById(R.id.panel_tone);
+                if (anchorTonePanel != null) anchorTonePanel.setVisibility(View.GONE);
                 // The LEVEL panel defaults to gone in layout; the normal
                 // plugin path unhides it when cells exist, but this anchor
                 // branch never did — knob attached yet invisible (F1 bug).
@@ -4018,11 +4178,18 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             // Tone3K is a neural-model feature: it must only be offered when the
             // active block can actually run neural models (canLoadNamModel). Plain
             // amp sims (C* AmpVTS etc.) have no model file ports -> no Tone3K.
-            final boolean allowT3k = ((isAmp || isCab) && canLoadNamModel(position)) || isTone3000Slot(position);
+            final boolean allowT3k = ((isAmp || isCab)
+                    && (canLoadNamModel(position) || canLoadIrModel(position)))
+                    || isTone3000Slot(position);
             if (browseBtn != null) try {
                 browseBtn.setVisibility(View.VISIBLE);
+                final boolean canLoadIr = canLoadIrModel(position);
+                if (canLoadIr) {
+                    browseBtn.setText("Load IR");
+                    browseBtn.setOnClickListener(v -> showLocalIrPicker(position));
+                }
                 JSONObject t3kMeta2 = getTone3000MetaForSlot(position);
-                if (t3kMeta2 != null) {
+                if (!canLoadIr && t3kMeta2 != null) {
                     browseBtn.setText("TONE3000 Details");
                     browseBtn.setOnClickListener(v -> {
                         String tid = t3kMeta2.optString("tone3000ToneId", null);
@@ -4032,11 +4199,11 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                             showModelPickerDialog(position);
                         }
                     });
-                } else {
+                } else if (!canLoadIr) {
                     browseBtn.setText("Browse");
                     browseBtn.setOnClickListener(v -> showModelPickerDialog(position));
                 }
-                if (t3kMeta2 != null) {
+                if (!canLoadIr && t3kMeta2 != null) {
                     browseBtn.setText("Tone3K");
                     browseBtn.setOnClickListener(v -> {
                         String tid = t3kMeta2.optString("tone3000ToneId", null);
@@ -4067,7 +4234,11 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     t3kLink.setClickable(true);
                     t3kLink.setFocusable(true);
                     t3kLink.setOnClickListener(v -> {
-                        try { Tone3000EntrySheet sheet = Tone3000EntrySheet.newInstance(); sheet.show(getSupportFragmentManager(), "t3k_entry"); } catch (Exception e) { android.util.Log.w(TAG, "t3k entry launch failed", e); }
+                        try {
+                            Tone3000EntrySheet sheet = Tone3000EntrySheet.newInstance(
+                                    canLoadIrModel(position) ? "cab" : null);
+                            sheet.show(getSupportFragmentManager(), "t3k_entry");
+                        } catch (Exception e) { android.util.Log.w(TAG, "t3k entry launch failed", e); }
                     });
                     // Set constraints: align start to end of browseBtn, end to parent, vertically centered
                     androidx.constraintlayout.widget.ConstraintLayout.LayoutParams linkLp = new androidx.constraintlayout.widget.ConstraintLayout.LayoutParams(
@@ -4169,6 +4340,10 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             if (rightCol != null) {
                 rightCol.setVisibility(View.VISIBLE);
             }
+            // Restore panels the IN/OUT anchor branch hid: plugins always have
+            // (at least) the CONTROLS column, even if it holds a "no controls"
+            // hint row.
+            if (tonePanel != null) tonePanel.setVisibility(View.VISIBLE);
 
             if (levelContainer != null && toneContainer != null) {
                 levelContainer.removeAllViews();
@@ -4943,15 +5118,18 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         
         TextView hintView = new TextView(this);
         // Percent rule (same as ParameterFormatter): scale 0..1 -> 0..100
-        // ONLY when the final unit is "%". Unitless 0..1 stays raw.
-        final boolean pctScaled = ParameterFormatter.isPercentScaled(unit, minVal, maxVal);
+        // when the final unit is "%" OR the name hints at a blend/level
+        // semantic (Feedback, Mix, ...) on a unitless 0..1 range.
+        final boolean pctScaled = ParameterFormatter.isPercentScaled(controlName, unit, minVal, maxVal);
+        final boolean tenScaled = ParameterFormatter.isTenScale(controlName, unit, minVal, maxVal);
         final String unitLabel = (unit != null) ? unit : "";
-        float dMin = pctScaled ? minVal * 100f : minVal;
-        float dMax = pctScaled ? maxVal * 100f : maxVal;
-        float dCur = pctScaled ? currentVal * 100f : currentVal;
+        float dMin = pctScaled ? minVal * 100f : (tenScaled ? minVal * 10f : minVal);
+        float dMax = pctScaled ? maxVal * 100f : (tenScaled ? maxVal * 10f : maxVal);
+        float dCur = pctScaled ? currentVal * 100f : (tenScaled ? currentVal * 10f : currentVal);
         String rangeStr = "Min: " + ParameterFormatter.formatNumber(dMin)
                 + "   Max: " + ParameterFormatter.formatNumber(dMax)
-                + (unitLabel.isEmpty() ? "" : " " + unitLabel);
+                + (pctScaled && unitLabel.isEmpty() ? " %"
+                   : (unitLabel.isEmpty() ? "" : " " + unitLabel));
         hintView.setText(rangeStr);
         hintView.setTextColor(Color.parseColor("#8F94A0"));
         hintView.setTextSize(12);
@@ -4977,7 +5155,8 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     try {
                         float enteredDisplay = Float.parseFloat(text);
                         float clampedDisplay = Math.max(dMin, Math.min(dMax, enteredDisplay));
-                        float rawVal = pctScaled ? clampedDisplay / 100f : clampedDisplay;
+                        float rawVal = pctScaled ? clampedDisplay / 100f
+                                : (tenScaled ? clampedDisplay / 10f : clampedDisplay);
                         rawVal = Math.max(minVal, Math.min(maxVal, rawVal));
                         if (listener != null) listener.onValueSet(rawVal);
                     } catch (Exception e) {
@@ -5167,9 +5346,11 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         // Bypass is released in finally: any exception escaping the body used
         // to wedge bypass stuck true = whole chain silent until the next load.
         AudioEngine.bypass(true);
+        inPresetRestore = true;
         try {
             loadPresetInner(preset);
         } finally {
+            inPresetRestore = false;
             AudioEngine.bypass(false);
         }
     }
@@ -5473,21 +5654,30 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             for (java.util.Map.Entry<Integer, String> e : copyFile.entrySet()) {
                 if (!t3kModelPath.containsKey(e.getKey())) t3kModelPath.put(e.getKey(), e.getValue());
             }
+            // Deliver the model file to the native plugin: without this the
+            // NAM/AIDA-X loader runs model-less (= dry passthrough). File path
+            // alone in t3kModelPath never reaches Plugin::setFileName.
+            for (java.util.Map.Entry<Integer, String> e : copyFile.entrySet()) {
+                int slot = e.getKey();
+                String fp = e.getValue();
+                if (fp != null && new java.io.File(fp).exists()) {
+                    try {
+                        if (slot < AudioEngine.getActivePlugins() && canLoadNamModel(slot)) {
+                            String err = AudioEngine.setPluginFilename(fp, slot);
+                            if (err != null) android.util.Log.w("Amp Rack MainActivity", "preset load setPluginFilename slot=" + slot + " err=" + err);
+                            else android.util.Log.i("Amp Rack MainActivity", "preset load setPluginFilename OK slot=" + slot);
+                        }
+                    } catch (Exception ex) { android.util.Log.w("Amp Rack MainActivity", "preset load setPluginFilename failed slot=" + slot, ex); }
+                }
+            }
             // after canvas rebuild, apply badges + missing check (600ms to ensure loadFromActivePlugins done)
             if (signalChainCanvas != null) {
                 signalChainCanvas.postDelayed(() -> {
-                    // Use CURRENT t3kBlockMeta (may have been shifted by a delete that
-                    // ran between load and this re-apply) instead of the snapshot copyMeta.
-                    // Gate on engine truth: stale meta must never badge a block
+                    // Engine-truth gated reapply: clears stale badges first,
+                    // then badges only live NAM-capable slots. A stale
+                    // slotToPluginId snapshot must never badge a block
                     // that cannot hold a model (the badge-on-non-NAM bug).
-                    for (Integer slot : t3kBlockMeta.keySet()) {
-                        try {
-                            if (slot != null && canLoadNamModel(slot))
-                                signalChainCanvas.setT3kBadge(slot, true);
-                            else
-                                Log.w(TAG, "skipping T3K badge on non-loader slot " + slot);
-                        } catch (Exception ignore) {}
-                    }
+                    reapplyT3kBadgesToCanvas();
                     // missing file check: if T3K toneId present but local file absent, prompt
                     // Use current t3kBlockMeta (same keys as t3kModelPath after any shift).
                     for (java.util.Map.Entry<Integer, JSONObject> e : t3kBlockMeta.entrySet()) {
@@ -5771,15 +5961,16 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             String n = AudioEngine.getActivePluginName(plugin);
             if (n == null) return false;
             String ln = n.toLowerCase();
-            CategoryHelper.Category c = CategoryHelper.getCategory(n);
-            return ln.contains("ir") || ln.contains("convolution") || ln.contains("cab")
-                    || ln.contains("reverb") || c == CategoryHelper.Category.CABINET;
+            return ln.equals("simple ir loader")
+                    || ln.equals("x42 - ir convolver mono => stereo");
         } catch (Throwable t) {
             return false;
         }
     }
 
     private void applyLocalModelToPlugin(int plugin, File srcFile) {
+        t3kBlockMeta.remove(plugin);
+        t3kModelPath.remove(plugin);
         try {
             String dirName = AudioEngine.getActivePluginName(plugin);
             if (dirName == null) dirName = "Model" + plugin;
@@ -5794,8 +5985,11 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                         java.nio.file.StandardCopyOption.REPLACE_EXISTING);
             }
             // Correct engine API: file-path ports (Plugin::setFileName)
-            if (!canLoadNamModel(plugin)) {
-                toast("Only AMP/CAB blocks can load .nam models");
+            String lowerName = srcFile.getName().toLowerCase(java.util.Locale.US);
+            boolean irFile = lowerName.endsWith(".wav") || lowerName.endsWith(".ir")
+                    || lowerName.endsWith(".flac");
+            if (irFile ? !canLoadIrModel(plugin) : !canLoadNamModel(plugin)) {
+                toast(irFile ? "Selected block cannot load IR files" : "Selected block cannot load .nam models");
                 return;
             }
             String err3 = AudioEngine.setPluginFilename(dest.getAbsolutePath(), plugin);
@@ -5811,6 +6005,15 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             Log.e(TAG, "applyLocalModelToPlugin failed", e);
             toast("Failed to load model: " + e.getMessage());
         }
+    }
+
+    private void showLocalIrPicker(int position) {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.setType("*/*");
+        intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"audio/wav", "audio/x-wav", "audio/flac", "application/octet-stream"});
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        startActivityForResult(intent, 6000 + position);
     }
 
     /**
@@ -6163,8 +6366,9 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 String k = keys.next();
                 JSONObject obj = source.optJSONObject(k);
                 if (obj == null) continue;
-                String pName = obj.optString("name", "");
-                if (pName.isEmpty() || loadedPluginNames.contains(pName)) continue;
+                 String pName = obj.optString("name", "");
+                 if (pName.isEmpty() || loadedPluginNames.contains(pName)) continue;
+                 if (!isGuitarPlugin(pName)) continue;
 
                 CategoryHelper.Category pCat = CategoryHelper.getCategory(pName);
                 if (pCat == cat) {
@@ -6182,7 +6386,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         }
 
         if (loadedPluginNames.isEmpty() && (cat == CategoryHelper.Category.AMP || cat == CategoryHelper.Category.CABINET)) {
-            String[] sampleAmps = {"Neural Amp Modeler", "Convolution Reverb", "AIDA-X"};
+             String[] sampleAmps = {"Neural Amp Modeler NG", "Convolution Reverb"};
             for (String sa : sampleAmps) {
                 final String pluginName = sa;
                 addPluginPickerRow(container, sa, cat.name() + " Loader", CategoryHelper.getIconRes(cat.name()), dialog, v -> {
@@ -6227,8 +6431,9 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             while (keys.hasNext()) {
                 JSONObject obj = source.optJSONObject(keys.next());
                 if (obj == null) continue;
-                final String pName = obj.optString("name", "");
-                if (pName.isEmpty() || seen.contains(pName)) continue;
+                 final String pName = obj.optString("name", "");
+                 if (pName.isEmpty() || seen.contains(pName)) continue;
+                 if (!isGuitarPlugin(pName)) continue;
                 String desc = obj.optString("desc", obj.optString("description", "Built-in Effect"));
                 if (!(pName.toLowerCase().contains(q) || desc.toLowerCase().contains(q))) continue;
                 seen.add(pName);
@@ -6333,6 +6538,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                         if (obj == null) continue;
                         String pName = obj.optString("name", "");
                         if (pName.isEmpty() || pluginNames.contains(pName)) continue;
+                        if (!isGuitarPlugin(pName)) continue;
                         if (CategoryHelper.getCategory(pName) != cat) continue;
                         pluginNames.add(pName);
                         final String pick = pName;
@@ -6375,7 +6581,8 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                         .setPositiveButton("OK", null).show();
                     return;
                 }
-                Tone3000EntrySheet sheet = Tone3000EntrySheet.newInstance();
+                Tone3000EntrySheet sheet = Tone3000EntrySheet.newInstance(
+                        canLoadIrModel(position) ? "cab" : null);
                 sheet.show(getSupportFragmentManager(), "t3k_entry");
             });
             container.addView(t3kRow);
@@ -6413,9 +6620,10 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     String k = keys.next();
                     JSONObject obj = source.optJSONObject(k);
                     if (obj == null) continue;
-                    String pName = obj.optString("name", "");
-                    if (pName.isEmpty()) continue;
-                    CategoryHelper.Category pCat = CategoryHelper.getCategory(pName);
+                        String pName = obj.optString("name", "");
+                        if (pName.isEmpty()) continue;
+                        if (!isGuitarPlugin(pName)) continue;
+                        CategoryHelper.Category pCat = CategoryHelper.getCategory(pName);
                     if (pCat == cat && !pluginNames.contains(pName)) {
                         pluginNames.add(pName);
                         View row = getLayoutInflater().inflate(R.layout.item_model_browser_row, container, false);
@@ -6606,7 +6814,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             if (signalChainCanvas != null) {
                 signalChainCanvas.clearT3kBadges();
                 signalChainCanvas.loadFromActivePlugins(true);
-                signalChainCanvas.post(() -> signalChainCanvas.reapplyT3kBadgesFromMeta(t3kBlockMeta));
+                signalChainCanvas.post(() -> reapplyT3kBadgesToCanvas());
                 signalChainCanvas.selectNode(position);
                 signalChainCanvas.invalidate();
             }
@@ -6803,13 +7011,27 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             if ("-1".equals(input)) {
                 for (AudioDeviceInfo d : inputs) {
                     int t = d.getType();
-                    boolean usb = (t == 4013 /* TYPE_USB_DEVICE */)
-                            || (t == 4020 /* TYPE_USB_HEADSET, API 26+ */)
-                            || (t == 4014 /* TYPE_USB_ACCESSORY */);
+                    boolean usb = (t == AudioDeviceInfo.TYPE_USB_DEVICE)
+                            || (t == AudioDeviceInfo.TYPE_USB_HEADSET)
+                            || (t == AudioDeviceInfo.TYPE_USB_ACCESSORY);
                     if (usb) {
                         Log.d(TAG, "AUDIO_DEVICE_SCAN: USB interface preferred for recording id="
                                 + d.getId() + " name=" + d.getProductName());
                         input = String.valueOf(d.getId());
+                        break;
+                    }
+                }
+            }
+            if ("-1".equals(output)) {
+                for (AudioDeviceInfo d : outputs) {
+                    int t = d.getType();
+                    boolean usb = (t == AudioDeviceInfo.TYPE_USB_DEVICE)
+                            || (t == AudioDeviceInfo.TYPE_USB_HEADSET)
+                            || (t == AudioDeviceInfo.TYPE_USB_ACCESSORY);
+                    if (usb) {
+                        Log.d(TAG, "AUDIO_DEVICE_SCAN: USB interface preferred for playback id="
+                                + d.getId() + " name=" + d.getProductName());
+                        output = String.valueOf(d.getId());
                         break;
                     }
                 }
@@ -7108,6 +7330,11 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         return false;
     }
 
+    /** Only expose reviewed, guitar-relevant processors in plugin pickers. */
+    static boolean isGuitarPlugin(String pluginName) {
+        return GuitarPluginCatalog.isCurated(pluginName);
+    }
+
     /** Refuse the add when the chain is full (native would overrun DSP arrays).
      *  Returns true when there is room. */
     boolean chainHasRoom(String pluginName) {
@@ -7131,10 +7358,39 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         return true;
     }
 
+    /** Fresh manual adds must be audible: some loaders (e.g. GxEpic LV2)
+     *  are born with their INTERNAL bypass control at 1 (= dry passthrough)
+     *  even though the block shows enabled. The block power switch only flips
+     *  native p->active, never this port — so without this the block stays dry
+     *  forever. Polarity is uniform across bundled families (0 = on).
+     *  Skipped during preset restore: the saved-controls loop re-applies the
+     *  user's bypass intent right after each add, so firing here would clobber
+     *  deliberately-bypassed blocks whose saved string lacks the bypass port. */
+    private void clearInternalBypassOnFreshAdd(int slot, String name) {
+        if (inPresetRestore) return;
+        try {
+            int n = 0;
+            try { n = AudioEngine.getPluginControls(slot); } catch (Throwable ignore) {}
+            for (int ci = 0; ci < n; ci++) {
+                String cn = null;
+                try { cn = AudioEngine.getControlName(slot, ci); } catch (Throwable ignore) {}
+                if (cn != null && cn.toLowerCase().contains("bypass")) {
+                    try { AudioEngine.setPluginControl(slot, ci, 0f); } catch (Throwable ignore) {}
+                    Log.i(TAG, "addPlugin: cleared internal bypass on " + name + " slot=" + slot + " control=" + cn);
+                }
+            }
+        } catch (Throwable ignore) {}
+    }
+
     public void addPluginByName(String pluginName) {
         if (isUnsupportedSynth(pluginName)) {
             Log.w(TAG, "addPluginByName: refusing MIDI-only synth " + pluginName);
             toast(pluginName + " needs MIDI input — not supported in a guitar chain");
+            return;
+        }
+        if (!isGuitarPlugin(pluginName)) {
+            Log.w(TAG, "addPluginByName: refusing non-guitar catalog item " + pluginName);
+            toast("Not in the curated guitar catalog");
             return;
         }
 //        Log.d(TAG, "addPluginByName: " + pluginName);
@@ -7173,6 +7429,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                             toast("Couldn't load " + name);
                             return;
                         }
+                        clearInternalBypassOnFreshAdd(before, name);
                         if (dataAdapter != null) {
                             int pluginID = 0;
                             try { pluginID = Integer.parseInt(key); } catch (Exception ignored) {}
@@ -7198,6 +7455,11 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         if (isUnsupportedSynth(pluginName)) {
             Log.w(TAG, "addPluginByNameLV2: refusing MIDI-only synth " + pluginName);
             toast(pluginName + " needs MIDI input — not supported in a guitar chain");
+            return;
+        }
+        if (!isGuitarPlugin(pluginName)) {
+            Log.w(TAG, "addPluginByNameLV2: refusing non-guitar catalog item " + pluginName);
+            toast("Not in the curated guitar catalog");
             return;
         }
 //        Log.d(TAG, "addPluginByName: " + pluginName);
@@ -7231,6 +7493,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                             toast("Couldn't load " + name);
                             return;
                         }
+                        clearInternalBypassOnFreshAdd(before, name);
                         if (dataAdapter != null) {
                             int pluginID = 0;
                             try { pluginID = Integer.parseInt(key); } catch (Exception ignored) {}
@@ -7458,7 +7721,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 TextView centsView = (TextView) mainActivity.tunerViews[2];
                 View indicator = mainActivity.tunerViews[3];
                 if (noteView != null) noteView.setText(finalNote);
-                if (freqView != null) freqView.setText(String.format("%.2f Hz", freq));
+                    if (freqView != null) freqView.setText(String.format(java.util.Locale.US, "%.0f Hz", freq));
                 boolean inTune = abs(finalCents) <= 3;
                 if (centsView != null) {
                     centsView.setText(String.format("%+.0f cents", finalCents));

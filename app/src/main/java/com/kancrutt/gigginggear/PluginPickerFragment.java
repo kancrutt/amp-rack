@@ -15,6 +15,7 @@ import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.EditText;
 import android.widget.Toast;
 
 import androidx.browser.customtabs.CustomTabsIntent;
@@ -42,6 +43,7 @@ public class PluginPickerFragment extends BottomSheetDialogFragment {
     private MainActivity mainActivity;
     private LinearLayout catContainer;
     private LinearLayout itemsContainer;
+    private CategoryHelper.Category activeCat = CategoryHelper.Category.AMP;
 
     public static PluginPickerFragment newInstance() {
         return new PluginPickerFragment();
@@ -99,6 +101,33 @@ public class PluginPickerFragment extends BottomSheetDialogFragment {
         itemsContainer = view.findViewById(R.id.picker_items_container);
 
         setupCategories();
+
+        // The picker layout ships a search box; without this watcher it is
+        // inert (typed queries changed nothing — the reported "search nggak
+        // jalan"). Non-empty query searches every category; empty restores
+        // the active category. Mirrors MainActivity's picker dialog.
+        EditText pickerSearch = view.findViewById(R.id.picker_search_input);
+        ImageButton pickerClear = view.findViewById(R.id.picker_search_clear);
+        if (pickerSearch != null && itemsContainer != null) {
+            if (pickerClear != null) {
+                pickerClear.setOnClickListener(v -> pickerSearch.setText(""));
+            }
+            pickerSearch.addTextChangedListener(new android.text.TextWatcher() {
+                @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+                @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                    String query = s.toString().trim().toLowerCase();
+                    if (pickerClear != null) {
+                        pickerClear.setVisibility(query.isEmpty() ? View.GONE : View.VISIBLE);
+                    }
+                    if (query.isEmpty()) {
+                        loadItemsForCategory(activeCat);
+                    } else {
+                        loadItemsMatchingQuery(query);
+                    }
+                }
+                @Override public void afterTextChanged(android.text.Editable s) {}
+            });
+        }
 
         return view;
     }
@@ -184,6 +213,7 @@ public class PluginPickerFragment extends BottomSheetDialogFragment {
                     catContainer.getChildAt(c).setBackgroundResource(R.drawable.glass_card_bg);
                 }
                 catView.setBackgroundResource(R.drawable.glass_category_selected_bg);
+                activeCat = cat;
                 loadItemsForCategory(cat);
             });
 
@@ -222,6 +252,7 @@ public class PluginPickerFragment extends BottomSheetDialogFragment {
                 if (obj == null) continue;
                 String pName = obj.optString("name", "");
                 if (pName.isEmpty() || loadedPluginNames.contains(pName)) continue;
+                if (!MainActivity.isGuitarPlugin(pName)) continue;
                 // MIDI-only synths can never sound in a guitar chain (no audio
                 // input to feed them) — hide instead of offering a crash/toast.
                 if (MainActivity.isUnsupportedSynth(pName)) continue;
@@ -262,7 +293,7 @@ public class PluginPickerFragment extends BottomSheetDialogFragment {
 
         // Fallback for file-based amps if plugin scan is empty
         if (loadedPluginNames.isEmpty() && (cat == CategoryHelper.Category.AMP || cat == CategoryHelper.Category.CABINET)) {
-            String[] sampleAmps = {"Neural Amp Modeler", "Convolution Reverb", "AIDA-X"};
+            String[] sampleAmps = {"Neural Amp Modeler NG", "Convolution Reverb"};
             for (String sa : sampleAmps) {
                 View row = getLayoutInflater().inflate(R.layout.item_model_browser_row, itemsContainer, false);
                 TextView t = row.findViewById(R.id.item_model_title);
@@ -281,6 +312,75 @@ public class PluginPickerFragment extends BottomSheetDialogFragment {
                 });
                 itemsContainer.addView(row);
             }
+        }
+    }
+
+    /** Global search across every category (routing rows + all LADSPA/LV2
+     *  plugins). Same blacklist/synth filters as the browse path so a searched
+     *  result is always addable. */
+    private void loadItemsMatchingQuery(String query) {
+        if (itemsContainer == null || mainActivity == null) return;
+        itemsContainer.removeAllViews();
+        String q = query.toLowerCase();
+        int hits = 0;
+
+        if ("split (parallel branch)".contains(q) || "split signal into 2 parallel paths".contains(q)) {
+            addRoutingRow("SPLIT (Parallel Branch)", "Split signal into 2 parallel paths", R.drawable.ic_routing_split, true);
+            hits++;
+        }
+        if ("merge (sum to mono)".contains(q) || "combine parallel branches into 1 path".contains(q)) {
+            addRoutingRow("MERGE (Sum to Mono)", "Combine parallel branches into 1 path", R.drawable.ic_routing_merge, false);
+            hits++;
+        }
+
+        JSONObject blacklist = ConnectGuitar.loadJSONFromAssetFile(mainActivity, "blacklist.json");
+        boolean enableBlacklisted = mainActivity.defaultSharedPreferences.getBoolean("enableBlacklisted", false);
+
+        JSONObject[] sources = {mainActivity.availablePlugins, mainActivity.availablePluginsLV2};
+        ArrayList<String> seen = new ArrayList<>();
+        for (JSONObject source : sources) {
+            if (source == null) continue;
+            Iterator<String> keys = source.keys();
+            while (keys.hasNext()) {
+                JSONObject obj = source.optJSONObject(keys.next());
+                if (obj == null) continue;
+                final String pName = obj.optString("name", "");
+                if (pName.isEmpty() || seen.contains(pName)) continue;
+                if (!MainActivity.isGuitarPlugin(pName)) continue;
+                if (MainActivity.isUnsupportedSynth(pName)) continue;
+                String pNameKey = pName.toLowerCase().trim();
+                if (blacklist != null && blacklist.has(pNameKey) && !enableBlacklisted) continue;
+                String desc = obj.optString("desc", obj.optString("description", "Built-in Effect"));
+                if (!(pName.toLowerCase().contains(q) || desc.toLowerCase().contains(q))) continue;
+                seen.add(pName);
+                String shortDesc = desc.length() > 40 ? desc.substring(0, 37) + "…" : desc;
+
+                View row = getLayoutInflater().inflate(R.layout.item_model_browser_row, itemsContainer, false);
+                TextView t = row.findViewById(R.id.item_model_title);
+                TextView b = row.findViewById(R.id.item_model_brand);
+                ImageView thumb = row.findViewById(R.id.item_model_thumb);
+                row.findViewById(R.id.item_model_star).setVisibility(View.GONE);
+                t.setText(PluginNaming.displayName(pName));
+                b.setText(shortDesc);
+                thumb.setImageResource(CategoryHelper.getIconRes(pName));
+                thumb.setColorFilter(CategoryHelper.getColor(pName), android.graphics.PorterDuff.Mode.SRC_IN);
+                row.setOnClickListener(v -> {
+                    mainActivity.addPluginByName(pName);
+                    dismiss();
+                });
+                itemsContainer.addView(row);
+                hits++;
+            }
+        }
+
+        if (hits == 0) {
+            TextView empty = new TextView(getContext());
+            empty.setText("No matches for \"" + query + "\"");
+            empty.setTextColor(Color.parseColor("#A1A1AA"));
+            empty.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12f);
+            int pad = Math.round(12 * getResources().getDisplayMetrics().density);
+            empty.setPadding(pad, Math.round(16 * getResources().getDisplayMetrics().density), pad, Math.round(16 * getResources().getDisplayMetrics().density));
+            itemsContainer.addView(empty);
         }
     }
 

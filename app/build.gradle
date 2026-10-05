@@ -123,6 +123,10 @@ dependencies {
     implementation 'androidx.constraintlayout:constraintlayout:2.2.0'
     implementation 'androidx.preference:preference:1.1.1'
     testImplementation 'junit:junit:4.13.2'
+    // Real JSON parser for local (JVM) unit tests; the Android stub in
+    // android.jar throws "not mocked" otherwise. Test-scope only — never
+    // packaged into the APK.
+    testImplementation 'org.json:json:20240303'
     androidTestImplementation 'androidx.test.ext:junit:1.1.3'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.4.0'
 

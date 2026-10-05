@@ -263,7 +263,7 @@ void AmpAtom::write_control (LV2_Atom_Sequence * control, int portSize, uint32_t
 
     LV2_Atom_Forge_Frame         notify_frame;
     lv2_atom_forge_init(&forge, urid_map);
-    lv2_atom_forge_set_buffer(&forge, (uint8_t*)control, portSize + sizeof (LV2_Atom));
+    lv2_atom_forge_set_buffer(&forge, (uint8_t*)control, (size_t) portSize);
     lv2_atom_forge_sequence_head(&forge, &notify_frame, 0);
 
     lv2_atom_forge_frame_time(&forge, 0);
@@ -277,7 +277,7 @@ void AmpAtom::write_control (LV2_Atom_Sequence * control, int portSize, uint32_t
     lv2_atom_forge_path(&forge, filename, strlen(filename) + 1);
 
     lv2_atom_forge_pop(&forge, &frame);
-//    HERE
+    lv2_atom_forge_pop(&forge, &notify_frame);
     OUT
     return ;
 //    memcpy(control, set, strlen(filename) + sizeof (LV2_Atom_Sequence ));
@@ -321,7 +321,7 @@ void AmpAtom::resetAtom (LV2_Atom_Sequence * control, int portSize) {
 
     LV2_Atom_Forge_Frame         notify_frame;
     lv2_atom_forge_init(&forge, urid_map);
-    lv2_atom_forge_set_buffer(&forge, (uint8_t*)control, portSize + sizeof (LV2_Atom));
+    lv2_atom_forge_set_buffer(&forge, (uint8_t*)control, (size_t) portSize);
     lv2_atom_forge_sequence_head(&forge, &notify_frame, 0);
 
     lv2_atom_forge_frame_time(&forge, 0);
@@ -337,25 +337,38 @@ void AmpAtom::resetAtom (LV2_Atom_Sequence * control, int portSize) {
     lv2_atom_forge_pop(&forge, &frame);
 }
 
-bool AmpAtom::has_file_path (LV2_Atom_Sequence * port) {
-//    IN
-    LV2_ATOM_SEQUENCE_FOREACH(port, ev) {
-//        HERE
-//        LOGD ("[atom host] BODY TYPE: %d [%d|%d|%d]", ev->body.type, forge.Object, forge.Resource,
-//              forge.Blank);
-        LV2_Atom_Object *obj = (LV2_Atom_Object *) &ev->body;
-//        LOGD ("did the value change: %d/%d", ev->body.type, obj->body);
-        const LV2_Atom *file_path = NULL;
-        lv2_atom_object_get(obj, uris.patch_value, &file_path, 0);
-//        OUT
-        if (file_path == nullptr) {
-//            LOGD ("file path is null ..!");
+bool AmpAtom::has_file_path (LV2_Atom_Sequence * port, size_t capacity) {
+    if (port == nullptr || port->atom.size < sizeof(LV2_Atom_Sequence_Body)) {
+        return false;
+    }
+    // atom.size is untrusted plugin data. Never let the LV2 iterator walk
+    // beyond the sequence body or follow a corrupt event size.
+    const uint8_t *begin = reinterpret_cast<const uint8_t *>(&port->body) +
+                           sizeof(LV2_Atom_Sequence_Body);
+    const uint8_t *end = reinterpret_cast<const uint8_t *>(&port->body) +
+                         port->atom.size;
+    if (capacity < sizeof(LV2_Atom_Sequence)) {
+        return false;
+    }
+    const uint8_t *limit = reinterpret_cast<const uint8_t *>(port) + capacity;
+    if (end < begin || end > limit) {
+        return false;
+    }
+    for (const uint8_t *cursor = begin; cursor + sizeof(LV2_Atom_Event) <= end;) {
+        const LV2_Atom_Event *ev = reinterpret_cast<const LV2_Atom_Event *>(cursor);
+        const size_t eventSize = sizeof(LV2_Atom_Event) + lv2_atom_pad_size(ev->body.size);
+        if (eventSize < sizeof(LV2_Atom_Event) || eventSize > static_cast<size_t>(end - cursor)) {
             return false;
         }
-        HERE LOGD ("file path found");
-        return true;
+        if (ev->body.type == uris.atom_Object) {
+        LV2_Atom_Object *obj = (LV2_Atom_Object *) &ev->body;
+        const LV2_Atom *file_path = NULL;
+        lv2_atom_object_get(obj, uris.patch_value, &file_path, 0);
+            if (file_path != nullptr) {
+                return true;
+            }
+        }
+        cursor += eventSize;
     }
-
-//    OUT
     return false;
 }

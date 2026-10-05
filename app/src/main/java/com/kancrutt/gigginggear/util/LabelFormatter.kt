@@ -142,12 +142,14 @@ object LabelFormatter {
                 s = s.removeRange(percentMatch.range).trim()
             }
         }
+        // The unit is NOT re-appended to the label: values render the unit
+        // beside the number (ParameterFormatter, "0.5dB"), so keeping "(dB)"
+        // in the label duplicated it ("Dry Level (dB)" + "0.5dB").
         val tail = buildString {
-            if (unitSuffix != null) append(" (").append(unitSuffix).append(")")
             for (g in keepGroups) append(" ").append(g)
         }
         if (s.isEmpty()) return ControlLabel(tail.trim(), hint)
-        return ControlLabel(formatControlLabel(s) + tail, hint)
+        return ControlLabel((formatControlLabel(s) + tail).trim(), hint)
     }
 
     /**

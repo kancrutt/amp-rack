@@ -1,4 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<shape xmlns:android="http://schemas.android.com/apk/res/android">
-    <solid android:color="#121214" />
-</shape>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Background gelap -->
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#121214" />
+        </shape>
+    </item>
+    <!-- HD Logo di tengah, warna asli tanpa tint -->
+    <item android:gravity="center">
+        <bitmap android:src="@drawable/logo_hd" />
+    </item>
+</layer-list>

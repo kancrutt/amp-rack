@@ -337,8 +337,9 @@ void Plugin::load () {
             LOGD ("configuring atom control port");
             if (filePort == nullptr) {
                 int portSize = jsonPort.value("minimumSize", 8192) + sizeof(LV2_Atom_Sequence) + sizeof (LV2_Atom) + 1 ;
-                filePort = (LV2_Atom_Sequence *) malloc(portSize);
-                filePort->atom.size = portSize - 1;
+                filePort = (LV2_Atom_Sequence *) calloc(1, (size_t) portSize);
+                filePort->atom.size = sizeof(LV2_Atom_Sequence_Body);
+                filePort->atom.type = 0;
                 LOGD ("file port allocated ok");
                 /*
                  *  Implement map properly here
@@ -368,8 +369,10 @@ void Plugin::load () {
             LOGD("[%s %d/%d]: found possible atom port", lv2Descriptor->URI, port, pluginIndex);
         } else if (jsonPort.find ("AtomPort") != jsonPort.end() && jsonPort.find ("OutputPort") != jsonPort.end()) {
             if (notifyPort == nullptr) {
-                notifyPort = (LV2_Atom_Sequence *) malloc(jsonPort.value("minimumSize", 8192) + sizeof (LV2_Atom_Sequence) + sizeof (LV2_Atom) + 1);
-                notifyPort->atom.size = jsonPort.value("minimumSize", 8192) + sizeof (LV2_Atom_Sequence) + sizeof (LV2_Atom)  ;
+                notifyPortSize = jsonPort.value("minimumSize", 8192) + sizeof (LV2_Atom_Sequence) + sizeof (LV2_Atom) + 1;
+                notifyPort = (LV2_Atom_Sequence *) calloc(1, (size_t) notifyPortSize);
+                notifyPort->atom.size = sizeof(LV2_Atom_Sequence_Body);
+                notifyPort->atom.type = 0;
 //                notifyPort->atom.type =
 
             }
@@ -605,7 +608,10 @@ void Plugin::setBufferStereo (float * buffer_left, int read_bytes_left, float * 
 bool Plugin::supportsModelFilePorts() const {
     if (sharedLibrary == nullptr) return false;
     const std::string &so = sharedLibrary->so_file;
-    return so == "neural_amp_modeler.so" || so == "rt-neural-generic.so";
+    const size_t slash = so.find_last_of("/\\");
+    const std::string base = slash == std::string::npos ? so : so.substr(slash + 1);
+    return base == "neural_amp_modeler.so" ||
+           base == "rt-neural-generic.so";
 }
 
 bool Plugin::setFileName (std::string filename) {
@@ -654,10 +660,25 @@ bool Plugin::setFileName (std::string filename) {
     // causes use-after-free crashes when the worker reads port 100.
     loadedFileNameSize = loadedFileName.size();
 
+    // Model delivery is plugin-protocol specific:
+    //   - aidadsp-style loaders (AIDA-X / neural_amp_modeler) take the model
+    //     path over their dedicated ports 99/100.
+    //   - the official NAM LV2 loader (nam.so) exposes an atom "model" control
+    //     port and takes the path as a patch:Set atom — it has no 99/100.
+    // Order matters: keep the proven 99/100 path for plugins that declare it,
+    // and use the atom path only for loaders that lack those ports.
+    bool usesFilePorts = supportsModelFilePorts();
+    if (!usesFilePorts && type == SharedLibrary::LV2 && filePort != nullptr) {
+        LOGI("[NAM] sending model path via atom CONTROL port: %s", filename.c_str());
+        setAtomPortValue(0, filename);
+        loadedFileType = 1;
+        OUT return true;
+    }
+
     // Ports 99/100 are an aidadsp-only convention. No bundled plugin declares
     // ports >= 90, so connecting them anywhere else is an out-of-bounds heap
     // write (later SIGSEGV in the audio thread). Refuse cleanly instead.
-    if (!supportsModelFilePorts()) {
+    if (!usesFilePorts) {
         LOGE("setFileName: %s has no model-file ports, refusing OOB connect",
              sharedLibrary != nullptr ? sharedLibrary->so_file.c_str() : "?");
         Plugin::lastLoadError = "Loader has no model file ports";
@@ -878,20 +899,18 @@ void Plugin::setFilePortValue1 (std::string filename) {
 }
 
 void Plugin::check_notify () {
-//    IN
     if (notifyPort == nullptr) {
-//        LOGD ("notify port is null, so .. well.. this is awkward");
         return;
     }
 
-    if (ampAtom != nullptr && filePort != nullptr && ampAtom->has_file_path(filePort)) {
+    // The worker consumes plugin output from notifyPort. filePort is the
+    // host-to-plugin input and must not be parsed or reset from this thread.
+    if (ampAtom != nullptr &&
+        ampAtom->has_file_path(notifyPort, (size_t) notifyPortSize)) {
         LOGD ("[atom port] reset file port");
-        ampAtom->resetAtom(filePort, filePortSize);
         LOGD ("[atom port] reset notify port");
-        ampAtom->resetAtom(notifyPort, filePortSize);
+        ampAtom->resetAtom(notifyPort, notifyPortSize);
     }
-
-//    OUT
 }
 
 #ifndef __ANDROID__

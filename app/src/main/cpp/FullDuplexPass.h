@@ -21,6 +21,7 @@
 #include <vector>
 #include <algorithm>
 #include <mutex>
+#include <atomic>
 #include "ladspa.h"
 #include "FullDuplexStream.h"
 #include "FileWriter.h"
@@ -90,6 +91,11 @@ public:
     // are scratch. Falls back to classic series/parallel when no plan is set.
     void runDagPlan(const float *data, int samplesToProcess) {
         if (!hasDagPlan) return;
+        // DSP_NODE trace = LOGI + energy sums inside the RT callback. Off by
+        // default; build with DSP_TRACE defined to re-enable for debugging.
+#ifdef DSP_TRACE
+        const bool trace = ((callbackCount.load() / 400) != ((callbackCount.load() - 1) / 400));
+#endif
         std::vector<std::vector<float>> *scratch = &dagScratch;
 
         auto bufFor = [&](int b) -> float * {
@@ -119,6 +125,12 @@ public:
                     int i = op.node;
                     if (i < 0 || i >= activePlugins) break;
                     float *b = bufFor(op.dst);
+#ifdef DSP_TRACE
+                    float before = 0.0f;
+                    if (trace) {
+                        for (int s = 0; s < std::min(samplesToProcess, 64); ++s) before += b[s] * b[s];
+                    }
+#endif
                     if (inputPorts [i] != -1)
                         connect_port [i] (handle [i], inputPorts [i], (LADSPA_Data *) b);
                     if (outputPorts [i] != -1)
@@ -131,6 +143,14 @@ public:
                         LOGE ("run %d is null, skipping node", i);
                     else
                         run [i] (handle [i], samplesToProcess);
+#ifdef DSP_TRACE
+                    if (trace) {
+                        float after = 0.0f;
+                        for (int s = 0; s < std::min(samplesToProcess, 64); ++s) after += b[s] * b[s];
+                        LOGI("[DSP_NODE] node=%d in2=%.6g out2=%.6g inPort=%d outPort=%d",
+                             i, before, after, inputPorts[i], outputPorts[i]);
+                    }
+#endif
                     break;
                 }
             }
@@ -143,6 +163,9 @@ public:
     bool triggerRecord = false ;
     bool bypass = false ;
     float * inSamples = NULL ;
+    std::atomic<uint64_t> callbackCount{0};
+    std::atomic<uint64_t> dspPassCount{0};
+    std::atomic<uint64_t> lockMissCount{0};
 
     virtual oboe::DataCallbackResult
     onBothStreamsReady(
@@ -152,6 +175,7 @@ public:
             std::shared_ptr<oboe::AudioStream> outputStream,
             void *outputData,
             int   numOutputFrames) {
+        const uint64_t callbackNo = ++callbackCount;
         // This code assumes the data format for both streams is Float.
         const float *inputFloats = static_cast<const float *>(inputData);
         float *outputFloats = static_cast<float *>(outputData);
@@ -187,9 +211,16 @@ if (meterEnabled) {
         // while this callback runs. try_lock keeps the audio thread
         // wait-free: if a rebuild is in flight we pass dry for this burst
         // instead of reading torn state (SIGSEGV inside plugin run()).
+        bool ranDsp = false;
         if (!bypass && chainMutex.try_lock()) {
             process(inSamples, monoFrames);
             chainMutex.unlock();
+            ranDsp = true;
+            ++dspPassCount;
+        } else if (!bypass) {
+            ++lockMissCount;
+        }
+        if ((callbackNo % 2000) == 0) {
         }
 
         /* this is not supposed to be called directly.
@@ -203,6 +234,21 @@ if (meterEnabled) {
             float v = inSamples [f] * outputVolume; // do some arbitrary processing
             inSamples [f] = v;
             for (int32_t c = 0; c < outCh; c++) *outputFloats++ = v;
+        }
+
+        if ((callbackNo % 4000) == 0 && monoFrames > 0) {
+            const float *written = static_cast<const float *>(outputData);
+            float processed2 = 0.0f;
+            float output2 = 0.0f;
+            for (int32_t f = 0; f < std::min(monoFrames, 64); ++f) {
+                processed2 += inSamples[f] * inSamples[f];
+                for (int32_t c = 0; c < outCh; ++c) {
+                    const float v = written[f * outCh + c];
+                    output2 += v * v;
+                }
+            }
+            LOGI("[OUTPUT_PATH] processed2=%.6g output2=%.6g outCh=%d frames=%d volume=%.6g",
+                 processed2, output2, outCh, monoFrames, outputVolume);
         }
 
 if (meterEnabled) {
@@ -267,49 +313,18 @@ if (meterEnabled) {
 #endif
             }
         } else {
-            // PARALLEL ROUTING
-            static std::vector<float> dryBuf;
-            static std::vector<float> branchBuf;
-            static std::vector<float> mixBuf;
-
-            if (dryBuf.size() < (size_t)samplesToProcess) {
-                dryBuf.resize(samplesToProcess);
-                branchBuf.resize(samplesToProcess);
-                mixBuf.resize(samplesToProcess);
-            }
-
-            for (int s = 0; s < samplesToProcess; s++) {
-                dryBuf[s] = data[s];
-                mixBuf[s] = 0.0f;
-            }
-
+            float *pData = (float *)data;
             for (int i = 0 ; i < activePlugins ; i ++) {
-                for (int s = 0; s < samplesToProcess; s++) {
-                    branchBuf[s] = dryBuf[s];
-                }
-
                 if (inputPorts [i] != -1)
-                    connect_port [i] (handle [i], inputPorts [i], (LADSPA_Data *) branchBuf.data());
+                    connect_port [i] (handle [i], inputPorts [i], (LADSPA_Data *) pData);
                 if (outputPorts [i] != -1)
-                    connect_port [i] (handle [i], outputPorts [i], (LADSPA_Data *) branchBuf.data());
-
+                    connect_port [i] (handle [i], outputPorts [i], (LADSPA_Data *) pData);
                 if (inputPorts2 [i] != -1)
-                    connect_port [i] (handle [i], inputPorts2 [i], (LADSPA_Data *) branchBuf.data());
+                    connect_port [i] (handle [i], inputPorts2 [i], (LADSPA_Data *) pData);
                 if (outputPorts2 [i] != -1)
-                    connect_port [i] (handle [i], outputPorts2 [i], (LADSPA_Data *) branchBuf.data());
-
+                    connect_port [i] (handle [i], outputPorts2 [i], (LADSPA_Data *) pData);
                 if (run [i] != NULL)
                     run [i] (handle [i], samplesToProcess);
-
-                for (int s = 0; s < samplesToProcess; s++) {
-                    mixBuf[s] += branchBuf[s];
-                }
-            }
-
-            float norm = 1.0f / activePlugins;
-            float * outData = (float *) data;
-            for (int s = 0; s < samplesToProcess; s++) {
-                outData[s] = mixBuf[s] * norm;
             }
         }
 

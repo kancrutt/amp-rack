@@ -21,3 +21,7 @@ app/release/app-release.apk
 WIP/
 fix_proof.diff
 WIP/
+
+# Python bytecode
+__pycache__/
+*.pyc

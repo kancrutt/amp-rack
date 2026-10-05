@@ -80,7 +80,7 @@ public:
 
     void resetAtom(LV2_Atom_Sequence *control, int portSize);
 
-    bool has_file_path(LV2_Atom_Sequence *port);
+    bool has_file_path(LV2_Atom_Sequence *port, size_t capacity);
 
     void
     write_control(LV2_Atom_Sequence *control, int portSize, uint32_t uri, const char *filename);

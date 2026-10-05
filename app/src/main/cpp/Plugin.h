@@ -43,6 +43,7 @@ public:
     std::string prefix ;
     LV2_Atom_Sequence * filePort = nullptr;//= static_cast<LV2_Atom_Sequence *>(malloc(sizeof (LV2_Atom_Sequence)));
     LV2_Atom_Sequence * notifyPort = nullptr;//= static_cast<LV2_Atom_Sequence *>(malloc(sizeof (LV2_Atom_Sequence)));
+    int notifyPortSize = 0;
     int filePortIndex = -1 ;
 //    LV2_Atom_Forge forge;
 

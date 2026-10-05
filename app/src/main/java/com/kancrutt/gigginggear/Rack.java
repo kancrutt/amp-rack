@@ -435,21 +435,11 @@ public class Rack extends Fragment {
             signalChainCanvas.setOnParallelDropListener(slot -> {
                 if (mainActivity != null) mainActivity.wrapBlockInParallel(slot);
             });
-            signalChainCanvas.setOnWireDeleteListener(edge -> {
-                if (edge == null) return;
-                AlertDialog.Builder wireBuilder = new AlertDialog.Builder(getContext());
-                wireBuilder
-                        .setTitle("Remove connection?")
-                        .setMessage("Delete this connection from the signal chain?")
-                        .setPositiveButton("Delete", (dialog, which) -> {
-                            signalChainCanvas.deleteEdge(edge);
-                            if (mainActivity.dataAdapter != null) mainActivity.dataAdapter.notifyDataSetChanged();
-                        })
-                        .setNegativeButton("Cancel", null);
-                AlertDialog wireDialog = wireBuilder.create();
-                wireDialog.show();
-                MainActivity.colorDialogButtons(wireDialog);
+            signalChainCanvas.setOnReorderListener(newOrder -> {
+                if (mainActivity != null) mainActivity.reorderChain(newOrder);
             });
+            // Manual wire deletion removed: connection lines are auto-generated
+            // from block order + explicit SPLIT/MERGE, never user-editable.
 //            view.postDelayed(() -> signalChainCanvas.loadFromActivePlugins(), 600);
 // Chain refresh happens after loadActivePreset() completes in MainActivity
         }
@@ -491,7 +481,7 @@ public class Rack extends Fragment {
         if (srText != null) {
             try {
                 int sr = AudioEngine.getSampleRate();
-                if (sr > 0) srText.setText((sr / 1000f) + " kHz");
+                if (sr > 0) srText.setText(sr + " Hz");
                 else srText.setText("");
             } catch (Exception e) {
                 Log.w(TAG, "sample rate read failed", e);
@@ -746,6 +736,7 @@ public class Rack extends Fragment {
                     JSONObject object = new JSONObject();
                     String name = AudioEngine.getPluginName(i, plugin);
                     int uniqueID = AudioEngine.getPluginUniqueID(i, plugin);
+                    if (!MainActivity.isGuitarPlugin(name)) continue;
 
                     // Skip blacklisted plugins in plugin dialog
                     String nameKey = name != null ? name.toLowerCase().trim() : "";
@@ -783,6 +774,7 @@ public class Rack extends Fragment {
                         JSONObject object = plugins.getJSONObject(key);
                         // do something with jsonObject here
                         String name = object.optString("name", "");
+                        if (!MainActivity.isGuitarPlugin(name)) continue;
                         String nameKey = name != null ? name.toLowerCase().trim() : "";
                         if (blacklist != null && blacklist.has(nameKey) && ! enableBlacklisted) {
                             Log.d(TAG, String.format ("[lv2] blacklisted: %s", name));
@@ -808,6 +800,7 @@ public class Rack extends Fragment {
                         JSONObject object = plugins.getJSONObject(key);
                         // do something with jsonObject here
                         String name = object.optString("name", "");
+                        if (!MainActivity.isGuitarPlugin(name)) continue;
                         String desc = object.optString("desc", "");
                         String id = object.optString("id", "0");
                         String nameKey = name != null ? name.toLowerCase().trim() : "";

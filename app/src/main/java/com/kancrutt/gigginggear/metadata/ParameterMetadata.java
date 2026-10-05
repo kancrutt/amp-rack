@@ -49,11 +49,21 @@ public final class ParameterMetadata {
         public final float[] enumValues;
         public final String[] enumLabels;
         public final int stepCount;
+        public final boolean isSampleRate;
 
         public PortMeta(String name, String symbol, int portIndex, float defaultValue,
                         float min, float max, String unit, ControlType controlType,
                         PluginType pluginType, boolean isLogarithmic, boolean isInteger,
                         boolean isToggled, float[] enumValues, String[] enumLabels) {
+            this(name, symbol, portIndex, defaultValue, min, max, unit, controlType,
+                    pluginType, isLogarithmic, isInteger, isToggled, false, enumValues, enumLabels);
+        }
+
+        public PortMeta(String name, String symbol, int portIndex, float defaultValue,
+                        float min, float max, String unit, ControlType controlType,
+                        PluginType pluginType, boolean isLogarithmic, boolean isInteger,
+                        boolean isToggled, boolean isSampleRate, float[] enumValues,
+                        String[] enumLabels) {
             this.name = name;
             this.symbol = symbol;
             this.portIndex = portIndex;
@@ -66,6 +76,7 @@ public final class ParameterMetadata {
             this.isLogarithmic = isLogarithmic;
             this.isInteger = isInteger;
             this.isToggled = isToggled;
+            this.isSampleRate = isSampleRate;
             this.enumValues = enumValues;
             this.enumLabels = enumLabels;
             this.stepCount = enumValues != null ? enumValues.length : 0;
@@ -205,6 +216,14 @@ public final class ParameterMetadata {
             boolean isLogarithmic = port.optBoolean("logarithmic", false);
             boolean isInteger = port.optBoolean("integer", false);
             boolean isToggled = port.optBoolean("toggled", false);
+            boolean isSampleRate = port.optBoolean("sample_rate", false);
+            // 3.2-B: log when rdf_default and hint_default disagree (declared vs
+            // descriptor source). Non-fatal: the merged "default" still wins.
+            if (port.optBoolean("conflict_default", false)) {
+                warn("Default source conflict for " + symbol + " in " + name
+                        + " (rdf_default=" + port.opt("rdf_default")
+                        + ", hint_default=" + port.opt("hint_default") + ")");
+            }
 
             ControlType controlType = ControlType.KNOB;
             if ("ENUM".equals(ctlTypeStr)) ctlTypeStr = "ENUM_PICKER";
@@ -228,7 +247,7 @@ public final class ParameterMetadata {
 
             return new PortMeta(name, symbol, portIndex, defaultValue, min, max, unit,
                     controlType, pluginType, isLogarithmic, isInteger, isToggled,
-                    enumValues, enumLabels);
+                    isSampleRate, enumValues, enumLabels);
         } catch (JSONException e) {
             return null;
         }
@@ -239,8 +258,33 @@ public final class ParameterMetadata {
         return ports != null ? ports.get(portIndex) : null;
     }
 
-    public PortMeta getLv2Port(String uri, String symbol) {
+    public java.util.Set<String> lv2Keys() {
+        return lv2Meta.keySet();
+    }
+
+    public java.util.Set<String> ladspaKeys() {
+        return ladspaMeta.keySet();
+    }
+
+    public Map<String, PortMeta> getLv2Plugin(String uri) {
+        return lv2Meta.get(uri);
+    }
+
+    public Map<Integer, PortMeta> getLadspaPlugin(String uniqueId) {
+        return ladspaMeta.get(uniqueId);
+    }
+
+    public PortMeta getLv2Port(String uri, String key) {
         Map<String, PortMeta> ports = lv2Meta.get(uri);
-        return ports != null ? ports.get(symbol) : null;
+        if (ports == null || key == null) return null;
+        PortMeta bySymbol = ports.get(key);
+        if (bySymbol != null) return bySymbol;
+        // MainActivity looks LV2 ports up by display name
+        // (AudioEngine.getControlName returns the port name, not the symbol).
+        // Fall back to the first port whose name matches.
+        for (PortMeta p : ports.values()) {
+            if (key.equals(p.name)) return p;
+        }
+        return null;
     }
 }

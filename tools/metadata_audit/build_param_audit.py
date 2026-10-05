@@ -531,6 +531,8 @@ def parse_lv2_ttl(ttl_dirs):
                     port_info["groups"].append(str(obj))
                 elif pred == LV2.scalePoint:
                     # obj is a blank node with rdfs:label and rdf:value
+                    label = None
+                    val = None
                     for sp_pred, sp_obj in g.predicate_objects(obj):
                         if sp_pred == RDFS.label:
                             label = str(sp_obj)

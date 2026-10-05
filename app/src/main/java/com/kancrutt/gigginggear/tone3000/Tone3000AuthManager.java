@@ -84,6 +84,11 @@ public final class Tone3000AuthManager {
     }
 
     public AuthStart startAuthorization(Context ctx, String prompt, @Nullable String toneId) throws ApiException {
+        return startAuthorization(ctx, prompt, toneId, null);
+    }
+
+    public AuthStart startAuthorization(Context ctx, String prompt, @Nullable String toneId,
+                                         @Nullable String gears) throws ApiException {
         String clientId = Tone3000Config.getClientId(ctx);
         if (clientId == null || clientId.isEmpty()) throw new ApiException(0, "missing_client_id", "TONE3000_CLIENT_ID not configured — set BuildConfig or manifest meta-data");
 
@@ -103,6 +108,7 @@ public final class Tone3000AuthManager {
                 .appendQueryParameter("state", state);
         if (prompt != null) b.appendQueryParameter("prompt", prompt);
         if (toneId != null) b.appendQueryParameter("tone_id", toneId);
+        if (gears != null && !gears.trim().isEmpty()) b.appendQueryParameter("gears", gears);
         // UX hints appropriate to Giggin Gear (NAM/IR amp/cab, preview, A2 support)
         // Only set when prompt is select/load to avoid noise on bare auth
         if ("select_tone".equals(prompt) || "load_tone".equals(prompt)) {
@@ -123,6 +129,11 @@ public final class Tone3000AuthManager {
     /** Convenience: prompt=select_tone (spec §1). */
     public AuthStart startSelectFlow(Context ctx) throws ApiException {
         return startAuthorization(ctx, "select_tone", null);
+    }
+
+    /** Select-flow variant scoped to a target gear family, e.g. "cab". */
+    public AuthStart startSelectFlow(Context ctx, @Nullable String gears) throws ApiException {
+        return startAuthorization(ctx, "select_tone", null, gears);
     }
 
     // --- Callback validation ---

@@ -42,6 +42,9 @@ public:
     void setGraphEdges(std::vector<ggsolver::Edge> edges) ;
     std::vector<ggsolver::Edge> getGraphEdges() { return graphEdges; }
     void rebuildDagPlan();
+    // True when a SPLIT/MERGE routing block is present: parallel DAG execution
+    // is only legal then; otherwise the chain is always pure series.
+    bool hasRoutingBlock();
 
     int deletePluginFromRack(int pIndex);
     void setRecordingDeviceId(int32_t deviceId);

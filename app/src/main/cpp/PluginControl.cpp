@@ -1,6 +1,8 @@
 #include "PluginControl.h"
 #include "JsonSafe.h"
+#include <cctype>
 #include <cmath>
+#include <cstring>
 #include <limits>
 
 LADSPA_Data PluginControl::control_rounding(LADSPA_Data _val)
@@ -24,10 +26,68 @@ void PluginControl::setSampleRate (unsigned long rate) {
     sample_rate = rate ;
 }
 
-// Parse declared unit from LADSPA port name (explicit tokens in parentheses)
+// Normalize a raw unit token ("ms", "in ms", "inches/sec, 1=normal") to the
+// canonical unit string the UI expects, or "" when the token is not a unit.
+static std::string normalizeUnitToken(const std::string& raw) {
+    std::string t;
+    for (char c : raw) {
+        if (c == ' ' || c == '\t' || c == '\n') continue;
+        t.push_back((char) tolower((unsigned char) c));
+    }
+    static const std::pair<const char*, const char*> units[] = {
+        {"db", "dB"},
+        {"hz", "Hz"}, {"khz", "kHz"},
+        {"s", "s"}, {"sec", "s"}, {"secs", "s"}, {"second", "s"}, {"seconds", "s"},
+        {"ms", "ms"}, {"msec", "ms"}, {"msecs", "ms"},
+        {"millisecond", "ms"}, {"milliseconds", "ms"},
+        {"%", "%"}, {"percent", "%"}, {"percentage", "%"},
+        {"octave", "octaves"}, {"octaves", "octaves"},
+        {"cent", "cents"}, {"cents", "cents"},
+        {"semitone", "semitones"}, {"semitones", "semitones"}, {"st", "semitones"},
+        {"bpm", "BPM"},
+        {"deg", "deg"}, {"degree", "deg"}, {"degrees", "deg"},
+        {"m", "m"}, {"meter", "m"}, {"meters", "m"}, {"metre", "m"}, {"metres", "m"},
+        {"inch", "inches"}, {"inches", "inches"},
+    };
+    for (const auto& u : units) {
+        if (t == u.first) return u.second;
+    }
+    // Strip a leading qualifier: "(in ms)" / "(in seconds)" -> "ms" / "seconds".
+    if (t.size() > 2 && t.compare(0, 2, "in") == 0) {
+        std::string rest = t.substr(2);
+        for (const auto& u : units) {
+            if (rest == u.first) return u.second;
+        }
+    }
+    return "";
+}
+
+// Parse declared unit from a LADSPA port name. Accepts square bracket tokens
+// ("Gain [dB]", "Decay [ms]", "Depth [%]") and parenthetical groups
+// ("Gain (dB)", "Look-ahead (seconds)", "Crossfade time (in ms)").
+// A bracket token that is not a unit (e.g. "[-3dB]" in a filter response
+// spec) falls through to the parenthetical group, which carries the unit.
 std::string PluginControl::parseDeclaredUnit(const char* portName) {
     if (!portName) return "";
     const char* p = portName;
+    const char* lastBracket = nullptr;
+    const char* bracketClose = nullptr;
+    while ((p = strchr(p, '[')) != nullptr) {
+        const char* close = strchr(p, ']');
+        if (close) {
+            lastBracket = p;
+            bracketClose = close;
+        }
+        p++;
+    }
+    if (lastBracket && bracketClose && bracketClose > lastBracket) {
+        size_t len = bracketClose - lastBracket - 1;
+        if (len > 0 && len <= 32) {
+            std::string u = normalizeUnitToken(std::string(lastBracket + 1, len));
+            if (!u.empty()) return u;
+        }
+    }
+    p = portName;
     const char* lastParen = nullptr;
     while ((p = strchr(p, '(')) != nullptr) {
         lastParen = p;
@@ -38,25 +98,7 @@ std::string PluginControl::parseDeclaredUnit(const char* portName) {
     if (!endParen) return "";
     size_t len = endParen - lastParen - 1;
     if (len == 0 || len > 32) return "";
-    std::string token(lastParen, len + 2);
-    static const std::pair<const char*, const char*> units[] = {
-        {"(dB)", "dB"}, {"(db)", "dB"}, {"(DB)", "dB"},
-        {"(Hz)", "Hz"}, {"(hz)", "Hz"}, {"(HZ)", "Hz"},
-        {"(kHz)", "kHz"}, {"(khz)", "kHz"},
-        {"(s)", "s"}, {"(sec)", "s"}, {"(seconds)", "s"},
-        {"(ms)", "ms"}, {"(msec)", "ms"}, {"(milliseconds)", "ms"},
-        {"(%)", "%"}, {"(percent)", "%"},
-        {"(octaves)", "octaves"}, {"(octave)", "octaves"},
-        {"(cents)", "cents"}, {"(cent)", "cents"},
-        {"(semitones)", "semitones"}, {"(semitone)", "semitones"},
-        {"(BPM)", "BPM"}, {"(bpm)", "BPM"},
-        {"(m)", "m"}, {"(meters)", "m"}, {"(metres)", "m"},
-        {"(inches)", "inches"}, {"(inch)", "inches"},
-    };
-    for (const auto& u : units) {
-        if (token == u.first) return u.second;
-    }
-    return "";
+    return normalizeUnitToken(std::string(lastParen + 1, len));
 }
 
 PluginControl::PluginControl(const LADSPA_Descriptor *descriptor, int _port, unsigned long _sampleRate, const PortMeta* _meta) {
@@ -90,6 +132,11 @@ PluginControl::PluginControl(const LADSPA_Descriptor *descriptor, int _port, uns
             unit = this->meta.declaredUnit;
         }
     }
+    // Fallback: many LADSPA plugins declare the unit in the port name
+    // ("Gain (dB)", "Decay (ms)"). Supplementary metadata does not cover
+    // every port; parse the declared token so the UI can render the unit
+    // beside the value and defaults can anchor on a physical unit.
+    if (unit.empty()) unit = parseDeclaredUnit(name);
 
     if (LADSPA_IS_HINT_SAMPLE_RATE(ladspaPortRangeHintDescriptor)) {
         lower_bound *= sample_rate;
@@ -174,9 +221,31 @@ PluginControl::PluginControl(const LADSPA_Descriptor *descriptor, int _port, uns
             }
         }
         else {
-            if (min <= 0.0f && max >= 0.0f) default_value = 0.0f;
-            else if (isLogHint) default_value = expf((logf(min) + logf(max)) * 0.5f);
-            else default_value = (min + max) * 0.5f;
+            // No explicit LADSPA default and no RDF override. The blind
+            // midpoint produces "uncommon" defaults (e.g. -24 dB for a
+            // -60..+12 dB gain knob). Anchor on the declared unit instead:
+            // dB spanning 0 -> unity, Hz -> 440 (A4) when in range,
+            // detune/feedback spanning 0 -> neutral 0, amplitude-ish ranges
+            // spanning 1 -> unity 1.0.
+            bool spansZero = (min <= 0.0f) && (max >= 0.0f);
+            if (!unit.empty() && unit == "dB" && spansZero) {
+                default_value = 0.0f;
+            } else if (!unit.empty() && unit == "Hz") {
+                if (440.0f >= min && 440.0f <= max)
+                    default_value = 440.0f;
+                else if (isLogHint && min > 0.0f)
+                    default_value = expf((logf(min) + logf(max)) * 0.5f);
+                else
+                    default_value = (min + max) * 0.5f;
+            } else if (spansZero) {
+                default_value = 0.0f;
+            } else if (isLogHint) {
+                default_value = expf((logf(min) + logf(max)) * 0.5f);
+            } else if (min <= 1.0f && max >= 1.0f && max <= 8.0f) {
+                default_value = 1.0f;
+            } else {
+                default_value = (min + max) * 0.5f;
+            }
         }
     }
 

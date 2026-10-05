@@ -95,10 +95,10 @@ public class LabelFormatterTest {
         assertEquals("Depth [%]", LabelFormatter.formatControlLabel("Depth [%]"));
         // Bare trailing % is preserved as-is by the cosmetic pass ...
         assertEquals("Gain %", LabelFormatter.formatControlLabel("Gain %"));
-        // ... while the full parser canonicalizes it to " (%)"
-        assertEquals("Gain (%)", LabelFormatter.parseControlLabel("Gain %").getMain());
-        assertEquals("Wet/Dry Mix (%)", LabelFormatter.parseControlLabel("Wet/Dry Mix (%)").getMain());
-        assertEquals("R/Haas Feedback (%)", LabelFormatter.parseControlLabel("R/Haas Feedback [%]").getMain());
+        // ... while the full parser strips pure unit suffixes so they are not duplicated with value units
+        assertEquals("Gain", LabelFormatter.parseControlLabel("Gain %").getMain());
+        assertEquals("Wet/Dry Mix", LabelFormatter.parseControlLabel("Wet/Dry Mix (%)").getMain());
+        assertEquals("R/Haas Feedback", LabelFormatter.parseControlLabel("R/Haas Feedback [%]").getMain());
     }
 
     @Test public void arrowsStayReadable() {
@@ -107,17 +107,17 @@ public class LabelFormatterTest {
     }
 
     @Test public void midStringAnnotationsKeptVerbatim() {
-        // Real audit findings: units/annotations NOT at the very end used to
-        // get lowercased ("(hz)") or shredded ("[ 3 D B]").
-        assertEquals("Frequency (Hz) [-3dB]",
+        // Real audit findings: pure unit suffixes are stripped from tail groups
+        // while non-unit annotations ([-3dB], shapes) are preserved verbatim.
+        assertEquals("Frequency [-3dB]",
                 LabelFormatter.parseControlLabel("Frequency (Hz) [-3dB]").getMain());
-        assertEquals("Frequency (Hz) [-6dB]",
+        assertEquals("Frequency [-6dB]",
                 LabelFormatter.parseControlLabel("Frequency (Hz) [-6dB]").getMain());
-        assertEquals("Amps Gain (dB)",
+        assertEquals("Amps Gain",
                 LabelFormatter.parseControlLabel("Amps gain (dB)").getMain());
         assertEquals("LFO Shape (square->sine->tri)",
                 LabelFormatter.parseControlLabel("LFO shape (square->sine->tri)").getMain());
-        assertEquals("Depth (%)",
+        assertEquals("Depth",
                 LabelFormatter.parseControlLabel("Depth [%]").getMain());
     }
 

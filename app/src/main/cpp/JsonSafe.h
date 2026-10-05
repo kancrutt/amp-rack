@@ -53,6 +53,23 @@ namespace jsonsafe {
         return j.contains(key) && !j[key].is_null() && j[key].is_number_integer();
     }
 
+    // Serialized ttl assets come in two key conventions: short class names
+    // ("AtomPort") or full RDF URIs ("http://lv2plug.in/ns/ext/atom#AtomPort").
+    // Matching only the short name silently skips class keys in URI-keyed
+    // assets. Accept either form; exact key wins first.
+    inline bool hasClassKey(const nlohmann::json &obj, const std::string &shortName) {
+        if (!obj.is_object()) return false;
+        if (obj.find(shortName) != obj.end()) return true;
+        for (auto it = obj.begin(); it != obj.end(); ++it) {
+            const std::string &k = it.key();
+            if (k.size() > shortName.size() &&
+                k.compare(k.size() - shortName.size(), shortName.size(), shortName) == 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     // Guard a json::parse call: returns empty json object on parse failure
     // instead of aborting the process.
     inline nlohmann::json safe_parse(const std::string &s) {

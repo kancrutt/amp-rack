@@ -530,7 +530,12 @@ Java_com_kancrutt_gigginggear_AudioEngine_getControlName(JNIEnv *env, jclass cla
 
     if (engine->activePlugins.at(plugin)->type == SharedLibrary::LADSPA) {
         auto *p = engine->activePlugins.at(plugin);
-        return env ->NewStringUTF(p->descriptor->PortNames [control]);
+        // Stored control name (PortNames[correct port] with metadata
+        // fallback), NOT PortNames[control] — control ordinal != port
+        // index, and some .so expose an all-NULL PortNames table
+        // (C* CabinetIV) → NewStringUTF(NULL).
+        const char *nm = p->pluginControls.at(control)->name;
+        return env ->NewStringUTF(nm ? nm : "");
     }
     else if (engine->activePlugins.at(plugin)->type == SharedLibrary::LV2) {
         auto *p = engine->activePlugins.at(plugin);
@@ -832,7 +837,8 @@ Java_com_kancrutt_gigginggear_AudioEngine_getActivePluginValues(JNIEnv *env, jcl
     Plugin *p = engine ->activePlugins.at(plugin);
     std::vector<float> controls ;
     for (int i = 0 ; i < p->pluginControls.size(); i ++) {
-        controls.push_back(*p->pluginControls.at(i)->def);
+        auto *pc = p->pluginControls.at(i);
+        controls.push_back(pc->def ? *pc->def : pc->getDefault());
     }
 
     jfloatArray r = env ->NewFloatArray(p->pluginControls.size());
@@ -975,7 +981,8 @@ Java_com_kancrutt_gigginggear_AudioEngine_printActiveChain(JNIEnv *env, jclass c
     for (int i = 0 ; i < engine -> activePlugins.size() ; i ++) {
         LOGE("---------| %d / %d|----------", i, engine->activePlugins.size());
         for (int control = 0 ; control < engine -> activePlugins.at(i)->pluginControls.size() ; control ++) {
-            LOGD("[%d] %d -> %f", i, control, *engine -> activePlugins.at(i)->pluginControls.at(control)->def);
+            auto *pc = engine -> activePlugins.at(i)->pluginControls.at(control);
+            LOGD("[%d] %d -> %f", i, control, pc->def ? *pc->def : 0.0f);
         }
     }
 }

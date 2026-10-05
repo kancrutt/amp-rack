@@ -19,6 +19,7 @@ void Plugin::setParameterMetadata(const nlohmann::json& metadata) {
 static bool readPortMeta(const nlohmann::json& p, PluginControl::PortMeta& out) {
     if (!p.is_object()) return false;
     out.declaredUnit = jsonsafe::str(p, "unit", "");
+    out.name = jsonsafe::str(p, "name", "");
     if (p.contains("default") && !p["default"].is_null()) {
         out.rdfDefault = jsonsafe::number(p, "default", 0.0f);
         out.hasRdfDefault = true;
@@ -73,16 +74,7 @@ static bool lv2Meta(const std::string& uri, const std::string& symbol, PluginCon
 // malloc) and crashing run() on the first audio callback (octolo SIGSEGV).
 // Accept either form; the short-name check stays first so exact keys win.
 static bool hasClassKey(const nlohmann::json &obj, const std::string &shortName) {
-    if (!obj.is_object()) return false;
-    if (obj.find(shortName) != obj.end()) return true;
-    for (auto it = obj.begin(); it != obj.end(); ++it) {
-        const std::string &k = it.key();
-        if (k.size() > shortName.size() &&
-            k.compare(k.size() - shortName.size(), shortName.size(), shortName) == 0) {
-            return true;
-        }
-    }
-    return false;
+    return jsonsafe::hasClassKey(obj, shortName);
 }
 
 void replaceAll(std::string& str, const std::string& from, const std::string& to) {

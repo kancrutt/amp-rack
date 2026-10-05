@@ -4408,6 +4408,10 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     try { int t = AudioEngine.getControlType(position, i); ctrlType = t; } catch (Throwable ignored) {}
                     try { isLog = AudioEngine.getControlIsLogarithmic(position, i); } catch (Throwable ignored) {}
                     if (ctrlType == 1) isIntegerParam = true; // INT type => discrete integer steps
+                    // ATOM ports (type 3) are internal event channels (tempo
+                    // sync). They carry no user value; rendering them made a
+                    // dead 0..1 slider on octolo/Echotron panels.
+                    if (ctrlType == 3) continue;
                     // LADSPA enum-in-name: "(0=none, 1=AM, 2=RM)" + INT range 0..N
                     // renders as a proper picker row, never as slider text.
                     String[] hintEnumLabels = null;

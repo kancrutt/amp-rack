@@ -13,7 +13,7 @@ LADSPA_Data PluginControl::control_rounding(LADSPA_Data _val)
 }
 
 void PluginControl::setValue (float value) {
-    if (!std::isfinite(value)) return;
+    if (!std::isfinite(value) || !def) return;
     value = std::max(min, std::min(max, value));
     *def = control_rounding(value);
 }
@@ -111,6 +111,13 @@ PluginControl::PluginControl(const LADSPA_Descriptor *descriptor, int _port, uns
     LADSPA_Data lower_bound = hint -> LowerBound;
     LADSPA_Data upper_bound = hint -> UpperBound;
     name = descriptor -> PortNames [port] ;
+    // Some shipped binaries (C* CabinetIV, uid 2606) expose an empty
+    // PortNames table at runtime — fall back to the curated metadata name
+    // so the UI can still label the control instead of dropping the row.
+    if (!name && _meta && !_meta->name.empty()) {
+        name = strdup(_meta->name.c_str());
+        name_allocated = true;
+    }
 
     // LADSPA has no unit field in LADSPA_PortRangeHint or LADSPA_Descriptor.
     // Units may only arrive through authoritative supplementary metadata.
@@ -320,7 +327,7 @@ PluginControl::PluginControl(const LADSPA_Descriptor *descriptor, int _port, uns
 LADSPA_Data PluginControl::getMin () { return min ; }
 LADSPA_Data PluginControl::getMax () { return max ; }
 LADSPA_Data PluginControl::getDefault () { return default_value ; }
-LADSPA_Data PluginControl::getValue () { return *def; }
+LADSPA_Data PluginControl::getValue () { return def ? *def : default_value; }
 
 void PluginControl::print () {
     LOGD(
@@ -435,7 +442,12 @@ PluginControl::PluginControl(const LV2_Descriptor *descriptor, nlohmann::json j,
     lv2_name = n;
     port = _port ;
 
-    if (j.value("InputPort", false) == true && j.value("ControlPort", false) == true) {
+    // Branch conditions mirror Plugin's loader (key presence + URI-suffix
+    // class keys). Previously j.value("AtomPort") required a literal key
+    // while the loader accepted the RDF-URI form, so URI-keyed atom ports
+    // were published as controls with an uninitialized def pointer
+    // (PluginControl::getValue SIGSEGV when the panel renders).
+    if (j.find("InputPort") != j.end() && j.find("ControlPort") != j.end()) {
         if (propToggled)
             type = TOGGLE;
         else if (isEnumeration)
@@ -508,7 +520,7 @@ PluginControl::PluginControl(const LV2_Descriptor *descriptor, nlohmann::json j,
             type = FLOAT;
         }
 
-    } else if (j.value("InputPort", false) == true && j.value("AtomPort", false) == true) {
+    } else if (jsonsafe::hasClassKey(j, "AtomPort") && j.find("InputPort") != j.end()) {
         type = ATOM ;
         int minSize = 8192;
         if (j.contains("minimumSize") && j["minimumSize"].is_number()) {
@@ -516,8 +528,21 @@ PluginControl::PluginControl(const LV2_Descriptor *descriptor, nlohmann::json j,
         }
         lv2AtomSequence = (LV2_Atom_Sequence *) malloc (minSize);
         def = (float *) malloc (sizeof (float));
+        *def = 0;
+        val = 0;
         min = 0;
         max = 1;
+    }
+
+    // Last-resort guard: any port shape neither branch understands still
+    // gets a writable def so getValue/setValue never dereference null
+    // (panel render used to SIGSEGV on PluginControl::getValue).
+    if (def == nullptr) {
+        def = (float *) malloc (sizeof (float));
+        *def = default_value;
+        val = default_value;
+        if (max <= min) { min = 0; max = 1; }
+        type = FLOAT;
     }
 
     OUT ;

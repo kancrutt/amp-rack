@@ -31,8 +31,8 @@ class PluginControl {
 public:
     unsigned long port;
     uint32_t urid ;
-    LADSPA_Data min;
-    LADSPA_Data max;
+    LADSPA_Data min = 0;
+    LADSPA_Data max = 1;
     LADSPA_Data default_value = 1; // 1 == no change in signal
 
     bool isLogarithmic = false;
@@ -44,13 +44,13 @@ public:
     std::vector<std::string> enumLabels;
 
     /* value in the plugin */
-    LADSPA_Data val;
-    LADSPA_Data *def;
+    LADSPA_Data val = 0;
+    LADSPA_Data *def = nullptr;
     LADSPA_Data presetValue = -1;
-    Type type ;
+    Type type = FLOAT ;
     std::string lv2_name ;
     bool name_allocated = false ;
-    LV2_Atom_Sequence * lv2AtomSequence ;
+    LV2_Atom_Sequence * lv2AtomSequence = nullptr ;
 
     // Metadata overlay (from parameter_metadata.json) - populated at construction
     struct PortMeta {
@@ -58,6 +58,7 @@ public:
         std::vector<float> enumValues;
         std::vector<std::string> enumLabels;
         std::string declaredUnit;
+        std::string name;
         bool hasRdfDefault = false;
     };
     PortMeta meta;
@@ -81,7 +82,7 @@ public:
 
     void print();
 
-    const char *name;
+    const char *name = nullptr;
 
     void freeMemory();
 

@@ -467,6 +467,7 @@
                             android:fontFamily="@font/plus_jakarta_sans" />
 
                         <androidx.core.widget.NestedScrollView
+                            android:id="@+id/level_panel_scroll"
                             android:layout_width="match_parent"
                             android:layout_height="match_parent"
                             android:fillViewport="true"
@@ -506,6 +507,7 @@
                             android:fontFamily="@font/plus_jakarta_sans" />
 
                         <androidx.core.widget.NestedScrollView
+                            android:id="@+id/tone_panel_scroll"
                             android:layout_width="match_parent"
                             android:layout_height="match_parent"
                             android:fillViewport="true"

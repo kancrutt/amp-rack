@@ -3812,19 +3812,36 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         return sb.toString();
     }
 
-    /** Same fingerprint for a schema-v1 snapshot JSON ("plugins[].name").
-     * Returns "" when the JSON cannot be parsed (never skip in that case). */
+    /** Same fingerprint for a preset JSON. Two accepted shapes:
+     * schema-v1 {"plugins":[{name:…},…]} and the legacy numeric-key form
+     * {"0":"{\"name\":…}", "1":…} that loadSchemaV1Preset emits. Returns ""
+     * when neither shape is found (never skip/warn in that case). */
     String snapshotChainSignature(String presetJson) {
         try {
             JSONObject root = new JSONObject(presetJson);
-            JSONArray arr = root.optJSONArray("plugins");
-            if (arr == null) return "";
             StringBuilder sb = new StringBuilder();
-            sb.append(arr.length()).append("|");
-            for (int i = 0; i < arr.length(); i++) {
-                JSONObject b = arr.optJSONObject(i);
-                sb.append(b != null ? b.optString("name", "?") : "?").append(";");
+            JSONArray arr = root.optJSONArray("plugins");
+            if (arr != null) {
+                sb.append(arr.length()).append("|");
+                for (int i = 0; i < arr.length(); i++) {
+                    JSONObject b = arr.optJSONObject(i);
+                    sb.append(b != null ? b.optString("name", "?") : "?").append(";");
+                }
+                return sb.toString();
             }
+            java.util.TreeMap<Integer, String> legacy = new java.util.TreeMap<>();
+            for (java.util.Iterator<String> it = root.keys(); it.hasNext(); ) {
+                String k = it.next();
+                if (!k.matches("\\d+")) continue; // skip metadata keys
+                String v = root.optString(k, null);
+                if (v == null) continue;
+                String nm = "?";
+                try { nm = new JSONObject(v).optString("name", "?"); } catch (Exception ignore) {}
+                legacy.put(Integer.parseInt(k), nm);
+            }
+            if (legacy.isEmpty()) return "";
+            sb.append(legacy.size()).append("|");
+            for (String nm : legacy.values()) sb.append(nm).append(";");
             return sb.toString();
         } catch (Exception e) {
             return "";
@@ -3987,6 +4004,14 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             View ledView = findViewById(R.id.detail_led);
             LinearLayout levelContainer = findViewById(R.id.container_level_knobs);
             LinearLayout toneContainer = findViewById(R.id.container_tone_knobs);
+            // Round-6: the panel scroll position survived re-populate, so
+            // reopening a block resumed mid-list (e.g. Compress at Threshold).
+            View lvlScroll = findViewById(R.id.level_panel_scroll);
+            if (lvlScroll instanceof androidx.core.widget.NestedScrollView)
+                ((androidx.core.widget.NestedScrollView) lvlScroll).scrollTo(0, 0);
+            View toneScroll = findViewById(R.id.tone_panel_scroll);
+            if (toneScroll instanceof androidx.core.widget.NestedScrollView)
+                ((androidx.core.widget.NestedScrollView) toneScroll).scrollTo(0, 0);
 
             if (position == -100 || position == -200) {
                 // Global physical I/O anchors. They do not have bypass switches or models.
@@ -5031,6 +5056,10 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     if (ciLvl % 2 == 0) clp.setMarginEnd(Math.round(4 * density));
                     else clp.setMarginStart(Math.round(4 * density));
                     cell.setLayoutParams(clp);
+                    // Weighted rows are taller than their content; center the
+                    // cell's label+slider+value group instead of pinning it top
+                    // (round-6: whitespace collected inside the card).
+                    cell.setGravity(Gravity.CENTER_VERTICAL);
                     gridRowLvl.addView(cell);
                 }
                 if (levelCells.size() % 2 == 1 && gridRowLvl != null) {
@@ -5456,10 +5485,12 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     void loadPreset(String preset) {
         // Round-5 K1 visibility: a restore rebuilds the whole chain, so any
         // engine block absent from the incoming preset is wiped. Log it.
+        // Cold start (live chain "0|") is not a wipe - stay quiet there.
         {
             String liveSig = engineChainSignature();
             String snapSig = snapshotChainSignature(preset);
-            if (!liveSig.isEmpty() && !snapSig.isEmpty() && !liveSig.equals(snapSig)) {
+            if (!liveSig.isEmpty() && !liveSig.startsWith("0|")
+                    && !snapSig.isEmpty() && !liveSig.equals(snapSig)) {
                 Log.w(TAG, "preset restore replaces live chain (" + liveSig
                         + ") with snapshot (" + snapSig + ")");
             }

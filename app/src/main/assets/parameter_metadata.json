@@ -29402,7 +29402,7 @@
             5.0
           ],
           "enum_labels": [
-            "Syncronous",
+            "Synchronous",
             "Alternate 1 Oct",
             "Alternate 2 Oct",
             "Step",
@@ -29653,7 +29653,7 @@
             5.0
           ],
           "enum_labels": [
-            "Syncronous",
+            "Synchronous",
             "Alternate 1 Oct",
             "Alternate 2 Oct",
             "Step",

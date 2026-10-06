@@ -4974,6 +4974,32 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     levelPanel.setVisibility(hasLevel ? View.VISIBLE : View.GONE);
                 }
 
+                // When BOTH columns show, give them bounded shares. panel_level
+                // is wrap_content and grew with every knob (octolo: 4 slider
+                // cards), starving panel_tone (weight=1) down to a ~38px sliver
+                // where "Sequence" wrapped one character per line.
+                if (levelPanel != null && tonePanel != null
+                        && levelPanel.getLayoutParams() instanceof LinearLayout.LayoutParams
+                        && tonePanel.getLayoutParams() instanceof LinearLayout.LayoutParams) {
+                    LinearLayout.LayoutParams lllp =
+                            (LinearLayout.LayoutParams) levelPanel.getLayoutParams();
+                    LinearLayout.LayoutParams tllp =
+                            (LinearLayout.LayoutParams) tonePanel.getLayoutParams();
+                    if (hasLevel && hasTone) {
+                        lllp.width = 0;
+                        lllp.weight = 1f;
+                        tllp.width = 0;
+                        tllp.weight = 2f;
+                    } else {
+                        lllp.width = ViewGroup.LayoutParams.WRAP_CONTENT;
+                        lllp.weight = 0f;
+                        tllp.width = 0;
+                        tllp.weight = 1f;
+                    }
+                    levelPanel.setLayoutParams(lllp);
+                    tonePanel.setLayoutParams(tllp);
+                }
+
                 if (!hasLevel && !hasTone) {
                     addEmptyPanelHint(toneContainer, "MODEL-CAPTURED / NO CONTROLS");
                 }
@@ -7440,7 +7466,15 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                             dataAdapter.addItem(pluginID, dataAdapter.getItemCount());
                         }
                         if (signalChainCanvas != null) {
-                            signalChainCanvas.post(() -> signalChainCanvas.loadFromActivePlugins());
+                            // Select the freshly-added block and open its editor;
+                            // the panel used to keep showing the previously
+                            // selected block (round-3 note: "add octolo, panel
+                            // shows AMP").
+                            signalChainCanvas.post(() -> {
+                                signalChainCanvas.loadFromActivePlugins();
+                                signalChainCanvas.selectNode(before);
+                                populateInlineParameterEditor(before, name);
+                            });
                         }
                         return;
                     }
@@ -7504,7 +7538,15 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                             dataAdapter.addItem(pluginID, dataAdapter.getItemCount());
                         }
                         if (signalChainCanvas != null) {
-                            signalChainCanvas.post(() -> signalChainCanvas.loadFromActivePlugins());
+                            // Select the freshly-added block and open its editor;
+                            // the panel used to keep showing the previously
+                            // selected block (round-3 note: "add octolo, panel
+                            // shows AMP").
+                            signalChainCanvas.post(() -> {
+                                signalChainCanvas.loadFromActivePlugins();
+                                signalChainCanvas.selectNode(before);
+                                populateInlineParameterEditor(before, name);
+                            });
                         }
                         return;
                     }

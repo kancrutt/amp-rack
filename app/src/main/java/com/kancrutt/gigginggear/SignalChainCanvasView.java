@@ -421,12 +421,21 @@ public class SignalChainCanvasView extends View {
         } catch (Exception ignored) {}
         // Save old nodes to preserve X/Y and selection
         Map<Integer, Node> oldNodes = new HashMap<>(nodeMap);
-        // Slot ids are not stable: reorder changes which plugin occupies each
-        // slot. Preserve visual state by the stable engine plugin id instead.
-        Map<Integer, Node> oldNodesByPluginId = new HashMap<>();
-        for (Node old : oldNodes.values()) {
-            if (old != null && !old.isAnchor()) {
-                oldNodesByPluginId.put(old.pluginId, old);
+        // Preserve visual state per plugin id, but as a FIFO queue per id:
+        // every LV2 plugin reports UniqueID 0 and two instances of one LADSPA
+        // plugin share an id, so a single Node-per-id map made every LV2 block
+        // "inherit" the same (last-wins) old node — selection stuck on the
+        // wrong tile after add/reorder. kth block of an id now gets the kth
+        // old state (ordered by slot so the queue is deterministic).
+        Map<Integer, java.util.ArrayDeque<Node>> oldByPluginId = new HashMap<>();
+        {
+            List<Node> oldList = new ArrayList<>();
+            for (Node old : oldNodes.values()) {
+                if (old != null && !old.isAnchor()) oldList.add(old);
+            }
+            oldList.sort(java.util.Comparator.comparingInt(o -> o.id));
+            for (Node old : oldList) {
+                oldByPluginId.computeIfAbsent(old.pluginId, k -> new java.util.ArrayDeque<>()).addLast(old);
             }
         }
         
@@ -578,7 +587,18 @@ public class SignalChainCanvasView extends View {
             // Preserve selection AND position from previous layout, or place new block right after the last block.
             // Bypass LEDs always re-read the engine: preset restores toggle
             // natively, so a stale preserved flag would draw the wrong state.
-            Node old = oldNodesByPluginId.get(n.pluginId);
+            // Prefer the previous node in the SAME slot (stable identity when
+            // nothing moved); fall back to the kth unused old node with the
+            // same plugin id (reorder case). Never "last LV2 block wins".
+            Node old = null;
+            java.util.ArrayDeque<Node> queue = oldByPluginId.get(n.pluginId);
+            Node sameSlot = oldNodes.get(i);
+            if (sameSlot != null && !sameSlot.isAnchor() && sameSlot.pluginId == n.pluginId) {
+                old = sameSlot;
+                if (queue != null) queue.remove(sameSlot);
+            } else if (queue != null) {
+                old = queue.pollFirst();
+            }
             if (old != null) {
                 n.selected = old.selected;
                 // X is canonical slot geometry. Preserving old X after a

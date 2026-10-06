@@ -248,7 +248,8 @@ public final class ParameterFormatter {
                 || compact.equalsIgnoreCase("pct") || compact.equalsIgnoreCase("percent")) return "%";
         if (compact.equalsIgnoreCase("s")) return "s";
         if (compact.equalsIgnoreCase("m")) return "m";
-        if (compact.equalsIgnoreCase("coef")) return "coef";
+        // "coef" (LV2 unit:coef) is a unitless ratio — render bare numbers.
+        if (compact.equalsIgnoreCase("coef")) return "";
         if (compact.equalsIgnoreCase("st") || compact.equalsIgnoreCase("semitone")
                 || compact.equalsIgnoreCase("semitones")) return "semitones";
         if (compact.equalsIgnoreCase("oct") || compact.equalsIgnoreCase("octave")

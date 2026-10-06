@@ -4,27 +4,27 @@
     android:viewportWidth="24"
     android:viewportHeight="24">
 
-    <!-- Noise bursts (3 batang pitch 3u, putih 1u) — digeser +0.5 agar bbox seimbang -->
+    <!-- Threshold line (spans past outer bars) -->
     <path
-        android:pathData="M4.5,9.5 L4.5,14.5 M7.5,7 L7.5,17 M10.5,10 L10.5,14"
+        android:pathData="M4,13 L20,13"
         android:strokeColor="#FB8C00"
         android:strokeWidth="2"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
         android:fillColor="@android:color/transparent" />
 
-    <!-- Gate opens: garis hening -->
+    <!-- Bars above threshold: full / bright (pitch 4u, white 2u) -->
     <path
-        android:pathData="M14,12 L21,12"
+        android:pathData="M6,7.5 L6,13 M10,9.5 L10,13 M14,7 L14,13 M18,8.5 L18,13"
         android:strokeColor="#FB8C00"
         android:strokeWidth="2"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
         android:fillColor="@android:color/transparent" />
 
-    <!-- Ghost threshold (span mengikuti flat agar centroid R2 pusat) -->
+    <!-- Bars below threshold: faded ghost (same direction for butt-continuation) -->
     <path
-        android:pathData="M13.5,19.5 L21,19.5"
+        android:pathData="M6,13 L6,17 M10,13 L10,16 M14,13 L14,17.5 M18,13 L18,16.5"
         android:strokeColor="#FB8C00"
         android:strokeWidth="1.2"
         android:strokeLineCap="round"

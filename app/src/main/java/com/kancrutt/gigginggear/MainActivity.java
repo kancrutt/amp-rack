@@ -4653,7 +4653,12 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                         sliderRowLvl.setGravity(Gravity.CENTER_VERTICAL);
                         sliderRowLvl.setPadding(Math.round(12 * density), Math.round(12 * density), Math.round(12 * density), Math.round(12 * density));
                         sliderRowLvl.setBackgroundResource(R.drawable.glass_card_bg);
-                        LinearLayout.LayoutParams rowLpLvl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                        LinearLayout.LayoutParams rowLpLvl = new LinearLayout.LayoutParams(
+                                // Fixed width: inside the horizontal LEVEL strip
+                                // MATCH_PARENT rows progressively starved each
+                                // other (round-4 dump: "DRY" label 21x61 px —
+                                // one glyph per line). Scroll shows the rest.
+                                Math.round(190 * density), ViewGroup.LayoutParams.WRAP_CONTENT);
                         rowLpLvl.setMargins(0, Math.round(4 * density), 0, Math.round(4 * density));
                         sliderRowLvl.setLayoutParams(rowLpLvl);
                         sliderRowLvl.setMinimumHeight(Math.round(48 * density));

@@ -4,29 +4,11 @@
     android:viewportWidth="24"
     android:viewportHeight="24">
 
-    <!-- Waveform: full sine entering, compressed flat in middle, exits -->
+    <!-- Loud in (tall) to tame out (small) — dynamics reduction -->
     <path
-        android:pathData="M2,12 L4,12 L5.5,5 L7,12 L8.5,19 L10,12 L11,8.5 L12,8.5 L13,8.5 L14,12 L15,15.5 L16,15.5 L17,15.5 L18,12 L20,12 L22,12"
+        android:pathData="M2,12 L3.5,12 L4.5,6 L6,6 L7,18 L8.5,18 L9.5,6 L11,6 L12,12 L13,9.5 L14,9.5 L15,14.5 L16,14.5 L17,12 L18,12 L22,12"
         android:strokeColor="#FB8C00"
         android:strokeWidth="2"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:fillColor="@android:color/transparent" />
-
-    <!-- Top threshold line -->
-    <path
-        android:pathData="M9,8.5 L19,8.5"
-        android:strokeColor="#FB8C00"
-        android:strokeWidth="1.5"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:fillColor="@android:color/transparent" />
-
-    <!-- Bottom threshold line -->
-    <path
-        android:pathData="M9,15.5 L19,15.5"
-        android:strokeColor="#FB8C00"
-        android:strokeWidth="1.5"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
         android:fillColor="@android:color/transparent" />

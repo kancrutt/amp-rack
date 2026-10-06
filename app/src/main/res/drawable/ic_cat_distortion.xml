@@ -4,31 +4,13 @@
     android:viewportWidth="24"
     android:viewportHeight="24">
 
-    <!-- Clipped waveform -->
+    <!-- Soft-clipped waveform: flat-chopped peaks at the ceiling -->
     <path
-        android:pathData="M2,12 L5,12 L6.5,6.5 L9,6.5 L9,17.5 L11.5,17.5 L11.5,6.5 L14,6.5 L14,17.5 L16.5,17.5 L16.5,6.5 L18,6.5 L19,12 L22,12"
+        android:pathData="M2,12 L4,12 L5,6.5 L8,6.5 L9,12 L10,6.5 L13,6.5 L14,12 L16,12 L22,12"
         android:strokeColor="#FF6D00"
         android:strokeWidth="2"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
         android:fillColor="@android:color/transparent" />
-
-    <!-- Upper clip threshold line -->
-    <path
-        android:pathData="M4,6.5 L20,6.5"
-        android:strokeColor="#FF6D00"
-        android:strokeWidth="1"
-        android:strokeLineCap="round"
-        android:fillColor="@android:color/transparent"
-        android:strokeAlpha="0.4" />
-
-    <!-- Lower clip threshold line -->
-    <path
-        android:pathData="M4,17.5 L20,17.5"
-        android:strokeColor="#FF6D00"
-        android:strokeWidth="1"
-        android:strokeLineCap="round"
-        android:fillColor="@android:color/transparent"
-        android:strokeAlpha="0.4" />
 
 </vector>

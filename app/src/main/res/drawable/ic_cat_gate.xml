@@ -4,22 +4,32 @@
     android:viewportWidth="24"
     android:viewportHeight="24">
 
-    <!-- Waveform: loud on sides, gated silence (flat) in middle -->
+    <!-- Noise bursts on the left -->
     <path
-        android:pathData="M2,12 L4,12 L5,7 L6,17 L7,8 L8,16 L9,12 L10,12 L11,12 L12,12 L13,12 L14,12 L15,8 L16,16 L17,7 L18,17 L19,12 L22,12"
+        android:pathData="M2,9.5 L2,12 L2.6,12 L2.6,8 L3.2,8 L3.2,12.5 L3.8,12.5 L3.8,9 L4.4,9 L4.4,12 L5,12"
         android:strokeColor="#FB8C00"
         android:strokeWidth="2"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
         android:fillColor="@android:color/transparent" />
 
-    <!-- Threshold line -->
+    <!-- Dead-flat gated silence to the right -->
     <path
-        android:pathData="M2,10 L22,10"
+        android:pathData="M6,12 L22,12"
+        android:strokeColor="#FB8C00"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="@android:color/transparent" />
+
+    <!-- Faint threshold baseline below the signal -->
+    <path
+        android:pathData="M2,17.5 L22,17.5"
         android:strokeColor="#FB8C00"
         android:strokeWidth="1"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
-        android:fillColor="@android:color/transparent" />
+        android:fillColor="@android:color/transparent"
+        android:strokeAlpha="0.4" />
 
 </vector>

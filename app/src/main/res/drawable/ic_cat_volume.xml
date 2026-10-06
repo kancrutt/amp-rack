@@ -6,70 +6,25 @@
 
     <!-- Fader track (vertical) -->
     <path
-        android:pathData="M12,4 L12,20"
-        android:strokeColor="#00897B"
-        android:strokeWidth="1.5"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:fillColor="@android:color/transparent" />
-
-    <!-- Fader knob (horizontal bar) -->
-    <path
-        android:pathData="M9,12 L15,12"
-        android:strokeColor="#00897B"
-        android:strokeWidth="3"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:fillColor="@android:color/transparent" />
-
-    <!-- Left arrow shaft -->
-    <path
-        android:pathData="M3,12 L6,12"
+        android:pathData="M12,3 L12,21"
         android:strokeColor="#00897B"
         android:strokeWidth="2"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
         android:fillColor="@android:color/transparent" />
 
-    <!-- Left arrow head top -->
+    <!-- Fader knob + range arrow shafts -->
     <path
-        android:pathData="M3,12 L5,10"
+        android:pathData="M9,12 L15,12 M3,12 L6,12 M18,12 L21,12"
         android:strokeColor="#00897B"
         android:strokeWidth="2"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
         android:fillColor="@android:color/transparent" />
 
-    <!-- Left arrow head bottom -->
+    <!-- Range arrow heads -->
     <path
-        android:pathData="M3,12 L5,14"
-        android:strokeColor="#00897B"
-        android:strokeWidth="2"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:fillColor="@android:color/transparent" />
-
-    <!-- Right arrow shaft -->
-    <path
-        android:pathData="M18,12 L21,12"
-        android:strokeColor="#00897B"
-        android:strokeWidth="2"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:fillColor="@android:color/transparent" />
-
-    <!-- Right arrow head top -->
-    <path
-        android:pathData="M21,12 L19,10"
-        android:strokeColor="#00897B"
-        android:strokeWidth="2"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:fillColor="@android:color/transparent" />
-
-    <!-- Right arrow head bottom -->
-    <path
-        android:pathData="M21,12 L19,14"
+        android:pathData="M3,12 L5,10 M3,12 L5,14 M21,12 L19,10 M21,12 L19,14"
         android:strokeColor="#00897B"
         android:strokeWidth="2"
         android:strokeLineCap="round"

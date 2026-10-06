@@ -31,8 +31,8 @@ public class CategoryHelper {
         EQ("EQ", COLOR_EQ, R.drawable.ic_cat_eq, R.drawable.sl_cat_eq),
         PITCH("PITCH", COLOR_PITCH, R.drawable.ic_cat_pitch, R.drawable.sl_cat_pitch),
         WAH("WAH", COLOR_WAH, R.drawable.ic_cat_wah, R.drawable.sl_cat_wah),
-        UTILITY("UTILITY", COLOR_ROUTING, R.drawable.ic_routing_split, R.drawable.sl_cat_volume),
-        UNKNOWN("UNKNOWN", COLOR_DEFAULT, R.drawable.ic_cat_volume, R.drawable.sl_cat_volume),
+        UTILITY("UTILITY", COLOR_ROUTING, R.drawable.ic_cat_utility, R.drawable.sl_cat_utility),
+        UNKNOWN("UNKNOWN", COLOR_DEFAULT, R.drawable.ic_cat_volume, R.drawable.sl_cat_unknown),
         GATE("GATE", COLOR_GATE, R.drawable.ic_cat_gate, R.drawable.sl_cat_gate),
         // Routing utilities (not audio effects): neutral/uncolored treatment,
         // same convention as CABINET staying uncolored.

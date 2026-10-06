@@ -229,6 +229,14 @@
     <color name="cat_gate_active">#F4A261</color>
     <color name="cat_gate_inactive">#634125</color>
 
+    <!-- ── Utility ── neutral gray (COLOR_ROUTING) ── -->
+    <color name="cat_utility_active">#8F94A0</color>
+    <color name="cat_utility_inactive">#494C54</color>
+
+    <!-- ── Unknown ── neutral gray (COLOR_DEFAULT) ── -->
+    <color name="cat_unknown_active">#8F94A0</color>
+    <color name="cat_unknown_inactive">#494C54</color>
+
     <!-- ── Nav icon tint (neutral) ── -->
     <color name="nav_icon_inactive">#6C6C70</color>
     <color name="nav_icon_active">#FFAA00</color>

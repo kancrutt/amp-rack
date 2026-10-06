@@ -38,7 +38,7 @@ public class CategoryIconLintTest {
     static final String[] FAMILY = {
             "ic_cat_amp", "ic_cat_cabinet", "ic_cat_distortion", "ic_cat_dynamics",
             "ic_cat_eq", "ic_cat_gate", "ic_cat_modulation", "ic_cat_pitch",
-            "ic_cat_reverb", "ic_cat_volume", "ic_cat_wah", "ic_cat_delay",
+            "ic_cat_reverb", "ic_cat_volume", "ic_cat_utility", "ic_cat_wah", "ic_cat_delay",
             "ic_routing_split", "ic_routing_merge",
     };
 

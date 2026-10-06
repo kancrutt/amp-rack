@@ -4,73 +4,27 @@
     android:viewportWidth="24"
     android:viewportHeight="24">
 
-    <!-- Chassis -->
+    <!-- Chassis (y3-17) + panel divider + legs, one stroke path -->
     <path
-        android:pathData="M4.5,4 L19.5,4 C20.33,4 21,4.67 21,5.5 L21,12.5 C21,13.33 20.33,14 19.5,14 L4.5,14 C3.67,14 3,13.33 3,12.5 L3,5.5 C3,4.67 3.67,4 4.5,4 Z"
+        android:pathData="M4.5,3 L19.5,3 C20.33,3 21,3.67 21,4.5 L21,15.5 C21,16.33 20.33,17 19.5,17 L4.5,17 C3.67,17 3,16.33 3,15.5 L3,4.5 C3,3.67 3.67,3 4.5,3 Z M3,10 L21,10 M7,17 L7,20.5 M17,17 L17,20.5"
         android:strokeColor="#E53935"
         android:strokeWidth="2"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
         android:fillColor="@android:color/transparent" />
 
-    <!-- Horizontal divider -->
+    <!-- Knobs (filled, upper panel) -->
     <path
-        android:pathData="M3,9 L21,9"
+        android:pathData="M7,5 A1.5,1.5 0 1,1 7,8 A1.5,1.5 0 1,1 7,5 Z M12,5 A1.5,1.5 0 1,1 12,8 A1.5,1.5 0 1,1 12,5 Z M17,5 A1.5,1.5 0 1,1 17,8 A1.5,1.5 0 1,1 17,5 Z"
+        android:fillColor="#E53935"
         android:strokeColor="#E53935"
-        android:strokeWidth="2"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:fillColor="@android:color/transparent" />
+        android:strokeWidth="0" />
 
-    <!-- Knob dots -->
+    <!-- Grille lines (lower panel, sw1.5) -->
     <path
-        android:pathData="M7,6.5 L7.01,6.5"
-        android:strokeColor="#E53935"
-        android:strokeWidth="2.5"
-        android:strokeLineCap="round"
-        android:fillColor="@android:color/transparent" />
-
-    <path
-        android:pathData="M12,6.5 L12.01,6.5"
-        android:strokeColor="#E53935"
-        android:strokeWidth="2.5"
-        android:strokeLineCap="round"
-        android:fillColor="@android:color/transparent" />
-
-    <path
-        android:pathData="M17,6.5 L17.01,6.5"
-        android:strokeColor="#E53935"
-        android:strokeWidth="2.5"
-        android:strokeLineCap="round"
-        android:fillColor="@android:color/transparent" />
-
-    <!-- Grille lines -->
-    <path
-        android:pathData="M6,11 L18,11"
+        android:pathData="M6,13 L18,13 M6,15 L18,15"
         android:strokeColor="#E53935"
         android:strokeWidth="1.5"
-        android:strokeLineCap="round"
-        android:fillColor="@android:color/transparent" />
-
-    <path
-        android:pathData="M6,13 L18,13"
-        android:strokeColor="#E53935"
-        android:strokeWidth="1.5"
-        android:strokeLineCap="round"
-        android:fillColor="@android:color/transparent" />
-
-    <!-- Legs -->
-    <path
-        android:pathData="M7,14 L7,16"
-        android:strokeColor="#E53935"
-        android:strokeWidth="2"
-        android:strokeLineCap="round"
-        android:fillColor="@android:color/transparent" />
-
-    <path
-        android:pathData="M17,14 L17,16"
-        android:strokeColor="#E53935"
-        android:strokeWidth="2"
         android:strokeLineCap="round"
         android:fillColor="@android:color/transparent" />
 

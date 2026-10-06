@@ -3796,14 +3796,49 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         Log.d(TAG, "saveActivePreset: Saved preset: " + preset);
     }
 
+    /** Order-sensitive block-identity fingerprint ("count|name;name;…") of
+     * the live engine chain. Used to skip redundant preset restores. */
+    String engineChainSignature() {
+        StringBuilder sb = new StringBuilder();
+        try {
+            int n = AudioEngine.getActivePlugins();
+            sb.append(n).append("|");
+            for (int i = 0; i < n; i++) {
+                String nm = "?";
+                try { nm = AudioEngine.getActivePluginName(i); } catch (Exception ignored) {}
+                sb.append(nm == null ? "?" : nm).append(";");
+            }
+        } catch (Exception ignored) {}
+        return sb.toString();
+    }
+
+    /** Same fingerprint for a schema-v1 snapshot JSON ("plugins[].name").
+     * Returns "" when the JSON cannot be parsed (never skip in that case). */
+    String snapshotChainSignature(String presetJson) {
+        try {
+            JSONObject root = new JSONObject(presetJson);
+            JSONArray arr = root.optJSONArray("plugins");
+            if (arr == null) return "";
+            StringBuilder sb = new StringBuilder();
+            sb.append(arr.length()).append("|");
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject b = arr.optJSONObject(i);
+                sb.append(b != null ? b.optString("name", "?") : "?").append(";");
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
     void loadActivePreset() {
         if (safeMode) {
             Log.d(TAG, "loadActivePreset: skipping loading preset");
             return;
         }
-        
+
         loadGlobalMidi();
-        
+
         SharedPreferences sharedPreferences = getPreferences(MODE_PRIVATE);
         String preset = sharedPreferences.getString("activePreset", null);
         AudioEngine.toggleMixer(sharedPreferences.getBoolean("toggleMixer", true));
@@ -3811,6 +3846,16 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
         if (preset != null && !preset.trim().isEmpty()) {
             Log.d(TAG, "loadActivePreset: " + preset);
+            // Round-5 K1: this runs on onResume/engine-start/Rack-create, so an
+            // unconditional rebuild wiped freshly-added blocks (and caused the
+            // double LOADPLUGIN batches at every cold start). Skip when the
+            // live chain already matches the snapshot block-for-block.
+            String liveSig = engineChainSignature();
+            String snapSig = snapshotChainSignature(preset);
+            if (!liveSig.isEmpty() && liveSig.equals(snapSig)) {
+                Log.i(TAG, "preset restore skipped, chain already matches snapshot");
+                return;
+            }
             // saveActivePreset now stores a schema-v1 snapshot ("plugins").
             // Route it through the Map loader (model files, T3K meta,
             // positions); legacy strings fall through to the String loader.
@@ -4646,22 +4691,19 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     final boolean fIsInt = isIntegerParam;
 
                     if (isLevelControl) {
-                        // Level controls use the same horizontal slider row as
-                        // tone controls (lastworks build: all controls are sliders)
+                        // Level cards are stacked vertically (label on top,
+                        // controls below) so they fit the adaptive 2-column
+                        // grid. Previously a horizontal [label .44 | slider |
+                        // value] strip starved labels ("DRY" at 21px wide).
                         LinearLayout sliderRowLvl = new LinearLayout(this);
-                        sliderRowLvl.setOrientation(LinearLayout.HORIZONTAL);
-                        sliderRowLvl.setGravity(Gravity.CENTER_VERTICAL);
-                        sliderRowLvl.setPadding(Math.round(12 * density), Math.round(12 * density), Math.round(12 * density), Math.round(12 * density));
+                        sliderRowLvl.setOrientation(LinearLayout.VERTICAL);
+                        sliderRowLvl.setGravity(Gravity.START);
+                        sliderRowLvl.setPadding(Math.round(12 * density), Math.round(10 * density), Math.round(12 * density), Math.round(10 * density));
                         sliderRowLvl.setBackgroundResource(R.drawable.glass_card_bg);
-                        LinearLayout.LayoutParams rowLpLvl = new LinearLayout.LayoutParams(
-                                // Fixed width: inside the horizontal LEVEL strip
-                                // MATCH_PARENT rows progressively starved each
-                                // other (round-4 dump: "DRY" label 21x61 px —
-                                // one glyph per line). Scroll shows the rest.
-                                Math.round(190 * density), ViewGroup.LayoutParams.WRAP_CONTENT);
+                        LinearLayout.LayoutParams rowLpLvl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
                         rowLpLvl.setMargins(0, Math.round(4 * density), 0, Math.round(4 * density));
                         sliderRowLvl.setLayoutParams(rowLpLvl);
-                        sliderRowLvl.setMinimumHeight(Math.round(48 * density));
+                        sliderRowLvl.setMinimumHeight(Math.round(56 * density));
 
                         TextView labelView = new TextView(this);
                         labelView.setText(cName.toUpperCase());
@@ -4674,9 +4716,9 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                         labelView.setMinLines(1);
                         labelView.setEllipsize(android.text.TextUtils.TruncateAt.END);
                         if (jakartaFont != null) labelView.setTypeface(jakartaFont, android.graphics.Typeface.BOLD);
-                        LinearLayout.LayoutParams nameLp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 0.44f);
-                        nameLp.setMarginEnd(Math.round(12 * density));
-                        nameLp.gravity = Gravity.CENTER_VERTICAL;
+                        LinearLayout.LayoutParams nameLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                        nameLp.setMarginEnd(0);
+                        nameLp.gravity = Gravity.START;
                         labelView.setLayoutParams(nameLp);
 
                         final int progressMaxLvl = 10000;
@@ -4766,8 +4808,13 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                         labelView.setOnClickListener(manualInputClickLvl);
 
                         sliderRowLvl.addView(labelView);
-                        sliderRowLvl.addView(seekBarLvl);
-                        sliderRowLvl.addView(valView);
+                        LinearLayout controlRow = new LinearLayout(this);
+                        controlRow.setOrientation(LinearLayout.HORIZONTAL);
+                        controlRow.setGravity(Gravity.CENTER_VERTICAL);
+                        controlRow.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+                        sliderRowLvl.addView(controlRow);
+                        controlRow.addView(seekBarLvl);
+                        controlRow.addView(valView);
                         levelCells.add(sliderRowLvl);
                     } else {
                         // Tone / FX controls: proportional layout — safe padding, no mepet/cut, aligned with slider
@@ -4959,9 +5006,38 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     }
                 }
 
-                // Populate LEVEL container
-                for (LinearLayout cell : levelCells) {
-                    levelContainer.addView(cell);
+                // Populate LEVEL container as an adaptive 2-column grid:
+                // rows = ceil(N/2), equal shares that fill the panel height
+                // (round-5: a horizontal 190dp strip left 79% dead space).
+                // Past 2 rows the panel scrolls; the first two rows are always
+                // fully visible without scrolling.
+                levelContainer.setOrientation(LinearLayout.VERTICAL);
+                levelContainer.setGravity(Gravity.NO_GRAVITY);
+                LinearLayout gridRowLvl = null;
+                for (int ciLvl = 0; ciLvl < levelCells.size(); ciLvl++) {
+                    LinearLayout cell = levelCells.get(ciLvl);
+                    if (ciLvl % 2 == 0) {
+                        gridRowLvl = new LinearLayout(this);
+                        gridRowLvl.setOrientation(LinearLayout.HORIZONTAL);
+                        LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(
+                                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f);
+                        rlp.setMargins(0, ciLvl == 0 ? 0 : Math.round(8 * density), 0, 0);
+                        gridRowLvl.setLayoutParams(rlp);
+                        gridRowLvl.setMinimumHeight(Math.round(72 * density));
+                        levelContainer.addView(gridRowLvl);
+                    }
+                    LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(
+                            0, ViewGroup.LayoutParams.MATCH_PARENT, 1f);
+                    if (ciLvl % 2 == 0) clp.setMarginEnd(Math.round(4 * density));
+                    else clp.setMarginStart(Math.round(4 * density));
+                    cell.setLayoutParams(clp);
+                    gridRowLvl.addView(cell);
+                }
+                if (levelCells.size() % 2 == 1 && gridRowLvl != null) {
+                    View padLvl = new View(this);
+                    padLvl.setLayoutParams(new LinearLayout.LayoutParams(
+                            0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
+                    gridRowLvl.addView(padLvl);
                 }
 
                 // Populate CONTROLS container as a vertical list of sleek slider rows
@@ -5378,6 +5454,16 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     }
 
     void loadPreset(String preset) {
+        // Round-5 K1 visibility: a restore rebuilds the whole chain, so any
+        // engine block absent from the incoming preset is wiped. Log it.
+        {
+            String liveSig = engineChainSignature();
+            String snapSig = snapshotChainSignature(preset);
+            if (!liveSig.isEmpty() && !snapSig.isEmpty() && !liveSig.equals(snapSig)) {
+                Log.w(TAG, "preset restore replaces live chain (" + liveSig
+                        + ") with snapshot (" + snapSig + ")");
+            }
+        }
         // Bypass is released in finally: any exception escaping the body used
         // to wedge bypass stuck true = whole chain silent until the next load.
         AudioEngine.bypass(true);
@@ -7386,8 +7472,11 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         int cap = parallel ? MAX_PARALLEL_BLOCKS : MAX_SERIES_BLOCKS;
         if (n >= cap) {
             Log.w(TAG, "chain full (" + n + " blocks), refusing " + pluginName);
-            toast(parallel ? "Chain full (" + cap + " blocks max) — remove one first"
-                    : "Chain full (10 series max) — split a branch or remove one");
+            // Name the rejected plugin: Android silently suppresses repeated
+            // identical toasts, and the round-5 device agent observed a
+            // rack-full attempt with "zero feedback".
+            toast("Rack full (" + cap + " blocks) — " + pluginName
+                    + " not added. Remove or bypass a block first.");
             return false;
         }
         return true;
@@ -7508,7 +7597,13 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 //        Log.d(TAG, "addPluginByName: " + pluginName);
         if (availablePluginsLV2 != null) Log.d(TAG, "addPluginByName: " + availablePluginsLV2.toString());
         JSONObject plugins = availablePluginsLV2;
-        if (plugins == null) { Log.e(TAG, "availablePluginsLV2 is null for " + pluginName); return; }
+        if (plugins == null) {
+            // Round-5 K2: catalog scan lands ~1.5s after launch; a `+` tap
+            // before that used to die silently.
+            Log.w(TAG, "addLV2 refused name=" + pluginName + " reason=scan-incomplete");
+            toast("Plugin catalog is still loading — try again in a moment");
+            return;
+        }
         Iterator<String> keys = plugins.keys();
 
         while (keys.hasNext()) {
@@ -7561,7 +7656,8 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             }
         }
 
-        Log.e(TAG, "[LV2] addPluginByName: unable to find plugin name " + pluginName);
+        Log.w(TAG, "add refused name=" + pluginName + " reason=not-in-loaded-catalog");
+        toast("Couldn't find " + pluginName + " in the plugin catalog");
     }
 
     static public String readAssetFile(Context context, String filename) {

@@ -23,7 +23,10 @@ public class GuitarPluginCatalogTest {
         loadBundledCatalog();
         // Phase-2 additions that the legacy name-token gate missed.
         assertTrue(GuitarPluginCatalog.isCurated("the infamous octolo"));
-        assertTrue(GuitarPluginCatalog.isCurated("octolo"));
+        // Round-5 dedup: the bare "octolo" duplicate (lv2_plugins key 24200,
+        // identical .so/index) was removed from the curated names list —
+        // exactly ONE picker tile may remain for that library.
+        assertFalse(GuitarPluginCatalog.isCurated("octolo"));
         assertTrue(GuitarPluginCatalog.isCurated("the infamous Hip2B"));
         assertTrue(GuitarPluginCatalog.isCurated("the infamous ewham"));
         assertTrue(GuitarPluginCatalog.isCurated("the infamous mindi"));
@@ -70,7 +73,10 @@ public class GuitarPluginCatalogTest {
         assertTrue("blacklist asset missing at " + bl.getAbsolutePath(), bl.exists());
         GuitarPluginCatalog.loadBlacklistFromJson(
                 new String(Files.readAllBytes(bl.toPath()), "UTF-8"));
-        assertTrue(GuitarPluginCatalog.isCurated("octolo"));
+        // Round-5 dedup: bare "octolo" left the curated names list entirely;
+        // only "the infamous octolo" remains curated.
+        assertFalse(GuitarPluginCatalog.isCurated("octolo"));
+        assertTrue(GuitarPluginCatalog.isCurated("the infamous octolo"));
 
         // A non-empty blacklist hides even curated names, case-insensitively;
         // entries with value 0 are ignored.

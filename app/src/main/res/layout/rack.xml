@@ -485,19 +485,19 @@
                             android:textStyle="bold"
                             android:fontFamily="@font/plus_jakarta_sans" />
 
-                        <HorizontalScrollView
-                            android:layout_width="wrap_content"
+                        <androidx.core.widget.NestedScrollView
+                            android:layout_width="match_parent"
                             android:layout_height="match_parent"
                             android:fillViewport="true"
                             android:scrollbars="none">
 
                             <LinearLayout
                                 android:id="@+id/container_level_knobs"
-                                android:layout_width="wrap_content"
+                                android:layout_width="match_parent"
                                 android:layout_height="match_parent"
-                                android:gravity="center_vertical"
-                                android:orientation="horizontal" />
-                        </HorizontalScrollView>
+                                android:gravity="top"
+                                android:orientation="vertical" />
+                        </androidx.core.widget.NestedScrollView>
                     </LinearLayout>
 
                     <!-- TONE / CONTROLS Panel (expands to fit available parameters) -->

@@ -4,9 +4,9 @@
     android:viewportWidth="24"
     android:viewportHeight="24">
 
-    <!-- Soft-clipped waveform: flat-chopped peaks at the ceiling -->
+    <!-- Signal hitting the ceiling: chop atas + bawah (clip kedua arah) -->
     <path
-        android:pathData="M2,12 L4,12 L5,6.5 L8,6.5 L9,12 L10,6.5 L13,6.5 L14,12 L16,12 L22,12"
+        android:pathData="M3,12 L5,12 L6.5,6.5 L9.5,6.5 L11,12 L12.5,17.5 L15.5,17.5 L17,12 L21,12"
         android:strokeColor="#FF6D00"
         android:strokeWidth="2"
         android:strokeLineCap="round"

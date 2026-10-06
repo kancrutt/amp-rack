@@ -4,29 +4,29 @@
     android:viewportWidth="24"
     android:viewportHeight="24">
 
-    <!-- Noise bursts on the left -->
+    <!-- Noise bursts (3 batang pitch 3u, putih 1u) — digeser +0.5 agar bbox seimbang -->
     <path
-        android:pathData="M2,9.5 L2,12 L2.6,12 L2.6,8 L3.2,8 L3.2,12.5 L3.8,12.5 L3.8,9 L4.4,9 L4.4,12 L5,12"
+        android:pathData="M4.5,9.5 L4.5,14.5 M7.5,7 L7.5,17 M10.5,10 L10.5,14"
         android:strokeColor="#FB8C00"
         android:strokeWidth="2"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
         android:fillColor="@android:color/transparent" />
 
-    <!-- Dead-flat gated silence to the right -->
+    <!-- Gate opens: garis hening -->
     <path
-        android:pathData="M6,12 L22,12"
+        android:pathData="M14,12 L21,12"
         android:strokeColor="#FB8C00"
         android:strokeWidth="2"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
         android:fillColor="@android:color/transparent" />
 
-    <!-- Faint threshold baseline below the signal -->
+    <!-- Ghost threshold (span mengikuti flat agar centroid R2 pusat) -->
     <path
-        android:pathData="M2,17.5 L22,17.5"
+        android:pathData="M13.5,19.5 L21,19.5"
         android:strokeColor="#FB8C00"
-        android:strokeWidth="1"
+        android:strokeWidth="1.2"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
         android:fillColor="@android:color/transparent"

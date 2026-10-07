@@ -5032,11 +5032,10 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 // (round-5: a horizontal 190dp strip left 79% dead space).
                 // Past 2 rows the panel scrolls; the first two rows are always
                 // fully visible without scrolling.
-                // Round-9 R5.1: columns = min(N,2). A single LEVEL param
-                // (Cabinet IV GAIN) got a half-width card + ~180px slider with
-                // the other half of the section empty; it now stretches full
-                // width. Multi-param grids keep the round-6 2-column layout.
-                final int colsLvl = Math.max(1, Math.min(levelCells.size(), 2));
+                // Round-10 R6.1: single full-width column for all LEVEL params
+                // (Cab IV n=1 was fixed in R9; Octolo 4-param etc. now stack
+                // vertically so each slider gets the full ~710px track width).
+                final int colsLvl = 1;
                 levelContainer.setOrientation(LinearLayout.VERTICAL);
                 levelContainer.setGravity(Gravity.NO_GRAVITY);
                 LinearLayout gridRowLvl = null;
@@ -7063,7 +7062,9 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
          android.widget.PopupWindow popup = new android.widget.PopupWindow(this);
          LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
-        content.setBackgroundResource(R.drawable.glass_card_bg);
+        // Round-10 R6.2: opaque dark surface (~#161a1f) like other panels,
+        // not the semi-transparent glass_card_bg that let rack text bleed through.
+        content.setBackgroundColor(Color.parseColor("#161A1F"));
         // 1px transparent frame so the popup window is focusable and outside
         // touches dismiss it (PopupWindow needs a non-null background for that).
         popup.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(0));

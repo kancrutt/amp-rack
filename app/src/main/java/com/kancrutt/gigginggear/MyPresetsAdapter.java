@@ -279,6 +279,20 @@ public class MyPresetsAdapter extends RecyclerView.Adapter<MyPresetsAdapter.View
                 try { mainActivity.syncTopBarPresetInfo(position + 1); } catch (Exception ignore) {}
             }
             MainActivity.toast("Loaded preset " + fPresetName);
+
+            // Round-7 user requirement (R5): a LOAD on the Preset tab must
+            // land on the Board so the new chain is immediately visible —
+            // loadPreset() above is synchronous, so the chain is already
+            // applied. Tab switching is show/hide, not replace(): no rack
+            // rebuild, no restore race. Failed loads still switch too (the
+            // error toast already fired inside loadPreset). The quick page
+            // keeps legacy in-place behavior.
+            if (!quick) {
+                View bottom = mainActivity.findViewById(R.id.bottom_navigation);
+                if (bottom instanceof com.google.android.material.navigation.NavigationBarView)
+                    ((com.google.android.material.navigation.NavigationBarView) bottom)
+                            .setSelectedItemId(R.id.page_rack);
+            }
         };
         holder.quickLoad.setOnClickListener(loadListener);
         // Whole row is the tap target (list interaction model)

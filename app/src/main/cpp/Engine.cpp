@@ -612,7 +612,7 @@ void Engine::reinitPluginsAtSampleRate() {
     // mid-callback -> SEGV @0x0 on the DSP worker. Lock the same pair
     // (plugins -> chain) as buildPluginChain, in that order.
     std::unique_lock<std::mutex> pluginLock(activePluginsMutex);
-    std::unique_lock<std::mutex> chainLock(mFullDuplexPass.chainMutex, std::defer_lock);
+    std::unique_lock<std::mutex> chainLock(mFullDuplexPass.chainMutex);
     if (mSampleRate <= 0) {
         LOGD("reinitPluginsAtSampleRate: no valid sample rate yet, skipping");
         OUT ; return ;

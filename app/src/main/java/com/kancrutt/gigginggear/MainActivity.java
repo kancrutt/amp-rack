@@ -5069,10 +5069,21 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     gridRowLvl.addView(padLvl);
                 }
 
-                // Populate CONTROLS container as a vertical list of sleek slider rows
+                // Populate CONTROLS container as a vertical list of sleek slider rows.
+                // Rows take vertical weight so that with few parameters the extra
+                // panel height is shared out evenly (round-8 R4: one GAIN row
+                // pinned to the top of a 600px panel left ~65% dead space below).
+                // fillViewport stretches the container only when content is
+                // short, so tall lists still scroll.
                 toneContainer.setOrientation(LinearLayout.VERTICAL);
                 toneContainer.setGravity(Gravity.NO_GRAVITY);
                 for (LinearLayout cell : toneCells) {
+                    if (cell.getLayoutParams() instanceof LinearLayout.LayoutParams) {
+                        LinearLayout.LayoutParams trlp =
+                                (LinearLayout.LayoutParams) cell.getLayoutParams();
+                        trlp.weight = 1f;
+                        cell.setLayoutParams(trlp);
+                    }
                     toneContainer.addView(cell);
                 }
 
@@ -5084,10 +5095,10 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     levelPanel.setVisibility(hasLevel ? View.VISIBLE : View.GONE);
                 }
 
-                // When BOTH columns show, give them bounded shares. panel_level
-                // is wrap_content and grew with every knob (octolo: 4 slider
-                // cards), starving panel_tone (weight=1) down to a ~38px sliver
-                // where "Sequence" wrapped one character per line.
+                // When BOTH columns show, share the width evenly (round-8 R4:
+                // the old 1:2 split left a fixed 34:66 ratio with ~550-600px
+                // label-to-value gaps in CONTROLS and dead space beside small
+                // LEVEL grids regardless of content).
                 if (levelPanel != null && tonePanel != null
                         && levelPanel.getLayoutParams() instanceof LinearLayout.LayoutParams
                         && tonePanel.getLayoutParams() instanceof LinearLayout.LayoutParams) {
@@ -5099,7 +5110,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                         lllp.width = 0;
                         lllp.weight = 1f;
                         tllp.width = 0;
-                        tllp.weight = 2f;
+                        tllp.weight = 1f;
                     } else {
                         lllp.width = ViewGroup.LayoutParams.WRAP_CONTENT;
                         lllp.weight = 0f;

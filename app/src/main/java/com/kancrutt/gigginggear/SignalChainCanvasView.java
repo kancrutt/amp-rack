@@ -344,6 +344,16 @@ public class SignalChainCanvasView extends View {
         invalidate();
     }
 
+    /** Highlight the tile at a chain slot (post-load order matches engine
+     *  order). selectNode takes a pluginId, which is shared by duplicate LV2
+     *  blocks and unrelated to slot indexes — add-flows need this one. */
+    public void selectSlot(int slot) {
+        for (int i = 0; i < nodes.size(); i++) {
+            nodes.get(i).selected = (i == slot);
+        }
+        invalidate();
+    }
+
     public void setOnNodeSelectedListener(OnNodeSelectedListener l) { this.listener = l; }
     public void setOnChainChangedListener(OnChainChangedListener l) { this.chainChangedListener = l; }
     public void setOnDeleteNodeListener(OnDeleteNodeListener l) { this.deleteNodeListener = l; }

@@ -3154,9 +3154,23 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
         dataAdapter.addItem(pluginID, ret >= 0 ? ret : dataAdapter.getItemCount());
 
+        // OBS-3: the picker's id path added the block but never highlighted it
+        // and never opened its params (the name-path fix didn't cover this
+        // overload). Mirror the addPluginByName behavior: reload the canvas,
+        // select the new tile, populate the parameter panel.
+        final int newSlot = Math.max(0, AudioEngine.getActivePlugins() - 1);
+        String newName = null;
+        try { newName = AudioEngine.getActivePluginName(newSlot); } catch (Exception ignored) {}
+        final String addedName = newName != null ? newName : "";
         try {
             if (signalChainCanvas != null) {
-                signalChainCanvas.post(() -> signalChainCanvas.loadFromActivePlugins());
+                signalChainCanvas.post(() -> {
+                    signalChainCanvas.loadFromActivePlugins();
+                    signalChainCanvas.selectSlot(newSlot);
+                    populateInlineParameterEditor(newSlot, addedName);
+                });
+            } else {
+                populateInlineParameterEditor(newSlot, addedName);
             }
         } catch (Exception e) {
             Log.w(TAG, "addPluginToRack: canvas refresh skipped", e);
@@ -3193,7 +3207,10 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 dataAdapter.addItem(isSplit ? ROUTING_ID_SPLIT : ROUTING_ID_MERGE, n - 1);
             }
             if (signalChainCanvas != null) {
-                signalChainCanvas.post(() -> signalChainCanvas.loadFromActivePlugins());
+                signalChainCanvas.post(() -> {
+                    signalChainCanvas.loadFromActivePlugins();
+                    signalChainCanvas.selectSlot(n - 1);
+                });
             }
             toast(isSplit ? "SPLIT added — chain branches into two paths"
                           : "MERGE added — branches recombine here");
@@ -4716,10 +4733,16 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                         // controls below) so they fit the adaptive 2-column
                         // grid. Previously a horizontal [label .44 | slider |
                         // value] strip starved labels ("DRY" at 21px wide).
+                        // Round-11 OBS-1: horizontal row (label | slider | value)
+                        // like CONTROLS rows. The stacked vertical card made each
+                        // row ~160px, so 4 LEVEL params overflowed the 546px
+                        // section and needed internal scroll on a 1200px-tall
+                        // tablet. Horizontal rows are ~120px -> 4 fit without
+                        // scrolling, and the slider keeps the full-width track.
                         LinearLayout sliderRowLvl = new LinearLayout(this);
-                        sliderRowLvl.setOrientation(LinearLayout.VERTICAL);
-                        sliderRowLvl.setGravity(Gravity.START);
-                        sliderRowLvl.setPadding(Math.round(12 * density), Math.round(10 * density), Math.round(12 * density), Math.round(10 * density));
+                        sliderRowLvl.setOrientation(LinearLayout.HORIZONTAL);
+                        sliderRowLvl.setGravity(Gravity.CENTER_VERTICAL);
+                        sliderRowLvl.setPadding(Math.round(12 * density), Math.round(6 * density), Math.round(12 * density), Math.round(6 * density));
                         sliderRowLvl.setBackgroundResource(R.drawable.glass_card_bg);
                         LinearLayout.LayoutParams rowLpLvl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
                         rowLpLvl.setMargins(0, Math.round(4 * density), 0, Math.round(4 * density));
@@ -4737,9 +4760,9 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                         labelView.setMinLines(1);
                         labelView.setEllipsize(android.text.TextUtils.TruncateAt.END);
                         if (jakartaFont != null) labelView.setTypeface(jakartaFont, android.graphics.Typeface.BOLD);
-                        LinearLayout.LayoutParams nameLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-                        nameLp.setMarginEnd(0);
-                        nameLp.gravity = Gravity.START;
+                        LinearLayout.LayoutParams nameLp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 0.32f);
+                        nameLp.setMarginEnd(Math.round(8 * density));
+                        nameLp.gravity = Gravity.START | Gravity.CENTER_VERTICAL;
                         labelView.setLayoutParams(nameLp);
 
                         final int progressMaxLvl = 10000;
@@ -4828,14 +4851,11 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                         valView.setOnClickListener(manualInputClickLvl);
                         labelView.setOnClickListener(manualInputClickLvl);
 
+                        // Horizontal row now hosts the children directly: drop the
+                        // old inner controlRow wrapper.
                         sliderRowLvl.addView(labelView);
-                        LinearLayout controlRow = new LinearLayout(this);
-                        controlRow.setOrientation(LinearLayout.HORIZONTAL);
-                        controlRow.setGravity(Gravity.CENTER_VERTICAL);
-                        controlRow.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-                        sliderRowLvl.addView(controlRow);
-                        controlRow.addView(seekBarLvl);
-                        controlRow.addView(valView);
+                        sliderRowLvl.addView(seekBarLvl);
+                        sliderRowLvl.addView(valView);
                         levelCells.add(sliderRowLvl);
                     } else {
                         // Tone / FX controls: proportional layout — safe padding, no mepet/cut, aligned with slider
@@ -6229,7 +6249,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         };
 
         final String[] catLabels = {
-                "Amp / Head", "Cabinet", "Overdrive / Dist", "Compressor",
+                "Amp / Head", "Cabinet", "OD/Dist", "Compressor",
                 "Modulation", "Delay", "Reverb", "EQ", "Pitch / Synth",
                 "Wah", "Utility", "Noise Gate"
         };
@@ -6432,7 +6452,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         };
 
         final String[] catLabels = {
-                "Amp / Head", "Cabinet", "Overdrive / Dist", "Compressor",
+                "Amp / Head", "Cabinet", "OD/Dist", "Compressor",
                 "Modulation", "Delay", "Reverb", "EQ", "Pitch / Synth",
                 "Wah", "Utility", "Noise Gate"
         };
@@ -7080,10 +7100,15 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             search.setSingleLine(true);
             search.setTextColor(Color.parseColor("#E6E6E6"));
             search.setHintTextColor(Color.parseColor("#71717A"));
+            // OBS-2: the default underline sat on the glyph descenders (ink
+            // y547-569 vs line y558). Give the field bottom air so the
+            // underline lands below the text and the caret sits after it.
             int pad = Math.round(12 * density);
-            search.setPadding(pad, Math.round(8 * density), pad, 0);
-            content.addView(search, new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            search.setPadding(pad, Math.round(8 * density), pad, Math.round(14 * density));
+            android.widget.LinearLayout.LayoutParams slp = new android.widget.LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            slp.setMargins(pad, Math.round(6 * density), pad, 0);
+            content.addView(search, slp);
         }
 
         android.widget.ListView list = new android.widget.ListView(this);
@@ -7696,7 +7721,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                             // shows AMP").
                             signalChainCanvas.post(() -> {
                                 signalChainCanvas.loadFromActivePlugins();
-                                signalChainCanvas.selectNode(before);
+                                signalChainCanvas.selectSlot(before);
                                 populateInlineParameterEditor(before, name);
                             });
                         }
@@ -7774,7 +7799,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                             // shows AMP").
                             signalChainCanvas.post(() -> {
                                 signalChainCanvas.loadFromActivePlugins();
-                                signalChainCanvas.selectNode(before);
+                                signalChainCanvas.selectSlot(before);
                                 populateInlineParameterEditor(before, name);
                             });
                         }

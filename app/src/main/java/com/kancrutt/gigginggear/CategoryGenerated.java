@@ -69,8 +69,8 @@ public final class CategoryGenerated {
         n.put("c*platex2versatileplatereverb,stereoinputs", "REVERB");
         n.put("c*saturatevariousstaticnonlinearities,8xoversampled", "DISTORTION");
         n.put("c*scapestereodelaywithchromaticresonances", "DELAY");
-        n.put("c*spicenotanexciter", "UTILITY");
-        n.put("c*spicex2notanexcitereither", "UTILITY");
+        n.put("c*spicenotanexciter", "DYNAMICS"); // R11: bass compressor+limiter
+        n.put("c*spicex2notanexcitereither", "DYNAMICS"); // R11: bass compressor+limiter
         n.put("c*tonestackclassicamplifiertonestackemulation", "AMP");
         n.put("chebyshevdistortion", "DISTORTION");
         n.put("combdelayline,cubicsplineinterpolation", "DELAY");
@@ -310,9 +310,9 @@ public final class CategoryGenerated {
         u.put(2598, "DYNAMICS"); // name-rule(no-rdf) :: C* CompressX2 - Stereo compressor and saturating limiter
         u.put(2601, "CABINET"); // name-rule(no-rdf) :: C* CabinetIII - Simplistic loudspeaker cabinet emulation
         u.put(2602, "GATE"); // name-rule(no-rdf) :: C* Noisegate - Attenuating hum and noise
-        u.put(2603, "UTILITY"); // name-rule(no-rdf) :: C* Spice - Not an exciter
+        u.put(2603, "DYNAMICS"); // R11 name-rule(no-rdf) :: C* Spice - Not an exciter
         u.put(2606, "CABINET"); // name-rule(no-rdf) :: C* CabinetIV - Idealised loudspeaker cabinet
-        u.put(2607, "UTILITY"); // name-rule(no-rdf) :: C* SpiceX2 - Not an exciter either
+        u.put(2607, "DYNAMICS"); // R11 name-rule(no-rdf) :: C* SpiceX2 - Not an exciter either
         u.put(2608, "EQ"); // name-rule(no-rdf) :: C* Eq4p - 4-band parametric shelving equaliser
         u.put(2609, "EQ"); // name-rule(no-rdf) :: C* EqFA4p - 4-band parametric eq
         u.put(3301, "UTILITY"); // rdf:UtilityPlugin :: :: Invada :: Input Module
@@ -333,7 +333,7 @@ public final class CategoryGenerated {
         u.put(4065, "CABINET"); // rdf:FrequencyPlugin :: irdsp
         u.put(4066, "AMP"); // rdf:AmplifierPlugin :: ampdsp
         u.put(4067, "DYNAMICS"); // rdf:CompressorPlugin :: comprdsp
-        u.put(4068, "AMP"); // rdf:SimulatorPlugin :: mydsp
+        u.put(4068, "UTILITY"); // R11 hardware-override :: mydsp multi-fx pedal
         u.put(4262, "PITCH"); // name-rule(no-rdf) :: Autotalent
         u.put(9001, "EQ"); // name-rule(no-rdf) :: RT parametric eq
         u.put(9002, "EQ"); // name-rule(no-rdf) :: RT Low Shelf
@@ -408,7 +408,7 @@ public final class CategoryGenerated {
         v.put("harmonicexciter", "DISTORTION");
         v.put("heathkit", "DISTORTION");
         v.put("hfbrightener", "DISTORTION");
-        v.put("hip2b", "DISTORTION");
+        v.put("hip2b", "GATE");
         v.put("hogsfoot", "DISTORTION");
         v.put("hornet", "DISTORTION");
         v.put("hotbox", "DISTORTION");
@@ -460,7 +460,7 @@ public final class CategoryGenerated {
         v.put("metalamp", "AMP");
         v.put("metalhead", "DISTORTION");
         v.put("metaltone", "DISTORTION");
-        v.put("microamp", "UTILITY");
+        v.put("microamp", "DISTORTION");
         v.put("mole", "DISTORTION");
         v.put("muff", "DISTORTION");
         v.put("multibandcompressor", "DYNAMICS");
@@ -480,7 +480,7 @@ public final class CategoryGenerated {
         v.put("poweramps", "AMP");
         v.put("preampimpulses", "AMP");
         v.put("preamps", "AMP");
-        v.put("pushpull", "PITCH");
+        v.put("pushpull", "DISTORTION");
         v.put("quack", "WAH");
         v.put("rangemaster", "DISTORTION");
         v.put("ratatouille", "UTILITY");
@@ -502,8 +502,8 @@ public final class CategoryGenerated {
         v.put("rkrechotron", "DELAY");
         v.put("rkrechoverse", "DELAY");
         v.put("rkreq", "EQ");
-        v.put("rkrexciter", "UTILITY");
-        v.put("rkrexpander", "GATE");
+        v.put("rkrexciter", "DISTORTION");
+        v.put("rkrexpander", "DYNAMICS");
         v.put("rkrflanger/chorus", "MODULATION");
         v.put("rkrharmonizer(nomidi)", "PITCH");
         v.put("rkrinfinity", "EQ");
@@ -511,7 +511,7 @@ public final class CategoryGenerated {
         v.put("rkrmutromojo", "EQ");
         v.put("rkrnoisegate", "GATE");
         v.put("rkropticaltrem", "MODULATION");
-        v.put("rkrpan", "UTILITY");
+        v.put("rkrpan", "MODULATION");
         v.put("rkrparametriceq", "EQ");
         v.put("rkrphaser", "MODULATION");
         v.put("rkrreverb", "REVERB");
@@ -542,7 +542,7 @@ public final class CategoryGenerated {
         v.put("shimmizita", "REVERB");
         v.put("simpleirloader", "CABINET");
         v.put("sloopyblue", "DISTORTION");
-        v.put("slowgear", "DYNAMICS");
+        v.put("slowgear", "UTILITY");
         v.put("studiopre", "AMP");
         v.put("studiopreampstereo", "AMP");
         v.put("sunface", "DISTORTION");
@@ -551,21 +551,21 @@ public final class CategoryGenerated {
         v.put("switchedtremolo", "MODULATION");
         v.put("switchlesswah", "WAH");
         v.put("tamgamp", "AMP");
-        v.put("tape", "EQ");
-        v.put("tapestereo", "EQ");
+        v.put("tape", "DISTORTION");
+        v.put("tapestereo", "DISTORTION");
         v.put("tapir", "CABINET");
         v.put("theinfamousbentdelay", "DELAY");
         v.put("theinfamouscellularautomatonsynth", "PITCH");
         v.put("theinfamouscheapdistortion", "DISTORTION");
         v.put("theinfamousenvelopefollower", "WAH");
         v.put("theinfamousewham", "PITCH");
-        v.put("theinfamouship2b", "DISTORTION");
+        v.put("theinfamouship2b", "GATE");
         v.put("theinfamouslushlife", "MODULATION");
         v.put("theinfamousmindi", "UTILITY");
         v.put("theinfamousoctolo", "PITCH");
         v.put("theinfamouspowercut", "MODULATION");
         v.put("theinfamouspowerup", "MODULATION");
-        v.put("theinfamousstuck", "PITCH");
+        v.put("theinfamousstuck", "UTILITY");
         v.put("tilttone", "EQ");
         v.put("timray", "DISTORTION");
         v.put("tonemachine", "DISTORTION");

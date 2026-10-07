@@ -313,6 +313,7 @@ LV2_LIB_RULES = [
 # by stable LADSPA UID or normalized LV2 name, never by a UI label substring.
 LADSPA_CATEGORY_OVERRIDES = {
     1190: "EQ",
+    4068: "UTILITY",  # R11 audit: mydsp multi-fx pedal beats rdf SimulatorPlugin
     1207: "UTILITY",
     1210: "UTILITY",
     1218: "MODULATION",
@@ -329,15 +330,15 @@ LADSPA_CATEGORY_OVERRIDES = {
 LV2_CATEGORY_OVERRIDES = {
     "ts9sim": "DISTORTION",
     "mdatesttone": "UTILITY",
-    "microamp": "UTILITY",
+    "microamp": "DISTORTION",  # R11 audit: Micro Amp Booster -> OD/Dist
     "mdadither": "UTILITY",
     "mdaloudness": "UTILITY",
     "theinfamouspowercut": "MODULATION",
-    "pushpull": "PITCH",
+    "pushpull": "DISTORTION",  # R11 audit: guitarix pushpull DISTORTION, not pitch
     "oc2": "PITCH",
     "collisiondrive": "DISTORTION",
     "axisface": "DISTORTION",
-    "slowgear": "DYNAMICS",
+    "slowgear": "UTILITY",  # R11 audit: volume swell tool -> utility
     "vstb": "DISTORTION",
     "osmutantes": "DISTORTION",
     "tonemachine": "DISTORTION",
@@ -349,15 +350,27 @@ LV2_CATEGORY_OVERRIDES = {
     "mdajx10": "PITCH",
     "mdapiano": "PITCH",
     "theinfamouspowerup": "MODULATION",
-    "theinfamousstuck": "PITCH",
-    "hip2b": "DISTORTION",
-    "theinfamouship2b": "DISTORTION",
+    "theinfamousstuck": "UTILITY",  # R11 audit: clip looper/drone, not pitch
+    "hip2b": "GATE",  # R11 audit: decimator-style noise suppressor
+    "theinfamouship2b": "GATE",  # R11 audit: cf. hip2b
     "lushlife": "MODULATION",
     "theinfamouslushlife": "MODULATION",
     "octolo": "PITCH",
     "theinfamousoctolo": "PITCH",
     "theinfamousewham": "PITCH",
     "theinfamousmindi": "UTILITY",
+    # R11 category audit (Bang Hery): explicit corrections over TTL/token guesses.
+    # OC-2 + ewham stay PITCH — TTL "Distortion pedal" for OC-2 is upstream junk
+    # but the plugin is a pitch/octave pedal (confirmed by Hery, do not move).
+    "tape": "DISTORTION",           # GxTape tape saturation, not an EQ
+    "tapestereo": "DISTORTION",     # Gx Tape Stereo
+    "rkrpan": "MODULATION",         # rkr Pan auto-panner (autopan family) -- not a utility
+    "rkrexciter": "DISTORTION",     # align with "harmonic exciter" (also DISTORTION)
+    "rkrexpander": "DYNAMICS",      # expander = dynamics; align with generic "expander"
+    "gxexpander": "DYNAMICS",
+    "c*spicenotanexciter": "DYNAMICS",        # desc: bass compressor + limiter
+    "c*spicex2notanexcitereither": "DYNAMICS",
+    "mydsp": "UTILITY",             # Guitarix Multi Effect Pedal (multi-fx, not an amp)
 }
 
 

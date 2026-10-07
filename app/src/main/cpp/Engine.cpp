@@ -1,4 +1,6 @@
 #include <cassert>
+#include <atomic>
+#include <mutex>
 #include <thread>
 
 #include "Engine.h"
@@ -20,6 +22,11 @@ std::string Engine::attributionTag = "";
 static jobject gClassLoader;
 static jmethodID gFindClassMethod;
 static std::mutex activePluginsMutex;
+// OBS-5: the disconnect auto-restart runs on a detached thread 2s after the
+// audio device is taken away. These guards keep it from touching a destroyed
+// engine or from racing the app's own start/stop (SEGV @0x0 on the DSP worker).
+static std::atomic<bool> sEngineAlive{false};
+static std::mutex sEngineLifecycleMutex;
 
 Engine::Engine () {
     // NOTE: input (mono) and output (stereo) channel counts intentionally
@@ -31,6 +38,7 @@ Engine::Engine () {
     queueManager.add_function (Meter::updateMeterOutput);
 //    discoverPlugins();
 //    loadPlugins();
+    sEngineAlive = true;
 }
 
 Engine::~Engine() {
@@ -38,6 +46,11 @@ Engine::~Engine() {
     // is freed. setEffectOn(false) stops the Oboe streams, and quit() stops
     // and joins the lock-free queue worker thread, so no native thread keeps
     // running against freed engine memory after deletion.
+    // OBS-5: hold the lifecycle mutex + clear the alive flag first so the
+    // disconnected-device auto-restart thread (see onErrorAfterClose) bails
+    // out instead of calling setEffectOn on freed memory (SEGV @0x0).
+    std::lock_guard<std::mutex> lifeLock(sEngineLifecycleMutex);
+    sEngineAlive = false;
     setEffectOn(false);
     queueManager.quit();
 }
@@ -412,6 +425,14 @@ void Engine::onErrorAfterClose(oboe::AudioStream *oboeStream,
         mIsEffectOn = false;
         std::thread([this]() {
             std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+            // OBS-5: guard the restart. The engine may be destroyed while we
+            // sleep (app killed / onDestroy). The destructor clears the alive
+            // flag while holding the same mutex, so after we acquire it we are
+            // safe to touch `this` again. Skip if the effect is already back
+            // on (e.g. the app restarted it from Java on resume).
+            std::lock_guard<std::mutex> lifeLock(sEngineLifecycleMutex);
+            if (!sEngineAlive.load() || this->mIsEffectOn) return;
+            LOGI("restarting audio after device disconnect");
             setEffectOn(true);
         }).detach();
     }
@@ -574,8 +595,24 @@ void Engine::buildPluginChain () {
     OUT
 }
 
+void Engine::detachActivePlugins(std::vector<Plugin*> &out) {
+    std::lock_guard<std::mutex> pluginLock(activePluginsMutex);
+    out = std::move(activePlugins);
+    activePlugins.clear();
+    graphEdges.clear();
+    hasExplicitGraph = false;
+}
+
 void Engine::reinitPluginsAtSampleRate() {
     IN ;
+    // OBS-5: this deletes Plugin instances and swaps activePlugins slots while
+    // the audio callback (try_locker on chainMutex) and JNI getters read the
+    // published port/handle arrays. Called from setEffectOn() on the detached
+    // disconnect-restart thread, an unsynchronized run here freed instances
+    // mid-callback -> SEGV @0x0 on the DSP worker. Lock the same pair
+    // (plugins -> chain) as buildPluginChain, in that order.
+    std::unique_lock<std::mutex> pluginLock(activePluginsMutex);
+    std::unique_lock<std::mutex> chainLock(mFullDuplexPass.chainMutex, std::defer_lock);
     if (mSampleRate <= 0) {
         LOGD("reinitPluginsAtSampleRate: no valid sample rate yet, skipping");
         OUT ; return ;
@@ -621,6 +658,9 @@ void Engine::reinitPluginsAtSampleRate() {
         activePlugins.at(i) = fresh ;
         rebuilt = true ;
     }
+    // Release before buildPluginChain(): it takes the same two locks.
+    chainLock.unlock();
+    pluginLock.unlock();
     if (rebuilt) buildPluginChain();
     OUT ;
 }

@@ -111,7 +111,7 @@ public class CategoryHelper {
         OVERRIDES.put("voodo", Category.DISTORTION);
         OVERRIDES.put("screamingbird_", Category.DISTORTION);
         // ---- Gx: Boosters ----
-        OVERRIDES.put("microamp", Category.UTILITY); // canonical LV2 category policy
+        OVERRIDES.put("microamp", Category.DISTORTION); // R11 audit: booster -> OD/Dist
         OVERRIDES.put("rangemaster", Category.DISTORTION);
         OVERRIDES.put("rangem", Category.DISTORTION);
         OVERRIDES.put("booster", Category.DISTORTION);
@@ -304,11 +304,11 @@ public class CategoryHelper {
         // ---- the infamous / famous singles ----
         OVERRIDES.put("cheapdist", Category.DISTORTION);
         OVERRIDES.put("coldfire", Category.DISTORTION);
-        OVERRIDES.put("hip2b", Category.DISTORTION);
+        OVERRIDES.put("hip2b", Category.GATE); // R11 audit: decimator-style cleaner
         OVERRIDES.put("octolo", Category.PITCH);
         OVERRIDES.put("powercut", Category.MODULATION);
         OVERRIDES.put("powerup", Category.UTILITY);
-        OVERRIDES.put("stuck", Category.DYNAMICS);
+        OVERRIDES.put("stuck", Category.UTILITY); // R11 audit: clip looper/drone
         OVERRIDES.put("lushlife", Category.MODULATION);
         OVERRIDES.put("mindi", Category.UTILITY);
         OVERRIDES.put("ewham", Category.PITCH);
@@ -360,12 +360,12 @@ public class CategoryHelper {
         OVERRIDES.put("vstb", Category.DISTORTION); // libGxSuppaToneBender: Tone Bender pedal sim
         // "the infamous X" family (norm keeps the prefix: "theinfamousewham")
         OVERRIDES.put("theinfamousewham", Category.PITCH); // cf. "ewham"
-        OVERRIDES.put("theinfamouship2b", Category.DISTORTION); // cf. "hip2b"
+        OVERRIDES.put("theinfamouship2b", Category.GATE); // cf. "hip2b"
         OVERRIDES.put("theinfamouslushlife", Category.MODULATION); // cf. "lushlife"
         OVERRIDES.put("theinfamousmindi", Category.UTILITY); // cf. "mindi"
         OVERRIDES.put("theinfamousoctolo", Category.PITCH); // cf. "octolo"
         OVERRIDES.put("theinfamouspowerup", Category.UTILITY); // cf. "powerup"
-        OVERRIDES.put("theinfamousstuck", Category.DYNAMICS); // waveform drone; cf. "stuck"
+        OVERRIDES.put("theinfamousstuck", Category.UTILITY); // waveform drone; cf. "stuck"
     }
 
     /** Direct id -> category lookup (normalized name), null when not overridden. */
@@ -396,19 +396,26 @@ public class CategoryHelper {
         if (g == null) g = CategoryGenerated.LV2_BY_NAME.get(k);
         if (g != null) {
             try {
-                return Category.valueOf(g);
+                return normalizeRouting(Category.valueOf(g));
             } catch (IllegalArgumentException ignored) {}
         }
 
         Category byName = getCategoryOverride(pluginName);
-        if (byName != null) return byName;
+        if (byName != null) return normalizeRouting(byName);
 
         Category tok = classifyTokens(pluginName);
-        if (tok != null) return tok;
+        if (tok != null) return normalizeRouting(tok);
 
         android.util.Log.w("CategoryHelper",
                 "no metadata for '" + pluginName + "' — fallback UNKNOWN");
         return Category.UNKNOWN;
+    }
+
+    /** Routing blocks (SPLIT/MERGE) have no picker chip — expose them as
+     * UTILITY so they browse under the Utility chip. (R11: Hery.) */
+    static Category normalizeRouting(Category c) {
+        if (c == Category.SPLIT || c == Category.MERGE) return Category.UTILITY;
+        return c;
     }
 
     /** Whole-token classifier. Must stay in sync with token_cat() in tools/gen_category_map.py. */

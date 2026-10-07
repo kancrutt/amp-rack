@@ -91,9 +91,12 @@ public:
     int moveActivePluginUp(int _p);
     int moveActivePlugin(int from, int to);
     void buildPluginChain();
+    // Move the whole active chain out of the engine under the plugins lock
+    // (clearActiveQueue) so no JNI getter can observe a half-cleared vector.
+    void detachActivePlugins(std::vector<Plugin*> &out);
     // Re-create LADSPA plugins instantiated before the streams opened (wrong
-    // sample rate) at the real rate, preserving control values. Safe to call
-    // when the audio callback is not running (e.g. right after openStreams).
+    // sample rate) at the real rate, preserving control values. Takes the
+    // plugins+chain locks, so it is safe against a running audio callback.
     void reinitPluginsAtSampleRate();
     void addPluginToRackLazy(char * library, int pluginIndex, SharedLibrary::PluginType _type = SharedLibrary::LADSPA);
     int addPlugintoRackByName(std::string);

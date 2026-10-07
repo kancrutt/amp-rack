@@ -188,7 +188,7 @@ public class PluginPickerFragment extends BottomSheetDialogFragment {
         };
 
         final String[] catLabels = {
-                "Amp / Head", "Cabinet", "Overdrive / Dist", "Compressor",
+                "Amp / Head", "Cabinet", "OD/Dist", "Compressor",
                 "Modulation", "Delay", "Reverb", "EQ", "Pitch / Synth",
                 "Wah", "Utility", "Noise Gate"
         };

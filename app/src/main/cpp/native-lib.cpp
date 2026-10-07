@@ -706,13 +706,10 @@ Java_com_kancrutt_gigginggear_AudioEngine_clearActiveQueue(JNIEnv *env, jclass c
     // The old .clear() leaked every Plugin + SharedLibrary + dlopen + LV2
     // instance per preset nav until LMK SIGKILLed the app (silent force
     // close, no tombstone, no Java trace).
-    std::vector<Plugin*> doomed = std::move(engine->activePlugins);
-    engine->activePlugins.clear();
-    // A cleared chain has no nodes: drop stale explicit edges too, otherwise
-    // every intermediate rebuild logs "edge references node outside" and
-    // falls back until the new graph is set.
-    engine->graphEdges.clear();
-    engine->hasExplicitGraph = false;
+    // OBS-5: detach happens under the plugins lock (detachActivePlugins), so
+    // getters cannot read a half-moved vector mid-preset-load.
+    std::vector<Plugin*> doomed;
+    engine->detachActivePlugins(doomed);
     engine-> buildPluginChain();
     for (Plugin * p : doomed) {
         if (p == nullptr) continue;

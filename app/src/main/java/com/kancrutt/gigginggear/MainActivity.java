@@ -4637,7 +4637,9 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                         enumValue.setLayoutParams(eValLp);
 
                         ImageView enumMore = new ImageView(this);
-                        enumMore.setImageResource(R.drawable.ic_more_vert);
+                        // Round-9 R5.2: caret = "opens the inline list below
+                        // this row". ⋮ stays reserved for other actions later.
+                        enumMore.setImageResource(R.drawable.baseline_arrow_drop_down_24);
                         enumMore.setColorFilter(Color.parseColor("#71717A"), android.graphics.PorterDuff.Mode.SRC_IN);
                         LinearLayout.LayoutParams eMoreLp = new LinearLayout.LayoutParams(Math.round(20 * density), Math.round(20 * density));
                         eMoreLp.setMargins(Math.round(4 * density), 0, Math.round(4 * density), 0);
@@ -4663,38 +4665,32 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                         enumValue.setText(hasLabelsFinal ? labelsFinal[initialIdx] : String.valueOf(initialIdx));
 
                         View.OnClickListener enumClick = v -> {
+                            // Round-9 R5.2: enum/model params pick from an
+                            // inline dropdown anchored under the row (outside
+                            // tap closes, no CANCEL) instead of a centered
+                            // modal that buries the panel.
+                            float live = AudioEngine.getActivePluginValue(position, finalIEnum);
                             if (hasLabelsFinal) {
-                                com.google.android.material.dialog.MaterialAlertDialogBuilder b = new com.google.android.material.dialog.MaterialAlertDialogBuilder(this);
-                                b.setTitle(cName);
-                                 int cur = valuesFinal != null ? nearestEnumIndex(AudioEngine.getActivePluginValue(position, finalIEnum), valuesFinal) : Math.max(0, Math.min(labelsFinal.length - 1, (int) Math.round(AudioEngine.getActivePluginValue(position, finalIEnum) - fEnumMinVal)));
-                                 b.setSingleChoiceItems(labelsFinal, cur, (dialog, which) -> {
-                                     float newVal = valuesFinal != null ? valuesFinal[which] : fEnumMinVal + (float) which;
-                                     AudioEngine.setPluginControl(position, finalIEnum, newVal);
-                                     enumValue.setText(labelsFinal[which]);
-                                     dialog.dismiss();
-                                 });
-                                 b.setNegativeButton("CANCEL", null);
-                                 AlertDialog d = b.create();
-                                 d.show();
-                                 colorDialogButtons(d);
-                             } else {
-                                // No labels — cycle integer steps via +/- in dialog
+                                int cur = valuesFinal != null
+                                        ? nearestEnumIndex(live, valuesFinal)
+                                        : Math.max(0, Math.min(labelsFinal.length - 1, Math.round(live - fEnumMinVal)));
+                                showInlineEnumDropdown(enumRow, labelsFinal, valuesFinal,
+                                        fEnumMinVal, cur, idx -> {
+                                            float newVal = valuesFinal != null
+                                                    ? valuesFinal[idx] : fEnumMinVal + (float) idx;
+                                            AudioEngine.setPluginControl(position, finalIEnum, newVal);
+                                            enumValue.setText(labelsFinal[idx]);
+                                        });
+                            } else {
                                 String[] opts = new String[optionCount];
                                 for (int k = 0; k < optionCount; k++) opts[k] = String.valueOf(k);
-                                com.google.android.material.dialog.MaterialAlertDialogBuilder b = new com.google.android.material.dialog.MaterialAlertDialogBuilder(this);
-                                b.setTitle(cName);
-                                final int finalOptionCount = optionCount;
-                                int cur = Math.max(0, Math.min(finalOptionCount - 1, (int) Math.round(AudioEngine.getActivePluginValue(position, finalIEnum) - fEnumMinVal)));
-                                b.setSingleChoiceItems(opts, cur, (dialog, which) -> {
-                                    float newVal = fEnumMinVal + (float) which;
-                                    AudioEngine.setPluginControl(position, finalIEnum, newVal);
-                                    enumValue.setText(opts[which]);
-                                    dialog.dismiss();
-                                });
-                                 b.setNegativeButton("CANCEL", null);
-                                 AlertDialog d2 = b.create();
-                                 d2.show();
-                                 colorDialogButtons(d2);
+                                int cur = Math.max(0, Math.min(optionCount - 1, Math.round(live - fEnumMinVal)));
+                                showInlineEnumDropdown(enumRow, opts, null,
+                                        fEnumMinVal, cur, idx -> {
+                                            AudioEngine.setPluginControl(position, finalIEnum,
+                                                    fEnumMinVal + (float) idx);
+                                            enumValue.setText(opts[idx]);
+                                        });
                             }
                         };
                         enumRow.setOnClickListener(enumClick);
@@ -5036,12 +5032,17 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 // (round-5: a horizontal 190dp strip left 79% dead space).
                 // Past 2 rows the panel scrolls; the first two rows are always
                 // fully visible without scrolling.
+                // Round-9 R5.1: columns = min(N,2). A single LEVEL param
+                // (Cabinet IV GAIN) got a half-width card + ~180px slider with
+                // the other half of the section empty; it now stretches full
+                // width. Multi-param grids keep the round-6 2-column layout.
+                final int colsLvl = Math.max(1, Math.min(levelCells.size(), 2));
                 levelContainer.setOrientation(LinearLayout.VERTICAL);
                 levelContainer.setGravity(Gravity.NO_GRAVITY);
                 LinearLayout gridRowLvl = null;
                 for (int ciLvl = 0; ciLvl < levelCells.size(); ciLvl++) {
                     LinearLayout cell = levelCells.get(ciLvl);
-                    if (ciLvl % 2 == 0) {
+                    if (ciLvl % colsLvl == 0) {
                         gridRowLvl = new LinearLayout(this);
                         gridRowLvl.setOrientation(LinearLayout.HORIZONTAL);
                         LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(
@@ -5053,7 +5054,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     }
                     LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(
                             0, ViewGroup.LayoutParams.MATCH_PARENT, 1f);
-                    if (ciLvl % 2 == 0) clp.setMarginEnd(Math.round(4 * density));
+                    if (ciLvl % colsLvl == 0) clp.setMarginEnd(Math.round(4 * density));
                     else clp.setMarginStart(Math.round(4 * density));
                     cell.setLayoutParams(clp);
                     // Weighted rows are taller than their content; center the
@@ -5062,7 +5063,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     cell.setGravity(Gravity.CENTER_VERTICAL);
                     gridRowLvl.addView(cell);
                 }
-                if (levelCells.size() % 2 == 1 && gridRowLvl != null) {
+                if (levelCells.size() % colsLvl != 0 && gridRowLvl != null) {
                     View padLvl = new View(this);
                     padLvl.setLayoutParams(new LinearLayout.LayoutParams(
                             0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
@@ -7047,6 +7048,92 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
      * light). Force every dialog button label to the glass primary text color so Save /
      * Cancel / Rename / Delete / Log out / CANCEL etc. are legible on the dark dialog.
      */
+    /** Callback for the inline enum dropdown below. */
+    private interface EnumPick { void onPick(int index); }
+
+    /**
+     * Inline exposed-dropdown for enum/model params (round-9 R5.2): the option
+     * list opens in a popup anchored under the control row instead of a
+     * centered modal dialog — outside tap dismisses, no CANCEL button. Lists
+     * are scrollable and get a search box past 10 options.
+     */
+    void showInlineEnumDropdown(View anchor, final String[] labels, float[] values,
+                                float enumMin, int initialIdx, EnumPick onPick) {
+         final float density = getResources().getDisplayMetrics().density;
+         android.widget.PopupWindow popup = new android.widget.PopupWindow(this);
+         LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setBackgroundResource(R.drawable.glass_card_bg);
+        // 1px transparent frame so the popup window is focusable and outside
+        // touches dismiss it (PopupWindow needs a non-null background for that).
+        popup.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(0));
+        popup.setOutsideTouchable(true);
+        popup.setFocusable(true);
+
+        final boolean searchable = labels.length > 10;
+        android.widget.EditText search = null;
+        if (searchable) {
+            search = new EditText(this);
+            search.setHint("Search " + labels.length + " options");
+            search.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12f);
+            search.setSingleLine(true);
+            search.setTextColor(Color.parseColor("#E6E6E6"));
+            search.setHintTextColor(Color.parseColor("#71717A"));
+            int pad = Math.round(12 * density);
+            search.setPadding(pad, Math.round(8 * density), pad, 0);
+            content.addView(search, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        }
+
+        android.widget.ListView list = new android.widget.ListView(this);
+        list.setDivider(null);
+        final ArrayAdapter<String> adapter = new ArrayAdapter<>(this,
+                android.R.layout.simple_list_item_single_choice, labels);
+        list.setChoiceMode(android.widget.AbsListView.CHOICE_MODE_SINGLE);
+        list.setAdapter(adapter);
+        if (initialIdx >= 0 && initialIdx < labels.length) {
+            list.setItemChecked(initialIdx, true);
+            list.setSelection(initialIdx);
+        }
+        content.addView(list, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+
+        list.setOnItemClickListener((parent, view, position, id) -> {
+            // With the filter active the adapter shows a subset — map the
+            // visible label back to its original index.
+            String picked = adapter.getItem(position);
+            int real = position;
+            if (searchable) {
+                real = -1;
+                for (int k = 0; k < labels.length; k++)
+                    if (labels[k].equals(picked)) { real = k; break; }
+                if (real < 0) return;
+            }
+            popup.dismiss();
+            onPick.onPick(real);
+        });
+
+        if (searchable) {
+            search.addTextChangedListener(new android.text.TextWatcher() {
+                @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
+                @Override public void onTextChanged(CharSequence s, int a, int b, int c) {}
+                @Override public void afterTextChanged(android.text.Editable s) {
+                    adapter.getFilter().filter(s == null ? "" : s.toString());
+                }
+            });
+        }
+
+        popup.setContentView(content);
+        popup.setWidth(Math.max(Math.round(260 * density),
+                Math.round(anchor.getWidth() * 0.6f)));
+        popup.setHeight(Math.round((searchable ? 340 : 300) * density));
+        popup.setInputMethodMode(searchable
+                ? android.widget.PopupWindow.INPUT_METHOD_NEEDED
+                : android.widget.PopupWindow.INPUT_METHOD_NOT_NEEDED);
+        popup.showAsDropDown(anchor);
+        if (search != null) search.requestFocus();
+    }
+
     public static void colorDialogButtons(androidx.appcompat.app.AlertDialog dialog) {
         if (dialog == null) return;
         try {

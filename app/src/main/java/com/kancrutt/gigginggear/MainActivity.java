@@ -4363,13 +4363,20 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             final ColorStateList trackTintOn = ColorStateList.valueOf(Color.parseColor("#2A3D2E"));
             final ColorStateList trackTintOff = ColorStateList.valueOf(Color.parseColor("#25272C"));
 
+            // R14 OBS-3: clearInlineParameterEditor() (chain mutations route through
+            // PARAM_EDITOR_CLEAR) GONEs the enable row; populate never restored
+            // it, so the toggle vanished mid-session after add/switch. Real
+            // plugins always have it; anchors keep GONE (they return above).
+            if (ledView != null) ledView.setVisibility(View.VISIBLE);
             if (enabledSwitch != null) {
+                enabledSwitch.setVisibility(View.VISIBLE);
                 enabledSwitch.setOnCheckedChangeListener(null);
                 enabledSwitch.setChecked(isActive);
                 enabledSwitch.setThumbTintList(isActive ? thumbTintOn : thumbTintOff);
                 enabledSwitch.setTrackTintList(isActive ? trackTintOn : trackTintOff);
 
                 if (enabledLabelView != null) {
+                    enabledLabelView.setVisibility(View.VISIBLE);
                     enabledLabelView.setText(isActive ? "ON" : "OFF");
                     enabledLabelView.setTextColor(isActive ? colorActiveGreen : colorInactiveGrey);
                 }
@@ -4747,7 +4754,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                         LinearLayout.LayoutParams rowLpLvl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
                         rowLpLvl.setMargins(0, Math.round(4 * density), 0, Math.round(4 * density));
                         sliderRowLvl.setLayoutParams(rowLpLvl);
-                        sliderRowLvl.setMinimumHeight(Math.round(56 * density));
 
                         TextView labelView = new TextView(this);
                         labelView.setText(cName.toUpperCase());
@@ -5066,9 +5072,12 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                         gridRowLvl.setOrientation(LinearLayout.HORIZONTAL);
                         LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(
                                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f);
-                        rlp.setMargins(0, ciLvl == 0 ? 0 : Math.round(8 * density), 0, 0);
+                        // No extra inter-row margin: the LEVEL card carries its
+                        // own 4dp top/bottom margins (round-14 OBS-1: the 72dp
+                        // min height + 8dp margin forced 4 rows past the panel
+                        // share -> internal scroll, mid-scroll label clipping).
+                        rlp.setMargins(0, 0, 0, 0);
                         gridRowLvl.setLayoutParams(rlp);
-                        gridRowLvl.setMinimumHeight(Math.round(72 * density));
                         levelContainer.addView(gridRowLvl);
                     }
                     LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(
@@ -6249,25 +6258,27 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
         // Category List Definitions — must cover every CategoryHelper family,
         // otherwise classified plugins become unreachable in the browser.
+        // Order per Bang Hery (R14): Amp, Cabs, Gate, Pitch, Wah, Dynamics,
+        // OD/Dist, EQ, Modulation, Delay, Reverb, Utility.
         final CategoryHelper.Category[] categories = {
                 CategoryHelper.Category.AMP,
                 CategoryHelper.Category.CABINET,
-                CategoryHelper.Category.DISTORTION,
+                CategoryHelper.Category.GATE,
+                CategoryHelper.Category.PITCH,
+                CategoryHelper.Category.WAH,
                 CategoryHelper.Category.DYNAMICS,
+                CategoryHelper.Category.DISTORTION,
+                CategoryHelper.Category.EQ,
                 CategoryHelper.Category.MODULATION,
                 CategoryHelper.Category.DELAY,
                 CategoryHelper.Category.REVERB,
-                CategoryHelper.Category.EQ,
-                CategoryHelper.Category.PITCH,
-                CategoryHelper.Category.WAH,
-                CategoryHelper.Category.UTILITY,
-                CategoryHelper.Category.GATE
+                CategoryHelper.Category.UTILITY
         };
 
         final String[] catLabels = {
-                "Amp / Head", "Cabinet", "OD/Dist", "Compressor",
-                "Modulation", "Delay", "Reverb", "EQ", "Pitch / Synth",
-                "Wah", "Utility", "Noise Gate"
+                "Amp/Head", "Cabinet", "Noise Gate", "Pitch/Synth", "Wah",
+                "Compressor", "OD/Dist", "EQ", "Modulation", "Delay",
+                "Reverb", "Utility"
         };
 
         final Runnable[] populateModelsForCat = new Runnable[1];
@@ -6455,22 +6466,22 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         final CategoryHelper.Category[] categories = {
                 CategoryHelper.Category.AMP,
                 CategoryHelper.Category.CABINET,
-                CategoryHelper.Category.DISTORTION,
+                CategoryHelper.Category.GATE,
+                CategoryHelper.Category.PITCH,
+                CategoryHelper.Category.WAH,
                 CategoryHelper.Category.DYNAMICS,
+                CategoryHelper.Category.DISTORTION,
+                CategoryHelper.Category.EQ,
                 CategoryHelper.Category.MODULATION,
                 CategoryHelper.Category.DELAY,
                 CategoryHelper.Category.REVERB,
-                CategoryHelper.Category.EQ,
-                CategoryHelper.Category.PITCH,
-                CategoryHelper.Category.WAH,
-                CategoryHelper.Category.UTILITY,
-                CategoryHelper.Category.GATE
+                CategoryHelper.Category.UTILITY
         };
 
         final String[] catLabels = {
-                "Amp / Head", "Cabinet", "OD/Dist", "Compressor",
-                "Modulation", "Delay", "Reverb", "EQ", "Pitch / Synth",
-                "Wah", "Utility", "Noise Gate"
+                "Amp/Head", "Cabinet", "Noise Gate", "Pitch/Synth", "Wah",
+                "Compressor", "OD/Dist", "EQ", "Modulation", "Delay",
+                "Reverb", "Utility"
         };
         // Active category holder — drives the global search fallback (empty query = this cat).
         final CategoryHelper.Category[] activePickerCat = {categories[0]};
@@ -6543,6 +6554,14 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         if (container == null) return;
         container.removeAllViews();
 
+        // R14 OBS-2: switching categories carried the previous viewport
+        // offset, so a tall category opened below its first rows and the
+        // SPLIT/MERGE tiles at the top were skipped. Reset the list scroll
+        // on every repopulate (same pattern as the panel scroll reset).
+        if (container.getParent() instanceof android.widget.ScrollView) {
+            ((android.widget.ScrollView) container.getParent()).scrollTo(0, 0);
+        }
+
         // Routing blocks live under the Utility chip (normalizeRouting maps
         // SPLIT/MERGE -> UTILITY; there is no dedicated Routing chip). Render
         // them for both the raw SPLIT/MERGE categories and UTILITY so the
@@ -6610,6 +6629,9 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                                           CategoryHelper.Category[] categories) {
         if (container == null) return;
         container.removeAllViews();
+        if (container.getParent() instanceof android.widget.ScrollView) {
+            ((android.widget.ScrollView) container.getParent()).scrollTo(0, 0);
+        }
         String q = query.toLowerCase();
         int hits = 0;
 
@@ -6632,6 +6654,8 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         // Every plugin across all categories
         JSONObject[] sources = {availablePlugins, availablePluginsLV2};
         ArrayList<String> seen = new ArrayList<>();
+        // Dash/underscore-insensitive: "oc2" must find "OC-2" (R14 OBS-4).
+        String qNorm = q.replaceAll("[^a-z0-9]", "");
         for (JSONObject source : sources) {
             if (source == null) continue;
             Iterator<String> keys = source.keys();
@@ -6642,7 +6666,8 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                  if (pName.isEmpty() || seen.contains(pName)) continue;
                  if (!isGuitarPlugin(pName)) continue;
                 String desc = obj.optString("desc", obj.optString("description", "Built-in Effect"));
-                if (!(pName.toLowerCase().contains(q) || desc.toLowerCase().contains(q))) continue;
+                String nameNorm = pName.toLowerCase().replaceAll("[^a-z0-9]", "");
+                if (!(nameNorm.contains(qNorm) || desc.toLowerCase().contains(q))) continue;
                 seen.add(pName);
                 String shortDesc = desc.length() > 40 ? desc.substring(0, 37) + "…" : desc;
                 addPluginPickerRow(container, pName, shortDesc, CategoryHelper.getIconRes(pName), dialog, v -> {
@@ -6685,6 +6710,9 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     private void loadModelsIntoContainer(LinearLayout container, CategoryHelper.Category cat, int position, androidx.appcompat.app.AlertDialog dialog) {
         if (container == null) return;
         container.removeAllViews();
+        if (container.getParent() instanceof android.widget.ScrollView) {
+            ((android.widget.ScrollView) container.getParent()).scrollTo(0, 0);
+        }
 
         boolean isFileBased = (cat == CategoryHelper.Category.AMP || cat == CategoryHelper.Category.CABINET);
 
@@ -6862,6 +6890,9 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                                          CategoryHelper.Category[] categories) {
         if (container == null) return;
         container.removeAllViews();
+        if (container.getParent() instanceof android.widget.ScrollView) {
+            ((android.widget.ScrollView) container.getParent()).scrollTo(0, 0);
+        }
         String q = query.toLowerCase();
         int hits = 0;
 
@@ -6909,7 +6940,8 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 final String pName = obj.optString("name", "");
                 if (pName.isEmpty() || seen.contains(pName)) continue;
                 String desc = obj.optString("desc", obj.optString("description", "Built-in Effect"));
-                if (!(pName.toLowerCase().contains(q) || desc.toLowerCase().contains(q))) continue;
+                if (!(pName.toLowerCase().replaceAll("[^a-z0-9]", "").contains(q.replaceAll("[^a-z0-9]", ""))
+                        || desc.toLowerCase().contains(q))) continue;
                 seen.add(pName);
                 View row = getLayoutInflater().inflate(R.layout.item_model_browser_row, container, false);
                 ((TextView) row.findViewById(R.id.item_model_title)).setText(pName);

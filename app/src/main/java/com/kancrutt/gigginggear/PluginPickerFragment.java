@@ -175,22 +175,22 @@ public class PluginPickerFragment extends BottomSheetDialogFragment {
         final CategoryHelper.Category[] categories = {
                 CategoryHelper.Category.AMP,
                 CategoryHelper.Category.CABINET,
-                CategoryHelper.Category.DISTORTION,
+                CategoryHelper.Category.GATE,
+                CategoryHelper.Category.PITCH,
+                CategoryHelper.Category.WAH,
                 CategoryHelper.Category.DYNAMICS,
+                CategoryHelper.Category.DISTORTION,
+                CategoryHelper.Category.EQ,
                 CategoryHelper.Category.MODULATION,
                 CategoryHelper.Category.DELAY,
                 CategoryHelper.Category.REVERB,
-                CategoryHelper.Category.EQ,
-                CategoryHelper.Category.PITCH,
-                CategoryHelper.Category.WAH,
-                CategoryHelper.Category.UTILITY,
-                CategoryHelper.Category.GATE
+                CategoryHelper.Category.UTILITY
         };
 
         final String[] catLabels = {
-                "Amp / Head", "Cabinet", "OD/Dist", "Compressor",
-                "Modulation", "Delay", "Reverb", "EQ", "Pitch / Synth",
-                "Wah", "Utility", "Noise Gate"
+                "Amp/Head", "Cabinet", "Noise Gate", "Pitch/Synth", "Wah",
+                "Compressor", "OD/Dist", "EQ", "Modulation", "Delay",
+                "Reverb", "Utility"
         };
 
         for (int i = 0; i < categories.length; i++) {

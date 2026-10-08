@@ -122,7 +122,7 @@ public final class CategoryGenerated {
         n.put("modulatabledelay", "DELAY");
         n.put("monotostereosplitter", "UTILITY");
         n.put("multivoicechorus", "MODULATION");
-        n.put("mydsp", "AMP");
+        n.put("mydsp", "UTILITY");
         n.put("platereverb", "REVERB");
         n.put("pointercastdistortion", "DISTORTION");
         n.put("rateshifter", "PITCH");

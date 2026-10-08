@@ -348,8 +348,13 @@ public class SignalChainCanvasView extends View {
      *  order). selectNode takes a pluginId, which is shared by duplicate LV2
      *  blocks and unrelated to slot indexes — add-flows need this one. */
     public void selectSlot(int slot) {
+        // nodes[] = [INPUT anchor, plugin0, plugin1, ..., OUTPUT anchor], so
+        // plugin slot s lives at index s+1. Matching i==slot was off by one:
+        // the add-flow highlighted the PREVIOUS block and left the new one
+        // unselected (round-13 R2.7: panel moved but rack marker didn't).
         for (int i = 0; i < nodes.size(); i++) {
-            nodes.get(i).selected = (i == slot);
+            Node n = nodes.get(i);
+            n.selected = !n.isAnchor() && (i - 1) == slot;
         }
         invalidate();
     }

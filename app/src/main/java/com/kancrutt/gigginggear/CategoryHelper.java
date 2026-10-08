@@ -160,7 +160,7 @@ public class CategoryHelper {
         // ---- Gx: Delay ----
         OVERRIDES.put("digitaldelay", Category.DELAY);
         OVERRIDES.put("reversedelay", Category.DELAY);
-        OVERRIDES.put("tape", Category.EQ); // TTL: GxTape is a "Nice Filter Pedal"
+        
         OVERRIDES.put("echocat", Category.DELAY);
         OVERRIDES.put("redeyefx", Category.DISTORTION); // TTL: Distortion pedal
         OVERRIDES.put("multibanddelay", Category.DELAY);

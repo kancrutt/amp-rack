@@ -5115,10 +5115,13 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     levelPanel.setVisibility(hasLevel ? View.VISIBLE : View.GONE);
                 }
 
-                // When BOTH columns show, share the width evenly (round-8 R4:
-                // the old 1:2 split left a fixed 34:66 ratio with ~550-600px
-                // label-to-value gaps in CONTROLS and dead space beside small
-                // LEVEL grids regardless of content).
+                // When BOTH columns show, stack them (LEVEL full-width on top,
+                // CONTROLS below) and share the height by row count.
+                // Round-13 R2.1: side-by-side split each panel to ~664px, so
+                // the Octolo LEVEL slider measured only 406px (< 500 target)
+                // once OBS-1 moved the label/value inline. Full width restores
+                // a >500px track. With a single panel, keep it full-width.
+                View paramPanels = findViewById(R.id.container_param_panels);
                 if (levelPanel != null && tonePanel != null
                         && levelPanel.getLayoutParams() instanceof LinearLayout.LayoutParams
                         && tonePanel.getLayoutParams() instanceof LinearLayout.LayoutParams) {
@@ -5126,16 +5129,29 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                             (LinearLayout.LayoutParams) levelPanel.getLayoutParams();
                     LinearLayout.LayoutParams tllp =
                             (LinearLayout.LayoutParams) tonePanel.getLayoutParams();
+                    if (paramPanels instanceof LinearLayout) {
+                        ((LinearLayout) paramPanels).setOrientation(
+                                (hasLevel && hasTone) ? LinearLayout.VERTICAL
+                                                      : LinearLayout.HORIZONTAL);
+                    }
                     if (hasLevel && hasTone) {
-                        lllp.width = 0;
-                        lllp.weight = 1f;
-                        tllp.width = 0;
-                        tllp.weight = 1f;
-                    } else {
-                        lllp.width = ViewGroup.LayoutParams.WRAP_CONTENT;
+                        // Weight by natural row height (LEVEL rows are 72dp,
+                        // CONTROLS 48dp) so 4 compact LEVEL rows fit without
+                        // internal scroll while CONTROLS takes the remainder.
+                        lllp.width = ViewGroup.LayoutParams.MATCH_PARENT;
+                        lllp.height = 0;
+                        lllp.weight = Math.max(1, levelCells.size()) * 72f;
+                        tllp.width = ViewGroup.LayoutParams.MATCH_PARENT;
+                        tllp.height = 0;
+                        tllp.weight = Math.max(1, toneCells.size()) * 48f;
+                    } else if (hasLevel) {
+                        lllp.width = ViewGroup.LayoutParams.MATCH_PARENT;
+                        lllp.height = ViewGroup.LayoutParams.MATCH_PARENT;
                         lllp.weight = 0f;
-                        tllp.width = 0;
-                        tllp.weight = 1f;
+                    } else {
+                        tllp.width = ViewGroup.LayoutParams.MATCH_PARENT;
+                        tllp.height = ViewGroup.LayoutParams.MATCH_PARENT;
+                        tllp.weight = 0f;
                     }
                     levelPanel.setLayoutParams(lllp);
                     tonePanel.setLayoutParams(tllp);
@@ -6527,7 +6543,13 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         if (container == null) return;
         container.removeAllViews();
 
-        if (cat == CategoryHelper.Category.SPLIT || cat == CategoryHelper.Category.MERGE) {
+        // Routing blocks live under the Utility chip (normalizeRouting maps
+        // SPLIT/MERGE -> UTILITY; there is no dedicated Routing chip). Render
+        // them for both the raw SPLIT/MERGE categories and UTILITY so the
+        // tiles actually appear when browsing (round-13 R2.5: they were only
+        // reachable via a direct "split"/"merge" text search).
+        if (cat == CategoryHelper.Category.SPLIT || cat == CategoryHelper.Category.MERGE
+                || cat == CategoryHelper.Category.UTILITY) {
             addPluginPickerRow(container, "SPLIT (Parallel Branch)", "Split signal into 2 parallel paths", R.drawable.ic_routing_split, dialog, v -> {
                 addRoutingBlock(true);
                 dialog.dismiss();
@@ -6536,7 +6558,9 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 addRoutingBlock(false);
                 dialog.dismiss();
             });
-            return;
+            if (cat == CategoryHelper.Category.SPLIT || cat == CategoryHelper.Category.MERGE) {
+                return;
+            }
         }
 
         JSONObject[] sources = {availablePlugins, availablePluginsLV2};

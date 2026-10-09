@@ -766,13 +766,18 @@ public class SignalChainCanvasView extends View {
         // crossed/stacked lines. SPLIT/MERGE is the only thing that enables
         // parallel topology; its branch edges are derived from current order.
         edges.clear();
-        autoWireRespectingRouting(inputNode, outputNode, count);
+        java.util.List<Node> walk = new java.util.ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            Node wn = nodeMap.get(i);
+            if (wn != null) walk.add(wn);
+        }
+        autoWireRespectingRouting(inputNode, outputNode, walk);
 
         logOrderedChain(count);
 
         // Branch labels are always recomputed from block order so the two-row
         // layout stays correct even when edges were restored from a preset.
-        assignBranchLabels(count);
+        assignBranchLabels(walk);
 
         // Lay out parallel branches as two rows between each SPLIT and its MERGE.
         if (hasRoutingBlock) {
@@ -810,11 +815,10 @@ public class SignalChainCanvasView extends View {
      * Derived purely from SPLIT/MERGE positions, so it is stable across
      * rebuilds and preset restores.
      */
-    private void assignBranchLabels(int count) {
+    private void assignBranchLabels(java.util.List<Node> walk) {
         boolean inSplit = false;
         boolean nextUpper = true;
-        for (int i = 0; i < count; i++) {
-            Node n = nodeMap.get(i);
+        for (Node n : walk) {
             if (n == null) continue;
             if (n.nodeType == NodeType.SPLIT) {
                 n.branch = 0;
@@ -843,11 +847,10 @@ public class SignalChainCanvasView extends View {
      *   - A MERGE recombines: both branch tails feed into it, and the chain
      *     continues as a single row afterwards.
      */
-    private void autoWireRespectingRouting(Node inputNode, Node outputNode, int count) {
+    private void autoWireRespectingRouting(Node inputNode, Node outputNode, java.util.List<Node> walk) {
         boolean hasSplit = false;
         boolean hasMerge = false;
-        for (int i = 0; i < count; i++) {
-            Node n = nodeMap.get(i);
+        for (Node n : walk) {
             if (n == null) continue;
             if (n.nodeType == NodeType.SPLIT) hasSplit = true;
             if (n.nodeType == NodeType.MERGE) hasMerge = true;
@@ -857,11 +860,11 @@ public class SignalChainCanvasView extends View {
         // SPLIT/MERGE counterpart is present.
         if (!hasSplit || !hasMerge) {
             int tail = inputNode.id;
-            for (int i = 0; i < count; i++) {
-                edges.add(new Edge(tail, i));
-                tail = i;
-                Node n = nodeMap.get(i);
-                if (n != null) n.branch = 0;
+            for (Node n : walk) {
+                if (n == null) continue;
+                edges.add(new Edge(tail, n.id));
+                tail = n.id;
+                n.branch = 0;
             }
             edges.add(new Edge(tail, outputNode.id));
             return;
@@ -872,16 +875,15 @@ public class SignalChainCanvasView extends View {
         boolean inSplit = false;
         boolean nextGoesUpper = true;
 
-        for (int i = 0; i < count; i++) {
-            Node n = nodeMap.get(i);
+        for (Node n : walk) {
             if (n == null) continue;
 
             if (n.nodeType == NodeType.SPLIT) {
                 // SPLIT consumes the current trunk and opens two branches.
-                edges.add(new Edge(trunkTail, i));
+                edges.add(new Edge(trunkTail, n.id));
                 inSplit = true;
-                upperTail = i;
-                lowerTail = i;
+                upperTail = n.id;
+                lowerTail = n.id;
                 nextGoesUpper = true;
                 n.branch = 0;
                 continue;
@@ -890,13 +892,13 @@ public class SignalChainCanvasView extends View {
             if (n.nodeType == NodeType.MERGE) {
                 // MERGE recombines both branch tails (2 inputs) into one trunk.
                 if (inSplit) {
-                    edges.add(new Edge(upperTail, i));
-                    if (lowerTail != upperTail) edges.add(new Edge(lowerTail, i));
+                    edges.add(new Edge(upperTail, n.id));
+                    if (lowerTail != upperTail) edges.add(new Edge(lowerTail, n.id));
                 } else {
-                    edges.add(new Edge(trunkTail, i));
+                    edges.add(new Edge(trunkTail, n.id));
                 }
                 inSplit = false;
-                trunkTail = i;
+                trunkTail = n.id;
                 upperTail = -1;
                 lowerTail = -1;
                 n.branch = 0;
@@ -906,18 +908,18 @@ public class SignalChainCanvasView extends View {
             if (inSplit) {
                 // Alternate effect blocks between the two branches so both populate.
                 if (nextGoesUpper) {
-                    edges.add(new Edge(upperTail, i));
-                    upperTail = i;
+                    edges.add(new Edge(upperTail, n.id));
+                    upperTail = n.id;
                     n.branch = 1;
                 } else {
-                    edges.add(new Edge(lowerTail, i));
-                    lowerTail = i;
+                    edges.add(new Edge(lowerTail, n.id));
+                    lowerTail = n.id;
                     n.branch = 2;
                 }
                 nextGoesUpper = !nextGoesUpper;
             } else {
-                edges.add(new Edge(trunkTail, i));
-                trunkTail = i;
+                edges.add(new Edge(trunkTail, n.id));
+                trunkTail = n.id;
                 n.branch = 0;
             }
         }
@@ -1051,9 +1053,9 @@ public class SignalChainCanvasView extends View {
         if (inputAnchor != null && outputAnchor != null) {
             // Ignore persisted edges. They are slot-indexed and therefore stale
             // after any block move; the current block order is authoritative.
-            int count = 0;
-            for (Node n : nodes) if (n != null && !n.isAnchor()) count++;
-            autoWireRespectingRouting(inputAnchor, outputAnchor, count);
+            java.util.List<Node> walk = new java.util.ArrayList<>();
+            for (Node n : nodes) if (n != null && !n.isAnchor()) walk.add(n);
+            autoWireRespectingRouting(inputAnchor, outputAnchor, walk);
         }
         // Push the normalized wiring to the engine: a preset's SPLIT/MERGE
         // branch topology is authoritative; a series preset sends order-derived
@@ -1305,6 +1307,35 @@ public class SignalChainCanvasView extends View {
                      // anchor and its neighbour: the dropped block visually
                      // stacked on the first block at slot 0.
                      layoutSeriesSlots(order);
+                     // layoutSeriesSlots() flattens every block into the single
+                     // series row. A parallel rig must KEEP its two branch rows
+                     // after a drop (geometry only changes; topology stays
+                     // SPLIT/MERGE-driven) — otherwise dragging any block, even
+                     // a pure vertical move inside one branch, visually reset
+                     // the canvas to series.
+                     java.util.List<Node> walk = new java.util.ArrayList<>();
+                     for (Integer id : order) {
+                         Node wn = nodeMap.get(id);
+                         if (wn != null) walk.add(wn);
+                     }
+                     boolean walkHasRouting = false;
+                     for (Node wn : walk) {
+                         if (wn.nodeType == NodeType.SPLIT || wn.nodeType == NodeType.MERGE) {
+                             walkHasRouting = true;
+                             break;
+                         }
+                     }
+                     if (walkHasRouting && inputAnchor != null && outputAnchor != null) {
+                         edges.clear();
+                         autoWireRespectingRouting(inputAnchor, outputAnchor, walk);
+                         assignBranchLabels(walk);
+                         float dropNodeH = 0f;
+                         for (Node wn : walk) if (wn.height > dropNodeH) dropNodeH = wn.height;
+                         float dropDensity = getResources().getDisplayMetrics().density;
+                         float dropYCenter = phoneScroll ? contentHPx / 2f
+                                 : (getHeight() > 0 ? getHeight() / 2f : 48f * dropDensity);
+                         layoutBranchRows(dropNodeH, 12f * dropDensity, dropYCenter);
+                     }
                      if (orderChanged && reorderListener != null) {
                          reorderListener.onReorder(newOrder);
                      } else {

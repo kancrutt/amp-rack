@@ -72,6 +72,21 @@ public:
     ggsolver::Plan dagPlan ;
     std::vector<std::vector<float>> dagScratch ; // scratch buffers [1..numBuffers-1]
 
+    // R15 §6 Helix-style routing. Split mode + per-branch vanity gains are
+    // static atomics: Engine::setRoutingMode/setBranchGain write them from
+    // the UI thread, the RT callback reads with a plain load — no locks on
+    // the hot path. Gains are indexed by the MERGE chain slot (the DAG tags
+    // each branch MIX with its merge node).
+    enum class SplitMode { AB_MIX = 0, AB_STEREO_SUM = 1, Y_LR = 2 };
+    static std::atomic<int> sSplitMode;                        // SplitMode
+    static std::atomic<float> sBranchGainA [MAX_PLUGINS];      // merge slot -> gain (0..2)
+    static std::atomic<float> sBranchGainB [MAX_PLUGINS];
+    // Y-mode (A->L, B->R) fan-out geometry, set by Engine::rebuildDagPlan
+    // under bypass: scratch buffer indexes + the merge chain slot. -1 = none.
+    int yBranchBufferA = -1 ;
+    int yBranchBufferB = -1 ;
+    int yMergeSlot = -1 ;
+
     // Set by Engine (non-audio thread) under bypass. Copies the plan and
     // (re)allocates scratch buffers sized to the current burst.
     void setDagPlan(const ggsolver::Plan &plan, int maxSamples) {
@@ -117,8 +132,18 @@ public:
                 case ggsolver::OpType::MIX: {
                     float *dst = bufFor(op.dst);
                     float *src = bufFor(op.src);
-                    if (dst != src)
-                        for (int s = 0; s < samplesToProcess; s++) dst[s] += src[s];
+                    if (dst != src) {
+                        // R15 §6: per-branch vanity gain (Helix-style). The
+                        // plan tags each merge MIX with the merge chain slot
+                        // + branch; unity when untagged (pre-routing plans).
+                        float g = 1.0f;
+                        if (op.gainNode >= 0) {
+                            g = op.gainBranch <= 0
+                                    ? sBranchGainA[op.gainNode].load(std::memory_order_relaxed)
+                                    : sBranchGainB[op.gainNode].load(std::memory_order_relaxed);
+                        }
+                        for (int s = 0; s < samplesToProcess; s++) dst[s] += src[s] * g;
+                    }
                     break;
                 }
                 case ggsolver::OpType::RUN: {
@@ -230,10 +255,41 @@ if (meterEnabled) {
         if (pushToLockFreeBeforeOutputVolume && ! pause)
             lockFreeQueueManager->process(raw, inSamples, monoFrames) ;
 
+        // R15 §6: Y split (A->L, B->R). The DSP core is mono; instead of fanning
+        // the merged mono out to both channels, route branch A to L and branch
+        // B to R (each with its own gain) so dual-mono rigs keep hard L/R
+        // sides. A/B mix modes keep the plain stereo fan-out.
+        const int splitMode = sSplitMode.load(std::memory_order_relaxed);
+        const bool yMode = splitMode == (int) SplitMode::Y_LR
+                && yBranchBufferA >= 1 && yBranchBufferB >= 1 && outCh >= 2;
+        float *bufA = nullptr, *bufB = nullptr;
+        if (yMode) {
+            int idxA = yBranchBufferA - 1, idxB = yBranchBufferB - 1;
+            if (idxA >= 0 && idxA < (int) dagScratch.size()) bufA = dagScratch[idxA].data();
+            if (idxB >= 0 && idxB < (int) dagScratch.size()) bufB = dagScratch[idxB].data();
+            if (bufA == nullptr || bufB == nullptr) {
+                // Scratch not sized for the plan yet — fall back to plain
+                // fan-out rather than a null deref.
+                bufA = bufB = nullptr;
+            }
+        }
+        const float gA = (yMode && yMergeSlot >= 0)
+                ? sBranchGainA[yMergeSlot].load(std::memory_order_relaxed) : 1.0f;
+        const float gB = (yMode && yMergeSlot >= 0)
+                ? sBranchGainB[yMergeSlot].load(std::memory_order_relaxed) : 1.0f;
         for (int32_t f = 0; f < monoFrames; f++) {
-            float v = inSamples [f] * outputVolume; // do some arbitrary processing
-            inSamples [f] = v;
-            for (int32_t c = 0; c < outCh; c++) *outputFloats++ = v;
+            if (yMode && bufA != nullptr && bufB != nullptr) {
+                float l = bufA[f] * gA * outputVolume;
+                float r = bufB[f] * gB * outputVolume;
+                inSamples [f] = (l + r) * 0.5f;
+                *outputFloats++ = l;
+                *outputFloats++ = r;
+                for (int32_t c = 2; c < outCh; c++) *outputFloats++ = (l + r) * 0.5f;
+            } else {
+                float v = inSamples [f] * outputVolume; // do some arbitrary processing
+                inSamples [f] = v;
+                for (int32_t c = 0; c < outCh; c++) *outputFloats++ = v;
+            }
         }
 
         if ((callbackNo % 4000) == 0 && monoFrames > 0) {

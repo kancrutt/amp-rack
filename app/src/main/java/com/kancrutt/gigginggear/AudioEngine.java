@@ -195,6 +195,14 @@ public class AudioEngine {
     public static native void setPluginBufferStereo (float  [] data_left, float [] data_right, int plugin);
     public static native void setRoutingMode (int mode);
     public static native int getRoutingMode ();
+
+    // R15 §6 Helix-style routing: split mode {0 = A/B mix, 1 = A/B stereo sum,
+    // 2 = Y (L/R)} + per-branch vanity gain (0..2, unity default) keyed to the
+    // split's pairing MERGE block.
+    public static native void setRoutingSplitMode (int mode);
+    public static native int getRoutingSplitMode ();
+    public static native void setBranchGain (int splitSlot, int branch, float gain);
+    public static native float getBranchGain (int splitSlot, int branch);
     public static native void setGraph (int[] from, int[] to);
     public static native int[] getGraphEdges ();
     public static native String setPluginFilename (String filename, int plugin);

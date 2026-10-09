@@ -1111,6 +1111,36 @@ Java_com_kancrutt_gigginggear_AudioEngine_getRoutingMode(JNIEnv *env, jclass cla
 
 extern "C"
 JNIEXPORT void JNICALL
+Java_com_kancrutt_gigginggear_AudioEngine_setRoutingSplitMode(JNIEnv *env, jclass clazz, jint mode) {
+    if (engine == nullptr) return;
+    engine->setRoutingSplitMode(mode);
+}
+
+extern "C"
+JNIEXPORT jint JNICALL
+Java_com_kancrutt_gigginggear_AudioEngine_getRoutingSplitMode(JNIEnv *env, jclass clazz) {
+    if (engine == nullptr) return 0;
+    return engine->getRoutingSplitMode();
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_kancrutt_gigginggear_AudioEngine_setBranchGain(JNIEnv *env, jclass clazz,
+                                                        jint splitSlot, jint branch, jfloat gain) {
+    if (engine == nullptr) return;
+    engine->setBranchGain(splitSlot, branch, gain);
+}
+
+extern "C"
+JNIEXPORT jfloat JNICALL
+Java_com_kancrutt_gigginggear_AudioEngine_getBranchGain(JNIEnv *env, jclass clazz,
+                                                        jint splitSlot, jint branch) {
+    if (engine == nullptr) return 1.0f;
+    return engine->getBranchGain(splitSlot, branch);
+}
+
+extern "C"
+JNIEXPORT void JNICALL
 Java_com_kancrutt_gigginggear_AudioEngine_setGraph(JNIEnv *env, jclass clazz,
                                                    jintArray fromArr, jintArray toArr) {
     if (engine == nullptr) return;

@@ -41,6 +41,11 @@ struct Op {
     int node;   // plugin chain index (meaningful only for RUN)
     int src;    // source buffer index (COPY/MIX)
     int dst;    // destination buffer index (RUN/COPY/MIX)
+    // R15 §6 (Helix-style routing): per-branch gain for MIX ops. gainNode =
+    // the merge chain slot, gainBranch = 0 (A) or 1 (B); -1 = unity (plain sum,
+    // backward compatible with every pre-routing plan).
+    int gainNode = -1;
+    int gainBranch = -1;
 };
 
 struct Edge {
@@ -52,6 +57,9 @@ struct Plan {
     bool seriesOnly = false;             // fast path: linear chain, single buffer 0
     std::vector<Op> ops;                 // execution order
     int numBuffers = 1;                  // scratch buffers needed (indexes 0..numBuffers-1)
+    // node -> scratch buffer index (R15 §6): lets the engine locate the
+    // branch buffers feeding a MERGE for Y-mode (A->L, B->R) fan-out.
+    std::vector<int> nodeBuffer;
 };
 
 // Builds an execution plan for the given DAG.
@@ -128,6 +136,7 @@ inline bool buildPlan(int numNodes,
     std::vector<int> buf(numNodes);
     for (int i = 0; i < numNodes; i++) buf[i] = i + 1;
     plan.numBuffers = numNodes + 1;
+    plan.nodeBuffer = buf;
 
     for (int u : order) {
         if (preds[u].empty()) {
@@ -140,11 +149,13 @@ inline bool buildPlan(int numNodes,
             plan.ops.push_back({OpType::RUN, u, buf[u], buf[u]});
         } else {
             // Merge (join): copy first pred, then mix the rest, then run.
-            plan.ops.push_back({OpType::COPY, -1, buf[preds[u][0]], buf[u]});
+            // Each MIX carries the merge node + branch so the RT thread can
+            // apply that branch's vanity gain (Helix-style) at sum time.
+            plan.ops.push_back({OpType::COPY, -1, buf[preds[u][0]], buf[u], u, 0});
             for (size_t k = 1; k < preds[u].size(); k++) {
-                plan.ops.push_back({OpType::MIX, -1, buf[preds[u][k]], buf[u]});
+                plan.ops.push_back({OpType::MIX, -1, buf[preds[u][k]], buf[u], u, (int) k});
             }
-            plan.ops.push_back({OpType::RUN, u, buf[u], buf[u]});
+            plan.ops.push_back({OpType::RUN, u, buf[u], buf[u], -1, -1});
         }
     }
 
@@ -154,9 +165,9 @@ inline bool buildPlan(int numNodes,
         if (adj[i].empty()) sinkList.push_back(i);
     }
     if (!sinkList.empty()) {
-        plan.ops.push_back({OpType::COPY, -1, buf[sinkList[0]], 0});
+        plan.ops.push_back({OpType::COPY, -1, buf[sinkList[0]], 0, -1, -1});
         for (size_t k = 1; k < sinkList.size(); k++) {
-            plan.ops.push_back({OpType::MIX, -1, buf[sinkList[k]], 0});
+            plan.ops.push_back({OpType::MIX, -1, buf[sinkList[k]], 0, -1, -1});
         }
     }
 

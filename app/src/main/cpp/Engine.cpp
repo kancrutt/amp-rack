@@ -28,6 +28,25 @@ static std::mutex activePluginsMutex;
 static std::atomic<bool> sEngineAlive{false};
 static std::mutex sEngineLifecycleMutex;
 
+// R15 §6 Helix-style routing state (defined here; declared FullDuplexPass.h).
+// Branch gains default to unity: a zero default would silence branch B the
+// moment a SPLIT/MERGE pair is added.
+std::atomic<int> FullDuplexPass::sSplitMode{0};
+std::atomic<float> FullDuplexPass::sBranchGainA[MAX_PLUGINS];
+std::atomic<float> FullDuplexPass::sBranchGainB[MAX_PLUGINS];
+
+namespace {
+struct BranchGainInit {
+    BranchGainInit() {
+        for (int i = 0; i < MAX_PLUGINS; i++) {
+            FullDuplexPass::sBranchGainA[i].store(1.0f);
+            FullDuplexPass::sBranchGainB[i].store(1.0f);
+        }
+    }
+};
+static BranchGainInit sBranchGainInit;
+}
+
 Engine::Engine () {
     // NOTE: input (mono) and output (stereo) channel counts intentionally
     // differ; onBothStreamsReady folds input to a mono DSP core and fans out.
@@ -698,6 +717,36 @@ void Engine::rebuildDagPlan() {
         ggsolver::buildPlan(n, fallback, plan, err);
     }
     mFullDuplexPass.setDagPlan(plan, maxSamples);
+
+    // R15 §6: locate Y-mode fan-out geometry — the MERGE node and the two
+    // branch buffers feeding it (A->L, B->R). Only valid for a real DAG plan
+    // with a 2-pred merge; cleared otherwise so Y mode falls back to the
+    // plain stereo fan-out.
+    mFullDuplexPass.yBranchBufferA = -1;
+    mFullDuplexPass.yBranchBufferB = -1;
+    mFullDuplexPass.yMergeSlot = -1;
+    if (!plan.seriesOnly && plan.numBuffers > 1
+            && plan.nodeBuffer.size() == (size_t) n) {
+        for (int i = 0; i < mFullDuplexPass.activePlugins; i++) {
+            if (mFullDuplexPass.descriptor[i] != nullptr
+                    && mFullDuplexPass.descriptor[i]->UniqueID == 9002 /* ggrouting MERGE */) {
+                int pa = -1, pb = -1;
+                for (const ggsolver::Edge &e : edges) {
+                    if (e.to == i) {
+                        if (pa < 0) pa = e.from;
+                        else if (pb < 0) pb = e.from;
+                    }
+                }
+                int maxNode = pa > pb ? pa : pb;
+                if (pa >= 0 && pb >= 0 && maxNode < (int) plan.nodeBuffer.size()) {
+                    mFullDuplexPass.yBranchBufferA = plan.nodeBuffer[pa];
+                    mFullDuplexPass.yBranchBufferB = plan.nodeBuffer[pb];
+                    mFullDuplexPass.yMergeSlot = i;
+                }
+                break;
+            }
+        }
+    }
     LOGI("[PLAN] topology=%s nodes=%d ops=%s",
          plan.seriesOnly ? "SERIES" : "DAG", n,
          ggsolver::planToString(plan).c_str());
@@ -971,6 +1020,50 @@ void Engine::setRoutingMode(int mode) {
 
 int Engine::getRoutingMode() {
     return mFullDuplexPass.routingMode ;
+}
+
+void Engine::setRoutingSplitMode(int mode) {
+    // R15 §6: Helix-style split mode {0 = A/B mix, 1 = A/B stereo sum,
+    // 2 = Y (L/R)}. The RT callback reads the atomic directly.
+    if (mode < 0 || mode > 2) return;
+    FullDuplexPass::sSplitMode.store(mode, std::memory_order_relaxed);
+}
+
+int Engine::getRoutingSplitMode() {
+    return FullDuplexPass::sSplitMode.load(std::memory_order_relaxed);
+}
+
+void Engine::setBranchGain(int splitSlot, int branch, float g) {
+    // R15 §6: per-branch vanity gain (0..2, unity default). Gains are keyed
+    // by the MERGE chain slot (the DAG tags each branch MIX with its merge
+    // node); map the SPLIT slot -> its pairing merge: the next MERGE block
+    // at/after the split slot.
+    if (g < 0.0f) g = 0.0f;
+    if (g > 2.0f) g = 2.0f;
+    std::lock_guard<std::mutex> lock(activePluginsMutex);
+    for (size_t i = (size_t) std::max(0, splitSlot); i < activePlugins.size(); i++) {
+        Plugin * p = activePlugins.at(i);
+        if (p == nullptr || p->descriptor == nullptr) continue;
+        if (p->descriptor->UniqueID == 9002 /* ggrouting MERGE */) {
+            if (branch <= 0) FullDuplexPass::sBranchGainA[i].store(g, std::memory_order_relaxed);
+            else FullDuplexPass::sBranchGainB[i].store(g, std::memory_order_relaxed);
+            return;
+        }
+    }
+}
+
+float Engine::getBranchGain(int splitSlot, int branch) {
+    std::lock_guard<std::mutex> lock(activePluginsMutex);
+    for (size_t i = (size_t) std::max(0, splitSlot); i < activePlugins.size(); i++) {
+        Plugin * p = activePlugins.at(i);
+        if (p == nullptr || p->descriptor == nullptr) continue;
+        if (p->descriptor->UniqueID == 9002 /* ggrouting MERGE */) {
+            return branch <= 0
+                    ? FullDuplexPass::sBranchGainA[i].load(std::memory_order_relaxed)
+                    : FullDuplexPass::sBranchGainB[i].load(std::memory_order_relaxed);
+        }
+    }
+    return 1.0f;
 }
 
 std::string Engine::tuneLatency () {

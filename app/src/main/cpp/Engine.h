@@ -37,6 +37,12 @@ public:
     bool setPluginBufferStereo (float * buffer_left, int buffer_size_left, float * buffer_right, int buffer_size_right, int plugin) ;
     void setRoutingMode(int mode);
     int getRoutingMode();
+    // R15 §6 Helix-style routing: split mode {0=A/B mix, 1=A/B stereo, 2=Y}
+    // + per-branch vanity gains keyed to the split's pairing MERGE block.
+    void setRoutingSplitMode(int mode);
+    int getRoutingSplitMode();
+    void setBranchGain(int splitSlot, int branch, float g);
+    float getBranchGain(int splitSlot, int branch);
     std::vector<ggsolver::Edge> graphEdges ;
     bool hasExplicitGraph = false ;
     void setGraphEdges(std::vector<ggsolver::Edge> edges) ;

@@ -3450,6 +3450,29 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             e.printStackTrace();
         }
 
+        // R15 §6: Helix-style split mode + per-branch gains. Slot-based like
+        // the graph edges (both shift together with the chain).
+        try {
+            preset.put("splitMode", AudioEngine.getRoutingSplitMode());
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+        try {
+            org.json.JSONObject gains = new org.json.JSONObject();
+            for (int s = 0; s < AudioEngine.getActivePlugins(); s++) {
+                String nm = null;
+                try { nm = AudioEngine.getActivePluginName(s); } catch (Exception ignored) {}
+                if (nm == null || !nm.toLowerCase().contains("split")) continue;
+                org.json.JSONObject g = new org.json.JSONObject();
+                g.put("a", AudioEngine.getBranchGain(s, 0));
+                g.put("b", AudioEngine.getBranchGain(s, 1));
+                gains.put(String.valueOf(s), g);
+            }
+            preset.put("routingGains", gains);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
         try {
             int[] graphEdges = AudioEngine.getGraphEdges();
             if (graphEdges != null && graphEdges.length > 0) {
@@ -5167,7 +5190,12 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 }
 
                 if (!hasLevel && !hasTone) {
-                    addEmptyPanelHint(toneContainer, "MODEL-CAPTURED / NO CONTROLS");
+                    int activeId = AudioEngine.getActivePluginID(position);
+                    if (activeId == 9001 /* ggrouting SPLIT */) {
+                        buildSplitRoutingPanel(toneContainer, position);
+                    } else {
+                        addEmptyPanelHint(toneContainer, "MODEL-CAPTURED / NO CONTROLS");
+                    }
                 }
             }
         });
@@ -5243,6 +5271,147 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     public void updateRoutingUI(int mode) {
         // No routing buttons anymore - routing is implicit from node wiring
         // This method kept for preset loading compatibility only
+    }
+
+    /**
+     * R15 §6: Helix-style routing panel for SPLIT blocks. The native ggrouting
+     * module has no control ports (numControls = 0), so the block previously
+     * fell into the "NO CONTROLS" hint with no way to pick a split mode or set
+     * branch gains. Segmented control [A/B Mix | A/B Stereo | Y (L/R)] +
+     * Gain A / Gain B seekbars (0..200% -> 0..2.0), applied live via
+     * setRoutingSplitMode / setBranchGain.
+     */
+    private void buildSplitRoutingPanel(LinearLayout container, int position) {
+        if (container == null) return;
+        float density = getResources().getDisplayMetrics().density;
+        container.setOrientation(LinearLayout.VERTICAL);
+
+        TextView modeTitle = new TextView(this);
+        modeTitle.setText("SPLIT MODE");
+        modeTitle.setTextColor(Color.parseColor("#8F94A0"));
+        modeTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 10f * density);
+        modeTitle.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        modeTitle.setPadding(0, Math.round(4 * density), 0, Math.round(6 * density));
+        container.addView(modeTitle);
+
+        LinearLayout segRow = new LinearLayout(this);
+        segRow.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams segLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        segLp.setMargins(0, 0, 0, Math.round(10 * density));
+        segRow.setLayoutParams(segLp);
+
+        final String[] modes = {"A/B Mix", "A/B Stereo", "Y (L/R)"};
+        int curMode = 0;
+        try { curMode = AudioEngine.getRoutingSplitMode(); } catch (Throwable ignored) {}
+        for (int m = 0; m < modes.length; m++) {
+            final int modeIdx = m;
+            TextView btn = new TextView(this);
+            btn.setText(modes[m]);
+            btn.setTextColor(Color.WHITE);
+            btn.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 10.5f * density);
+            btn.setGravity(Gravity.CENTER);
+            btn.setPadding(Math.round(8 * density), Math.round(10 * density),
+                    Math.round(8 * density), Math.round(10 * density));
+            LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(
+                    0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+            if (m > 0) blp.setMarginStart(Math.round(4 * density));
+            btn.setLayoutParams(blp);
+            btn.setBackgroundResource(modeIdx == curMode
+                    ? R.drawable.glass_category_selected_bg : R.drawable.glass_card_bg);
+            btn.setOnClickListener(v -> {
+                AudioEngine.setRoutingSplitMode(modeIdx);
+                for (int c = 0; c < segRow.getChildCount(); c++) {
+                    segRow.getChildAt(c).setBackgroundResource(
+                            c == modeIdx ? R.drawable.glass_category_selected_bg
+                                         : R.drawable.glass_card_bg);
+                }
+            });
+            segRow.addView(btn);
+        }
+        container.addView(segRow);
+
+        TextView gainTitle = new TextView(this);
+        gainTitle.setText("BRANCH GAIN");
+        gainTitle.setTextColor(Color.parseColor("#8F94A0"));
+        gainTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 10f * density);
+        gainTitle.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        gainTitle.setPadding(0, 0, 0, Math.round(6 * density));
+        container.addView(gainTitle);
+
+        String[] gainNames = {"GAIN A", "GAIN B"};
+        int routingColor = Color.parseColor("#A1A1AA");
+        for (int br = 0; br < 2; br++) {
+            final int branch = br;
+            float g = 1.0f;
+            try { g = AudioEngine.getBranchGain(position, branch); } catch (Throwable ignored) {}
+
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding(Math.round(12 * density), Math.round(6 * density),
+                    Math.round(12 * density), Math.round(6 * density));
+            row.setBackgroundResource(R.drawable.glass_card_bg);
+            LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            rlp.setMargins(0, 0, 0, Math.round(6 * density));
+            row.setLayoutParams(rlp);
+
+            TextView label = new TextView(this);
+            label.setText(gainNames[branch]);
+            label.setTextColor(Color.parseColor("#E6E6E6"));
+            label.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 11f * density);
+            label.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+            LinearLayout.LayoutParams llp = new LinearLayout.LayoutParams(
+                    0, ViewGroup.LayoutParams.WRAP_CONTENT, 0.32f);
+            llp.setMarginEnd(Math.round(8 * density));
+            label.setLayoutParams(llp);
+
+            final int progressMax = 200;
+            SeekBar seek = new SeekBar(this);
+            float radius = 7 * density;
+            android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+            bg.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+            bg.setCornerRadius(radius);
+            bg.setColor(Color.parseColor("#2E323B"));
+            RoundedProgressDrawable fill = new RoundedProgressDrawable(routingColor, radius);
+            android.graphics.drawable.LayerDrawable layer = new android.graphics.drawable.LayerDrawable(
+                    new android.graphics.drawable.Drawable[]{bg, fill});
+            layer.setId(0, android.R.id.background);
+            layer.setId(1, android.R.id.progress);
+            seek.setProgressDrawable(layer);
+            seek.setThumb(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+            seek.setPadding(0, 0, 0, 0);
+            seek.setMax(progressMax);
+            seek.setProgress(Math.round(g * 100f));
+            LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(
+                    0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+            slp.setMarginStart(Math.round(4 * density));
+            seek.setLayoutParams(slp);
+
+            TextView val = new TextView(this);
+            val.setText(String.format(java.util.Locale.US, "%.0f%%", g * 100f));
+            val.setTextColor(Color.parseColor("#E6E6E6"));
+            val.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 11f * density);
+            val.setMinWidth(Math.round(48 * density));
+            val.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+
+            seek.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
+                @Override public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
+                    if (!fromUser) return;
+                    float gv = progress / 100f;
+                    AudioEngine.setBranchGain(position, branch, gv);
+                    val.setText(String.format(java.util.Locale.US, "%.0f%%", gv * 100f));
+                }
+                @Override public void onStartTrackingTouch(SeekBar sb) {}
+                @Override public void onStopTrackingTouch(SeekBar sb) {}
+            });
+
+            row.addView(label);
+            row.addView(seek);
+            row.addView(val);
+            container.addView(row);
+        }
     }
 
     int getCategoryIconRes(String pluginName) {
@@ -5598,6 +5767,14 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             AudioEngine.setRoutingMode(rMode);
             updateRoutingUI(rMode);
         }
+        // R15 §6: Helix-style split mode + per-branch gains. Gains are
+        // slot-based (keyed to the split's pairing MERGE) like the graph
+        // edges; applied after the chain is rebuilt so slots are final.
+        if (jsonObject.has("splitMode")) {
+            AudioEngine.setRoutingSplitMode(jsonObject.optInt("splitMode", 0));
+        }
+        final org.json.JSONObject savedGains =
+                jsonObject.optJSONObject("routingGains");
 
         final List<Integer> savedGraphEdges = new ArrayList<>();
         // Engine slots of blocks saved as bypassed (re-applied after build).
@@ -5811,6 +5988,24 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 if (s >= 0 && s < AudioEngine.getActivePlugins()) AudioEngine.togglePlugin(s, false);
             } catch (Exception e) {
                 Log.w(TAG, "loadPreset: bypass restore failed for slot " + s, e);
+            }
+        }
+
+        // R15 §6: restore per-split branch gains now that the chain (and its
+        // slot indexes) is final.
+        if (savedGains != null) {
+            java.util.Iterator<String> gk = savedGains.keys();
+            while (gk.hasNext()) {
+                String slotKey = gk.next();
+                org.json.JSONObject g = savedGains.optJSONObject(slotKey);
+                if (g == null) continue;
+                try {
+                    int slot = Integer.parseInt(slotKey);
+                    if (slot >= 0 && slot < AudioEngine.getActivePlugins()) {
+                        AudioEngine.setBranchGain(slot, 0, (float) g.optDouble("a", 1.0));
+                        AudioEngine.setBranchGain(slot, 1, (float) g.optDouble("b", 1.0));
+                    }
+                } catch (NumberFormatException ignored) {}
             }
         }
 

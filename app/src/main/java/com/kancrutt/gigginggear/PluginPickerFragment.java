@@ -364,7 +364,12 @@ public class PluginPickerFragment extends BottomSheetDialogFragment {
                 String pNameKey = pName.toLowerCase().trim();
                 if (blacklist != null && blacklist.has(pNameKey) && !enableBlacklisted) continue;
                 String desc = obj.optString("desc", obj.optString("description", "Built-in Effect"));
-                if (!(pName.toLowerCase().contains(q) || desc.toLowerCase().contains(q))) continue;
+                // Dash/underscore-insensitive: "oc2" must find "OC-2" (R16:
+                // the FAB picker kept its own unnormalized contains and the
+                // MainActivity fix never touched this path).
+                String nameNorm = pName.toLowerCase().replaceAll("[^a-z0-9]", "");
+                if (!(nameNorm.contains(q.replaceAll("[^a-z0-9]", ""))
+                        || desc.toLowerCase().contains(q))) continue;
                 seen.add(pName);
                 String shortDesc = desc.length() > 40 ? desc.substring(0, 37) + "…" : desc;
 

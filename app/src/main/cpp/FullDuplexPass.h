@@ -125,8 +125,22 @@ public:
                 case ggsolver::OpType::COPY: {
                     float *dst = bufFor(op.dst);
                     float *src = bufFor(op.src);
-                    if (dst != src)
-                        memcpy(dst, src, sizeof(float) * (size_t)samplesToProcess);
+                    if (dst != src) {
+                        // R16 §6 fix: the FIRST predecessor of a merge is
+                        // COPIED (not MIXed), so its vanity gain used to be a
+                        // silent no-op — the signal-path test proved muting
+                        // Gain A changed nothing. The plan now tags that COPY
+                        // with its merge node + branch. Unity copies keep the
+                        // fast memcpy.
+                        if (op.gainNode < 0) {
+                            memcpy(dst, src, sizeof(float) * (size_t)samplesToProcess);
+                        } else {
+                            float g = op.gainBranch <= 0
+                                    ? sBranchGainA[op.gainNode].load(std::memory_order_relaxed)
+                                    : sBranchGainB[op.gainNode].load(std::memory_order_relaxed);
+                            for (int s = 0; s < samplesToProcess; s++) dst[s] = src[s] * g;
+                        }
+                    }
                     break;
                 }
                 case ggsolver::OpType::MIX: {

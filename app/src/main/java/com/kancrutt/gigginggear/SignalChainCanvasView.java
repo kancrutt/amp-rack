@@ -594,11 +594,16 @@ public class SignalChainCanvasView extends View {
                 n.categoryColor = COLOR_SPLIT;
                 n.categoryIconRes = R.drawable.ic_routing_split;
                 n.name = "SPLIT";
+                // R16: the tile badge derives from the raw name ("Giggin Gear
+                // SPLIT" -> UTILITY category code); routing blocks get their
+                // own short code so the canvas reads SPLIT/MERGE.
+                n.categoryCode = "SPLIT";
             } else if (nlow.contains("merge")) {
                 n.nodeType = NodeType.MERGE;
                 n.categoryColor = COLOR_MERGE;
                 n.categoryIconRes = R.drawable.ic_routing_merge;
                 n.name = "MERGE";
+                n.categoryCode = "MERGE";
             }
 
             // Preserve selection AND position from previous layout, or place new block right after the last block.

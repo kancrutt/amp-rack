@@ -4579,7 +4579,10 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                         LinearLayout.LayoutParams toggleLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
                         toggleLp.setMargins(0, Math.round(4 * density), 0, Math.round(4 * density));
                         toggleRow.setLayoutParams(toggleLp);
-                        toggleRow.setMinimumHeight(Math.round(48 * density));
+                        // R16: no fixed min height — tone rows are weight-driven.
+                        // The 48dp floor forced a 3-control panel past its
+                        // weight share, starving the stacked LEVEL panel to
+                        // 200px (Octolo row 4 fell below the fold).
 
                         TextView tLabel = new TextView(this);
                         tLabel.setText(cName);
@@ -4650,7 +4653,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                         LinearLayout.LayoutParams eRowLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
                         eRowLp.setMargins(0, Math.round(4 * density), 0, Math.round(4 * density));
                         enumRow.setLayoutParams(eRowLp);
-                        enumRow.setMinimumHeight(Math.round(48 * density));
 
                         TextView enumName = new TextView(this);
                         enumName.setText(cName);
@@ -4896,7 +4898,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                         LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
                         rowLp.setMargins(0, Math.round(4 * density), 0, Math.round(4 * density));
                         sliderRow.setLayoutParams(rowLp);
-                        sliderRow.setMinimumHeight(Math.round(48 * density));
 
                         TextView nameLabel = new TextView(this);
                         nameLabel.setText(cName);
@@ -5186,6 +5187,12 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                         tllp.weight = 0f;
                     }
                     levelPanel.setLayoutParams(lllp);
+                        // R16: LEVEL needs a floor big enough for its rows
+                        // (72px/row -> 288px for 4). A tall CONTROLS list used
+                        // to starve the stacked LEVEL panel to ~200px and push
+                        // the last rows below the fold (Octolo R3.2).
+                        int minLvlRows = Math.max(1, Math.min(6, levelCells.size()));
+                        levelPanel.setMinimumHeight(Math.round(minLvlRows * 72f));
                     tonePanel.setLayoutParams(tllp);
                 }
 

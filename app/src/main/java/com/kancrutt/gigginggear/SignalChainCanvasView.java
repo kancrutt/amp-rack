@@ -247,6 +247,18 @@ public class SignalChainCanvasView extends View {
     private static final int COLOR_MERGE  = Color.parseColor("#FF8A00");
     private static final int COLOR_ROUTING = Color.parseColor("#A1A1AA");
     private static final int COLOR_SPLIT  = COLOR_ROUTING;
+    // R17 §2.3: Helix-style branch colors — upper branch (A) blue, lower
+    // branch (B) amber. Wires, port dots and tile borders carry them so the
+    // two parallel paths are readable at a glance (previously only a thin
+    // category-colored dot distinguished them).
+    private static final int COLOR_BRANCH_A = Color.parseColor("#4C8DFF");
+    private static final int COLOR_BRANCH_B = Color.parseColor("#E3B341");
+    /** Branch identity of a chain slot, or 0 when it is not in a branch. */
+    static int branchAccentColor(int branch) {
+        if (branch == 1) return COLOR_BRANCH_A;
+        if (branch == 2) return COLOR_BRANCH_B;
+        return 0;
+    }
 
     public SignalChainCanvasView(Context ctx) { super(ctx); init(); }
     public SignalChainCanvasView(Context ctx, AttributeSet attrs) { super(ctx, attrs); init(); }
@@ -1473,7 +1485,13 @@ public class SignalChainCanvasView extends View {
             Node a = nodeMap.get(e.fromNodeId);
             Node b = nodeMap.get(e.toNodeId);
             if (a == null || b == null) continue;
-            int wireColor = a.isAnchor() ? WIRE_COLOR : a.categoryColor;
+            // R17 §2.3: a segment inside a parallel branch wears that branch's
+            // color. Source branch wins when set (block -> next block); the
+            // SPLIT -> first-branch-block wire inherits the destination branch.
+            int wireBranch = a.branch != 0 ? a.branch : b.branch;
+            int wireColor = a.isAnchor() ? WIRE_COLOR
+                    : (branchAccentColor(wireBranch) != 0 ? branchAccentColor(wireBranch)
+                                                          : a.categoryColor);
             float ax = a.getOutputX();
             float ay = a.getOutputY();
             float bx = b.getInputX();
@@ -1497,6 +1515,67 @@ public class SignalChainCanvasView extends View {
                 drawNode(canvas, n);
             }
         }
+
+        drawRoutingLegend(canvas);
+    }
+
+    /**
+     * R17 §2.3: routing legend while any block sits in a parallel branch.
+     * Fixed to the viewport corner (survives canvas scrolling) so the branch
+     * colors are always explained: A = blue, B = amber.
+     */
+    private void drawRoutingLegend(Canvas canvas) {
+        boolean anyBranch = false;
+        for (Node n : nodes) {
+            if (!n.isAnchor() && n.branch != 0) { anyBranch = true; break; }
+        }
+        if (!anyBranch) return;
+
+        float d = getResources().getDisplayMetrics().density;
+        float pad = 6f * d;
+        float chipH = 16f * d;
+        float dotR = 3.5f * d;
+        float gap = 5f * d;
+        float between = 10f * d;
+        float textSize = 8.5f * d;
+
+        Paint labelPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        labelPaint.setTextSize(textSize);
+        labelPaint.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
+                android.graphics.Typeface.BOLD));
+        labelPaint.setTextAlign(Paint.Align.LEFT);
+
+        float entryW = dotR * 2 + gap + labelPaint.measureText("A");
+        float legendW = pad * 2 + entryW * 2 + between;
+        float x0 = 8f * d, y0 = 8f * d;
+        android.graphics.RectF r = new android.graphics.RectF(x0, y0, x0 + legendW, y0 + chipH + pad * 2);
+
+        Paint bg = new Paint(Paint.ANTI_ALIAS_FLAG);
+        bg.setColor(Color.parseColor("#CC161A1F"));
+        canvas.drawRoundRect(r, 6f * d, 6f * d, bg);
+        Paint border = new Paint(Paint.ANTI_ALIAS_FLAG);
+        border.setStyle(Paint.Style.STROKE);
+        border.setStrokeWidth(1f);
+        border.setColor(Color.parseColor("#2A2F37"));
+        canvas.drawRoundRect(r, 6f * d, 6f * d, border);
+
+        float cx = x0 + pad;
+        float cy = r.centerY();
+        drawLegendEntry(canvas, cx, cy, dotR, gap, textSize, COLOR_BRANCH_A, "A", labelPaint);
+        cx += entryW + between;
+        drawLegendEntry(canvas, cx, cy, dotR, gap, textSize, COLOR_BRANCH_B, "B", labelPaint);
+    }
+
+    private void drawLegendEntry(Canvas canvas, float x, float cy, float dotR, float gap,
+                                 float textSize, int color, String label, Paint labelPaint) {
+        float d = getResources().getDisplayMetrics().density;
+        Paint dot = new Paint(Paint.ANTI_ALIAS_FLAG);
+        dot.setColor(color);
+        canvas.drawCircle(x + dotR, cy, dotR, dot);
+        labelPaint.setColor(color);
+        labelPaint.setTextSize(textSize);
+        android.graphics.Paint.FontMetrics fm = labelPaint.getFontMetrics();
+        canvas.drawText(label, x + dotR * 2 + gap, cy - (fm.ascent + fm.descent) / 2f, labelPaint);
     }
 
     private void drawAnchorNode(Canvas canvas, Node n) {
@@ -1534,6 +1613,9 @@ public class SignalChainCanvasView extends View {
 
         // Bypassed nodes use dimmed/desaturated category color
         int drawColor = n.bypassed ? dimColor(n.categoryColor, 0.35f) : n.categoryColor;
+        // R17 §2.3: blocks inside a parallel branch wear the branch color on
+        // their border + ports; the icon keeps the category color. 0 = trunk.
+        int branchAccent = branchAccentColor(n.branch);
 
         if (n.selected) {
             Paint glowBg = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -1549,8 +1631,10 @@ public class SignalChainCanvasView extends View {
         } else {
             Paint normBorder = new Paint(Paint.ANTI_ALIAS_FLAG);
             normBorder.setStyle(Paint.Style.STROKE);
-            normBorder.setStrokeWidth(1.5f);
-            normBorder.setColor(Color.argb(35, 255, 255, 255));
+            normBorder.setStrokeWidth(branchAccent != 0 ? 2.5f : 1.5f);
+            normBorder.setColor(branchAccent != 0
+                    ? branchAccent
+                    : Color.argb(35, 255, 255, 255));
             canvas.drawRoundRect(r, 12, 12, normBorder);
         }
 
@@ -1593,10 +1677,11 @@ public class SignalChainCanvasView extends View {
          paintText.setTextSize(10f * d);
         canvas.drawText(code, n.x + n.width / 2f, n.y + n.height - 8f * d, paintText);
 
-        // Port dots — density-scaled to match anchor nodes
+        // Port dots — density-scaled to match anchor nodes. Branch members
+        // use the branch accent (R17 §2.3) so both sides of a split read A/B.
         float pr = 4.5f * getResources().getDisplayMetrics().density;
-        paintInputDot.setColor(drawColor);
-        paintOutputDot.setColor(drawColor);
+        paintInputDot.setColor(branchAccent != 0 ? branchAccent : drawColor);
+        paintOutputDot.setColor(branchAccent != 0 ? branchAccent : drawColor);
         canvas.drawCircle(n.getInputX(), n.getInputY(), pr, paintInputDot);
         canvas.drawCircle(n.getOutputX(), n.getOutputY(), pr, paintOutputDot);
 
@@ -1611,6 +1696,28 @@ public class SignalChainCanvasView extends View {
             float sep = n.height * 0.26f;
             canvas.drawCircle(n.getInputX(), n.getInputY() - sep, pr * 0.85f, paintInputDot);
             canvas.drawCircle(n.getInputX(), n.getInputY() + sep, pr * 0.85f, paintInputDot);
+        }
+
+        // R17 §2.3: small A/B badge so a branch member is identifiable even
+        // before following its wires.
+        if (branchAccent != 0) {
+            String tag = n.branch == 1 ? "A" : "B";
+            Paint badgeBg = new Paint(Paint.ANTI_ALIAS_FLAG);
+            badgeBg.setColor(branchAccent);
+            Paint badgeText = new Paint(Paint.ANTI_ALIAS_FLAG);
+            badgeText.setColor(Color.parseColor("#101318"));
+            badgeText.setTextSize(7.5f * d);
+            badgeText.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
+                    android.graphics.Typeface.BOLD));
+            badgeText.setTextAlign(Paint.Align.CENTER);
+            float bh = 10f * d;
+            float bw = badgeText.measureText(tag) + 6f * d;
+            float bx = n.x + n.width - bw - 4f * d;
+            float by = n.y + 4f * d;
+            canvas.drawRoundRect(new android.graphics.RectF(bx, by, bx + bw, by + bh),
+                    3f * d, 3f * d, badgeBg);
+            android.graphics.Paint.FontMetrics fm = badgeText.getFontMetrics();
+            canvas.drawText(tag, bx + bw / 2f, by + bh / 2f - (fm.ascent + fm.descent) / 2f, badgeText);
         }
 
         if (n.selected) {

@@ -574,7 +574,8 @@ public class Tracks extends Fragment {
         trackDrawable.setId(0, android.R.id.background);
         trackDrawable.setId(1, android.R.id.progress);
         seekBar.setProgressDrawable(trackDrawable);
-        seekBar.setThumb(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+        seekBar.setThumb(MainActivity.transparentSeekThumb(
+                    getResources().getDisplayMetrics().density));
         seekBar.setPadding(0,0,0,0);
     }
 }

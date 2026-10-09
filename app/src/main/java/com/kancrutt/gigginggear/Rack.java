@@ -516,7 +516,8 @@ public class Rack extends Fragment {
             layer.setId(0, android.R.id.background);
             layer.setId(1, android.R.id.progress);
             volSeek.setProgressDrawable(layer);
-            volSeek.setThumb(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+            volSeek.setThumb(MainActivity.transparentSeekThumb(
+                    getResources().getDisplayMetrics().density));
             volSeek.setPadding(0, 0, 0, 0);
             volSeek.setMax(10000);
             volSeek.setProgress(7936);

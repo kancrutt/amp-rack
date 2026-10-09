@@ -4123,7 +4123,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 gLayer.setId(0, android.R.id.background);
                 gLayer.setId(1, android.R.id.progress);
                 gainSeek.setProgressDrawable(gLayer);
-                gainSeek.setThumb(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+                gainSeek.setThumb(transparentSeekThumb(getResources().getDisplayMetrics().density));
                 gainSeek.setPadding(0, 0, 0, 0);
                 gainSeek.setMax(gainSeekMax);
                 int initPct;
@@ -4808,7 +4808,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                         trackDrawableLvl.setId(0, android.R.id.background);
                         trackDrawableLvl.setId(1, android.R.id.progress);
                         seekBarLvl.setProgressDrawable(trackDrawableLvl);
-                        seekBarLvl.setThumb(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+                        seekBarLvl.setThumb(transparentSeekThumb(getResources().getDisplayMetrics().density));
                         seekBarLvl.setPadding(0, 0, 0, 0);
                         seekBarLvl.setMax(progressMaxLvl);
                         float clampedValLvl = Math.max(minVal, Math.min(val, maxVal));
@@ -4933,7 +4933,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                         trackDrawable.setId(0, android.R.id.background);
                         trackDrawable.setId(1, android.R.id.progress);
                         seekBar.setProgressDrawable(trackDrawable);
-                        seekBar.setThumb(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+                        seekBar.setThumb(transparentSeekThumb(getResources().getDisplayMetrics().density));
                         seekBar.setPadding(0, 0, 0, 0);
                         seekBar.setMax(progressMax);
                         float clampedVal = Math.max(minVal, Math.min(val, maxVal));
@@ -5387,7 +5387,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             layer.setId(0, android.R.id.background);
             layer.setId(1, android.R.id.progress);
             seek.setProgressDrawable(layer);
-            seek.setThumb(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+            seek.setThumb(transparentSeekThumb(getResources().getDisplayMetrics().density));
             seek.setPadding(0, 0, 0, 0);
             seek.setMax(progressMax);
             seek.setProgress(Math.round(g * 100f));
@@ -5419,6 +5419,23 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             row.addView(val);
             container.addView(row);
         }
+    }
+
+    /**
+     * R17: an invisible seekbar thumb. ColorDrawable.getIntrinsicWidth()
+     * returns -1, which skews AbsSeekBar's touch->progress mapping at the
+     * track ends - tapping exactly 0% needed two taps (r16 finding 4). A
+     * 1dp transparent oval keeps the mapping honest and stays invisible:
+     * the rounded fill + track carry all the visuals.
+     */
+    static android.graphics.drawable.Drawable transparentSeekThumb(float density) {
+        android.graphics.drawable.GradientDrawable thumb =
+                new android.graphics.drawable.GradientDrawable();
+        thumb.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        int px = Math.max(1, Math.round(1 * density));
+        thumb.setSize(px, px);
+        thumb.setColor(android.graphics.Color.TRANSPARENT);
+        return thumb;
     }
 
     int getCategoryIconRes(String pluginName) {

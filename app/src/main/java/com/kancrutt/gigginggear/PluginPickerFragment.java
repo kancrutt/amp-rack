@@ -227,12 +227,25 @@ public class PluginPickerFragment extends BottomSheetDialogFragment {
     private void loadItemsForCategory(CategoryHelper.Category cat) {
         if (itemsContainer == null || mainActivity == null) return;
         itemsContainer.removeAllViews();
+        // R15 §1: reset the viewport on every repopulate so a tall category
+        // doesn't open below its first rows.
+        if (itemsContainer.getParent() instanceof android.widget.ScrollView) {
+            ((android.widget.ScrollView) itemsContainer.getParent()).scrollTo(0, 0);
+        }
 
-        if (cat == CategoryHelper.Category.SPLIT || cat == CategoryHelper.Category.MERGE) {
+        // Routing blocks live under the Utility chip (normalizeRouting maps
+        // SPLIT/MERGE -> UTILITY; there is no dedicated Routing chip). The
+        // FAB "ADD EFFECT BLOCK" list is built from the 282-name catalog
+        // which has ZERO split/merge entries — without this branch the tiles
+        // were only reachable via a direct text search (round-15 §1).
+        if (cat == CategoryHelper.Category.SPLIT || cat == CategoryHelper.Category.MERGE
+                || cat == CategoryHelper.Category.UTILITY) {
             // Routing utilities
             addRoutingRow("SPLIT (Parallel Branch)", "Split signal into 2 parallel paths", R.drawable.ic_routing_split, true);
             addRoutingRow("MERGE (Sum to Mono)", "Combine parallel branches into 1 path", R.drawable.ic_routing_merge, false);
-            return;
+            if (cat == CategoryHelper.Category.SPLIT || cat == CategoryHelper.Category.MERGE) {
+                return;
+            }
         }
 
         // Load blacklist

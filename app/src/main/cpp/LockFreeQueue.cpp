@@ -8,6 +8,7 @@
 LockFreeQueue<AudioBuffer *, LOCK_FREE_SIZE> LockFreeQueueManager::lockFreeQueue;
 std::thread LockFreeQueueManager::fileWriteThread  ;
 std::atomic<bool> LockFreeQueueManager::ready = false;
+std::atomic<int> LockFreeQueueManager::poolBufferSize = 0;
 void (* LockFreeQueueManager::functions [MAX_FUNCTIONS])(AudioBuffer *) ;
 AudioBuffer * LockFreeQueueManager::pAudioBuffer [SPARE_BUFFERS]; 
 int  LockFreeQueueManager::buffer_counter ;
@@ -30,6 +31,10 @@ void LockFreeQueueManager::init (int _buffer_size) {
             thread_started = false;
         }
         if (pAudioBuffer[0] != nullptr) {
+            // Publish 0 FIRST: a queue entry still in flight now fails
+            // updateMeterOutput's capacity check instead of reading the freed
+            // data arrays (R15 §5 SIGSEGV on the worker).
+            LockFreeQueueManager::poolBufferSize = 0;
             for (int i = 0; i < SPARE_BUFFERS; i++) {
                 if (pAudioBuffer[i] != nullptr) {
                     free(pAudioBuffer[i]->data);
@@ -52,6 +57,7 @@ void LockFreeQueueManager::init (int _buffer_size) {
             pAudioBuffer[i]->raw = static_cast<float *>(malloc(buffer_size * sizeof(float)));
             pAudioBuffer[i]->pos = 0;
         }
+        LockFreeQueueManager::poolBufferSize = buffer_size ;
     }
 //        for (int x = 0 ; x < buffer_size ; x ++) {
 //            pAudioBuffer [i]->data [x] = 0.0f ;
@@ -97,6 +103,11 @@ void LockFreeQueueManager::process (float * raw, float * data, int samplesToProc
         return;
     }
 
+    // R15 §5: an empty parallel branch can hand the callback null pointers
+    // (nothing is wired into that branch yet). Writing through them here was
+    // a null-deref on the RT thread — bail instead, the queue just skips
+    // that burst's meter/tuner sample.
+    if (raw == nullptr || data == nullptr) return;
     if (pAudioBuffer[buffer_counter] == nullptr) return;
     int toProcess = std::min(samplesToProcess, buffer_size);
     if (toProcess <= 0) return;

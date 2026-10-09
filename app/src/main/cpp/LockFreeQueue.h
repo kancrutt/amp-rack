@@ -175,6 +175,11 @@ class LockFreeQueueManager {
     // thread (init()/quit()). Plain bool was a data race (UB); atomic makes
     // the gate well-defined without adding a lock to the hot path.
     static std::atomic<bool> ready ;
+    // Current pool buffer capacity in floats (R15 §5): Meter::updateMeterOutput
+    // reads buffer->pos on the worker thread and must reject samples counts
+    // above the allocated capacity — a stale queue entry from before a pool
+    // resize would otherwise read out of bounds.
+    static std::atomic<int> poolBufferSize ;
 
     #define MAX_FUNCTIONS 10
     static void (* functions [MAX_FUNCTIONS])(AudioBuffer *) ;
@@ -185,6 +190,9 @@ class LockFreeQueueManager {
 
 public:
     JavaVM * vm = NULL  ;
+
+    /** Current pool capacity in floats (see poolBufferSize comment). */
+    static int curPoolBufferSize() { return poolBufferSize.load(); }
 
     void init (int _buffer_size) ;
     void add_function(int (*f)(AudioBuffer *));

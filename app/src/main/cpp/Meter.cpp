@@ -127,6 +127,11 @@ int Meter::updateMeterOutput (AudioBuffer * buffer) {
     // Legit bursts are a few hundred frames; anything at/above this bound is
     // a torn/corrupt header — reading it would fault out of bounds.
     if (samples <= 0 || samples > 8192) return 0;
+    // R15 §5: the pool arrays are allocated at the current queue buffer size.
+    // A stale queue entry published before a pool resize (or a torn pos) can
+    // carry a samples count above the allocated capacity -> OOB read on the
+    // worker (SIGSEGV after adding SPLIT/MERGE with an empty branch B).
+    if (samples > LockFreeQueueManager::curPoolBufferSize()) return 0;
 
     /*
     if (! enabled) {

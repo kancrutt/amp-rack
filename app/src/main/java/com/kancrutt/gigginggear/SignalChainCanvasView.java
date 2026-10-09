@@ -593,26 +593,35 @@ public class SignalChainCanvasView extends View {
                 n.nodeType = NodeType.SPLIT;
                 n.categoryColor = COLOR_SPLIT;
                 n.categoryIconRes = R.drawable.ic_routing_split;
+                n.name = "SPLIT";
             } else if (nlow.contains("merge")) {
                 n.nodeType = NodeType.MERGE;
                 n.categoryColor = COLOR_MERGE;
                 n.categoryIconRes = R.drawable.ic_routing_merge;
+                n.name = "MERGE";
             }
-            
+
             // Preserve selection AND position from previous layout, or place new block right after the last block.
             // Bypass LEDs always re-read the engine: preset restores toggle
             // natively, so a stale preserved flag would draw the wrong state.
             // Prefer the previous node in the SAME slot (stable identity when
             // nothing moved); fall back to the kth unused old node with the
             // same plugin id (reorder case). Never "last LV2 block wins".
+            // R15 §4: SPLIT/MERGE instantiate from ONE native ggrouting module
+            // -> the SAME pluginId for both, so the reuse queue collided (MERGE
+            // polled SPLIT's old node) and stacked both tiles on one spot.
+            // Routing blocks skip reuse entirely: always laid out at their
+            // sequential slot position.
             Node old = null;
-            java.util.ArrayDeque<Node> queue = oldByPluginId.get(n.pluginId);
-            Node sameSlot = oldNodes.get(i);
-            if (sameSlot != null && !sameSlot.isAnchor() && sameSlot.pluginId == n.pluginId) {
-                old = sameSlot;
-                if (queue != null) queue.remove(sameSlot);
-            } else if (queue != null) {
-                old = queue.pollFirst();
+            if (!n.isRouting()) {
+                java.util.ArrayDeque<Node> queue = oldByPluginId.get(n.pluginId);
+                Node sameSlot = oldNodes.get(i);
+                if (sameSlot != null && !sameSlot.isAnchor() && sameSlot.pluginId == n.pluginId) {
+                    old = sameSlot;
+                    if (queue != null) queue.remove(sameSlot);
+                } else if (queue != null) {
+                    old = queue.pollFirst();
+                }
             }
             if (old != null) {
                 n.selected = old.selected;
@@ -621,6 +630,9 @@ public class SignalChainCanvasView extends View {
                 n.x = cx;
                 n.y = old.y;
                 n.bypassed = old.bypassed;
+            } else if (n.isRouting()) {
+                // Sequential slot position: the Node ctor already holds cx
+                // (xCursor advanced above); do NOT rightmost-place these.
             } else if (!oldNodes.isEmpty()) {
                 // Auto-place new effect block in empty canvas space immediately to the right of the last block
                 n.x = rightmostX + spacing;

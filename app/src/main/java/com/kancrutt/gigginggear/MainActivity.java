@@ -3462,7 +3462,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             for (int s = 0; s < AudioEngine.getActivePlugins(); s++) {
                 String nm = null;
                 try { nm = AudioEngine.getActivePluginName(s); } catch (Exception ignored) {}
-                if (nm == null || !nm.toLowerCase().contains("split")) continue;
+                if (!PluginNaming.isRoutingName(nm)) continue;
                 org.json.JSONObject g = new org.json.JSONObject();
                 g.put("a", AudioEngine.getBranchGain(s, 0));
                 g.put("b", AudioEngine.getBranchGain(s, 1));
@@ -3557,6 +3557,29 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 preset.put("node_positions", (Map) posMap);
             }
         }
+
+        // R15 §6 / r17: Helix routing state — parity with presetToString(). The
+        // scene save path serializes this map, and without these keys a scene
+        // restored its blocks but reset split mode and branch gains to default.
+        try {
+            preset.put("routingMode", AudioEngine.getRoutingMode());
+        } catch (Exception ignored) {}
+        try {
+            preset.put("splitMode", AudioEngine.getRoutingSplitMode());
+        } catch (Exception ignored) {}
+        try {
+            Map<String, Object> gains = new HashMap<>();
+            for (int s = 0; s < AudioEngine.getActivePlugins(); s++) {
+                String nm = null;
+                try { nm = AudioEngine.getActivePluginName(s); } catch (Exception ignored) {}
+                if (!PluginNaming.isRoutingName(nm)) continue;
+                Map<String, Float> g = new HashMap<>();
+                g.put("a", AudioEngine.getBranchGain(s, 0));
+                g.put("b", AudioEngine.getBranchGain(s, 1));
+                gains.put(String.valueOf(s), g);
+            }
+            preset.put("routingGains", gains);
+        } catch (Exception ignored) {}
 
         return preset;
     }
@@ -3678,6 +3701,26 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                         p.nodePositions.put(String.valueOf(n.id), new float[]{n.x, n.y});
                     }
                 }
+            }
+        } catch (Exception ignored) {}
+
+        // Helix routing state for the Preset schema (floppy save + cold-start
+        // activePreset snapshot) — same keys as presetToString()/presetToMap().
+        try {
+            p.routingMode = AudioEngine.getRoutingMode();
+        } catch (Exception ignored) {}
+        try {
+            p.splitMode = AudioEngine.getRoutingSplitMode();
+        } catch (Exception ignored) {}
+        try {
+            for (int s = 0; s < total; s++) {
+                String nm = null;
+                try { nm = AudioEngine.getActivePluginName(s); } catch (Exception ignored) {}
+                if (!PluginNaming.isRoutingName(nm)) continue;
+                float[] g = new float[2];
+                g[0] = AudioEngine.getBranchGain(s, 0);
+                g[1] = AudioEngine.getBranchGain(s, 1);
+                p.routingGains.put(String.valueOf(s), g);
             }
         } catch (Exception ignored) {}
 
@@ -5721,6 +5764,26 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             if (map.containsKey("node_positions") && map.get("node_positions") instanceof Map) {
                 legacy.put("node_positions", new JSONObject((Map<?, ?>) map.get("node_positions")));
             }
+            // Helix routing state — forward so loadPreset()'s apply-side reads
+            // it (Gson yields Double for JSON numbers, hence Number.intValue).
+            if (map.get("routingMode") instanceof Number) {
+                legacy.put("routingMode", ((Number) map.get("routingMode")).intValue());
+            }
+            if (map.get("splitMode") instanceof Number) {
+                legacy.put("splitMode", ((Number) map.get("splitMode")).intValue());
+            }
+            if (map.get("routingGains") instanceof Map) {
+                JSONObject rgObj = new JSONObject();
+                for (Map.Entry<?, ?> e : ((Map<?, ?>) map.get("routingGains")).entrySet()) {
+                    if (!(e.getValue() instanceof Map)) continue;
+                    Map<?, ?> g = (Map<?, ?>) e.getValue();
+                    JSONObject gObj = new JSONObject();
+                    if (g.containsKey("a")) gObj.put("a", g.get("a"));
+                    if (g.containsKey("b")) gObj.put("b", g.get("b"));
+                    rgObj.put(String.valueOf(e.getKey()), gObj);
+                }
+                if (rgObj.length() > 0) legacy.put("routingGains", rgObj);
+            }
         } catch (JSONException e) {
             MainActivity.toast("Cannot load preset: " + e.getMessage());
             Log.e(TAG, "loadSchemaV1Preset: ", e);
@@ -5779,10 +5842,10 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             return;
         }
 
-        int items = dataAdapter.totalItems;
-        if (items > 0) {
-            Log.d(TAG, "loadPreset: already loaded something, deleting ...");
-//            dataAdapter.deleteAll();
+        // Always clear the rack list before a rebuild: dataAdapter.totalItems
+        // is a dead field (never assigned), so the old "items > 0" gate never
+        // fired and a load stacked fresh entries on top of stale ones.
+        if (dataAdapter != null) {
             dataAdapter.reset();
         }
 
@@ -5924,6 +5987,32 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 continue;
             }
 
+            // P1 (r17 A.2): ggrouting SPLIT/MERGE are synthetic LADSPA
+            // descriptors present in no shared library and no catalog entry,
+            // so both name-based loaders below silently miss them — save→load
+            // dropped the routing blocks and the whole parallel branch with
+            // them ("connector reset to series"). Restore through the routing
+            // path instead. Slots are engine slots, so keep the plugin counter
+            // in lockstep with whatever the engine actually added.
+            if (PluginNaming.isRoutingName(name)) {
+                boolean split = PluginNaming.isRoutingSplit(name);
+                int beforeRouting = AudioEngine.getActivePlugins();
+                AudioEngine.addRoutingBlock(split);
+                if (AudioEngine.getActivePlugins() > beforeRouting) {
+                    if (dataAdapter != null) {
+                        dataAdapter.addItem(split ? ROUTING_ID_SPLIT : ROUTING_ID_MERGE,
+                                dataAdapter.getItemCount());
+                    }
+                    if (!enabled) disabledSlots.add(plugin);
+                    Log.i(TAG, "loadPreset: restored routing block " + name.trim()
+                            + " at slot " + plugin);
+                    plugin++;
+                } else {
+                    Log.w(TAG, "loadPreset: engine refused routing block " + name);
+                }
+                continue;
+            }
+
             int ret = -1;
             // Blacklist check: skip loading blacklisted plugins from presets
             JSONObject blacklist = ConnectGuitar.loadJSONFromAssetFile(this, "blacklist.json");
@@ -6059,6 +6148,23 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     populateInlineParameterEditor(0, AudioEngine.getActivePluginName(0));
                 }
             }, 300);
+        }
+        // Reconcile the rack list with the engine. The lazy loader adds entries
+        // itself, but the non-lazy path (native addPluginByName) never touches
+        // the adapter; engine is the source of truth and routing slots need the
+        // sentinel ids so chainHasRoom keeps detecting parallel rigs.
+        if (dataAdapter != null && dataAdapter.plugins.size() != AudioEngine.getActivePlugins()) {
+            dataAdapter.reset();
+            int engTotal = AudioEngine.getActivePlugins();
+            for (int s = 0; s < engTotal; s++) {
+                String engName = null;
+                try { engName = AudioEngine.getActivePluginName(s); } catch (Exception ignored) {}
+                int id = 0;
+                if (PluginNaming.isRoutingName(engName)) {
+                    id = PluginNaming.isRoutingSplit(engName) ? ROUTING_ID_SPLIT : ROUTING_ID_MERGE;
+                }
+                dataAdapter.addItem(id, s);
+            }
         }
         if (dataAdapter != null) {
             dataAdapter.notifyDataSetChanged();

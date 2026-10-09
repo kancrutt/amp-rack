@@ -261,6 +261,21 @@ public class LocalPresetManager {
             root.put("node_positions", npObj);
         }
 
+        // Helix routing state — same keys/shape as presetToString() so the
+        // loadPreset() apply-side reads both formats identically.
+        if (p.routingMode >= 0) root.put("routingMode", p.routingMode);
+        if (p.splitMode >= 0) root.put("splitMode", p.splitMode);
+        if (p.routingGains != null && !p.routingGains.isEmpty()) {
+            JSONObject rgObj = new JSONObject();
+            for (Map.Entry<String, float[]> e : p.routingGains.entrySet()) {
+                JSONObject g = new JSONObject();
+                g.put("a", e.getValue()[0]);
+                g.put("b", e.getValue()[1]);
+                rgObj.put(e.getKey(), g);
+            }
+            root.put("routingGains", rgObj);
+        }
+
         return root;
     }
 
@@ -369,6 +384,22 @@ public class LocalPresetManager {
             }
         }
 
+        // Restore Helix routing state (absent in presets saved before R15 §6)
+        p.routingMode = json.optInt("routingMode", -1);
+        p.splitMode = json.optInt("splitMode", -1);
+        JSONObject rgObj = json.optJSONObject("routingGains");
+        if (rgObj != null) {
+            Iterator<String> rgKeys = rgObj.keys();
+            while (rgKeys.hasNext()) {
+                String k = rgKeys.next();
+                JSONObject g = rgObj.optJSONObject(k);
+                if (g == null) continue;
+                p.routingGains.put(k, new float[]{
+                        (float) g.optDouble("a", 1.0f),
+                        (float) g.optDouble("b", 1.0f)});
+            }
+        }
+
         return p;
     }
 
@@ -453,6 +484,10 @@ public class LocalPresetManager {
         public List<PluginItem> plugins = new ArrayList<>();
         public int[] graph;
         public Map<String, float[]> nodePositions = new HashMap<>(); // pluginName/id -> [x, y]
+        // Helix routing state (-1 = not captured, keep engine current).
+        public int routingMode = -1;
+        public int splitMode = -1;
+        public Map<String, float[]> routingGains = new HashMap<>(); // split slot -> [gainA, gainB]
     }
 
     public static class PluginItem {

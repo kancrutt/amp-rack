@@ -209,6 +209,25 @@ public final class PluginNaming {
         return fallbackClean(pluginName);
     }
 
+    /**
+     * True for the synthetic ggrouting blocks (SPLIT/MERGE). These descriptors
+     * live outside every shared library AND the curated catalog, so name-based
+     * preset loaders (addPluginByName / addPlugintoRackByName) can never find
+     * them — callers must restore them through AudioEngine.addRoutingBlock or
+     * the routing blocks are silently dropped on load.
+     */
+    public static boolean isRoutingName(String name) {
+        if (name == null || name.isEmpty()) return false;
+        String n = name.toLowerCase(java.util.Locale.ROOT);
+        return n.contains("giggin gear split") || n.contains("giggin gear merge");
+    }
+
+    /** Whether a routing name ({@link #isRoutingName}) is the SPLIT block (vs MERGE). */
+    public static boolean isRoutingSplit(String name) {
+        return name != null
+                && name.toLowerCase(java.util.Locale.ROOT).contains("giggin gear split");
+    }
+
     /** Generic cleaner: strips prefixes/separators, splits camel case, capitalizes words. */
     static String fallbackClean(String n) {
         if (n == null || n.isEmpty()) return n;

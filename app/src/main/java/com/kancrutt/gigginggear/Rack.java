@@ -2263,8 +2263,30 @@ public class Rack extends Fragment {
             if (chainMap == null) return;
             org.json.JSONObject json = new org.json.JSONObject();
             for (Object k : chainMap.keySet()) {
-                Object p = chainMap.get(k);
-                json.put((String) k, new org.json.JSONObject((java.util.Map) p).toString());
+                String key = (String) k;
+                Object v = chainMap.get(k);
+                if (v == null) continue;
+                if (key.matches("\\d+")) {
+                    // Legacy per-plugin entries stay double-encoded: loadPreset()
+                    // re-parses them via getString(key).
+                    if (v instanceof java.util.Map) {
+                        json.put(key, new org.json.JSONObject((java.util.Map) v).toString());
+                    } else {
+                        json.put(key, String.valueOf(v));
+                    }
+                } else if (v instanceof java.util.Map) {
+                    // Container maps (node_positions, routingGains) must stay
+                    // typed JSONObject — the load side reads them with
+                    // optJSONObject/optJSONArray, which a stringified value
+                    // fails. The old blind (Map) cast also threw
+                    // ClassCastException on graph (List) and routingMode
+                    // (Integer), silently aborting every scene save.
+                    json.put(key, mapToJsonTyped((java.util.Map<?, ?>) v));
+                } else if (v instanceof java.util.List) {
+                    json.put(key, new org.json.JSONArray((java.util.Collection<?>) v));
+                } else {
+                    json.put(key, v);
+                }
             }
             int scene = currentSceneIndex;
             if (scene < 0 || scene >= names.size()) scene = 0;
@@ -2275,51 +2297,33 @@ public class Rack extends Fragment {
         }
     }
 
+    /** Deep-convert a Map tree (incl. nested Maps/Lists) into typed JSON. */
+    private static org.json.JSONObject mapToJsonTyped(java.util.Map<?, ?> m) throws org.json.JSONException {
+        org.json.JSONObject o = new org.json.JSONObject();
+        for (java.util.Map.Entry<?, ?> e : m.entrySet()) {
+            String k = String.valueOf(e.getKey());
+            Object v = e.getValue();
+            if (v instanceof java.util.Map) o.put(k, mapToJsonTyped((java.util.Map<?, ?>) v));
+            else if (v instanceof java.util.List) o.put(k, new org.json.JSONArray((java.util.Collection<?>) v));
+            else if (v != null) o.put(k, v);
+        }
+        return o;
+    }
+
     private LocalPresetManager.Preset buildPresetFromChain(String name, String desc) {
-        LocalPresetManager.Preset p = new LocalPresetManager.Preset();
-        p.name = name;
-        p.description = desc;
-        p.author = "GigginGear Stage";
-        p.favorite = false;
-        p.masterInputVolume = 1.0f;
-        p.masterOutputVolume = 1.0f;
-        java.util.List<LocalPresetManager.PluginItem> plugins = new java.util.ArrayList<>();
-        int total = AudioEngine.getActivePlugins();
-        for (int i = 0; i < total; i++) {
-            LocalPresetManager.PluginItem item = new LocalPresetManager.PluginItem();
-            item.name = AudioEngine.getActivePluginName(i);
-            item.uniqueId = AudioEngine.getActivePluginID(i);
-            item.enabled = AudioEngine.getActivePluginEnabled(i);
-            float[] values = AudioEngine.getActivePluginValues(i);
-            java.util.List<LocalPresetManager.ControlItem> controls = new java.util.ArrayList<>();
-            for (int k = 0; k < values.length; k++) {
-                LocalPresetManager.ControlItem ci = new LocalPresetManager.ControlItem();
-                ci.name = AudioEngine.getControlName(i, k);
-                ci.value = values[k];
-                controls.add(ci);
-            }
-            item.controls = controls;
-            plugins.add(item);
+        // Delegate to MainActivity's snapshot — single source of truth. This
+        // duplicated copy had drifted (no filePorts, no TONE3000 meta, no Helix
+        // routing state), so floppy saves from this dialog lost model badges
+        // and dropped SPLIT/MERGE + branch gains on restore.
+        if (mainActivity == null) {
+            Log.w(TAG, "buildPresetFromChain: no host activity, saving shell preset");
+            LocalPresetManager.Preset shell = new LocalPresetManager.Preset();
+            shell.name = name;
+            shell.description = desc;
+            shell.author = "GigginGear Stage";
+            return shell;
         }
-        p.plugins = plugins;
-
-        // Persist real-time graph wiring and canvas node positions
-        try {
-            int[] graphEdges = AudioEngine.getGraphEdges();
-            if (graphEdges != null && graphEdges.length > 0) {
-                p.graph = graphEdges;
-            }
-        } catch (Exception ignored) {}
-
-        if (mainActivity != null && mainActivity.signalChainCanvas != null) {
-            for (SignalChainCanvasView.Node n : mainActivity.signalChainCanvas.getNodes()) {
-                if (n != null) {
-                    p.nodePositions.put(String.valueOf(n.id), new float[]{n.x, n.y});
-                }
-            }
-        }
-
-        return p;
+        return mainActivity.buildPresetFromChain(name, desc);
     }
 
 

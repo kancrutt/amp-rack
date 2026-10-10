@@ -4253,11 +4253,15 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             }
 
             if (subtitle != null) {
-                if (isCab) {
+                int routingId = -1;
+                try { routingId = AudioEngine.getActivePluginID(position); } catch (Throwable ignored) {}
+                if (routingId == 9001) {
+                    subtitle.setText("ROUTING · SPLIT");
+                } else if (routingId == 9002) {
+                    subtitle.setText("ROUTING · MERGE");
+                } else if (isCab) {
                     subtitle.setText("CAB · SPEAKER CABINET 4x12");
                 } else if (isAmp) {
-                    // Only real model loaders may claim NAM; anything else is
-                    // just an amp (C* AmpVTS etc. have no file ports).
                     subtitle.setText(canLoadNamModel(position) ? "AMP · NEURAL AMP (NAM)" : "AMP");
                 } else {
                     subtitle.setText("EFFECT · STOMPBOX");
@@ -5243,6 +5247,8 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     int activeId = AudioEngine.getActivePluginID(position);
                     if (activeId == 9001 /* ggrouting SPLIT */) {
                         buildSplitRoutingPanel(toneContainer, position);
+                    } else if (activeId == 9002 /* ggrouting MERGE */) {
+                        buildMergeRoutingPanel(toneContainer, position);
                     } else {
                         addEmptyPanelHint(toneContainer, "MODEL-CAPTURED / NO CONTROLS");
                     }
@@ -5462,6 +5468,40 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             row.addView(val);
             container.addView(row);
         }
+    }
+
+    /**
+     * R18: MERGE has no control ports either, so the tile fell into the
+     * "MODEL-CAPTURED / NO CONTROLS" hint — wrong text for a routing block
+     * (it captures no model and the engine is stereo-aware: Y (L/R) split
+     * keeps two output channels). Short routing explainer instead.
+     */
+    private void buildMergeRoutingPanel(LinearLayout container, int position) {
+        if (container == null) return;
+        float density = getResources().getDisplayMetrics().density;
+        container.setOrientation(LinearLayout.VERTICAL);
+
+        TextView title = new TextView(this);
+        title.setText("MERGE");
+        title.setTextColor(Color.parseColor("#8F94A0"));
+        title.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 10f * density);
+        title.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        title.setPadding(0, Math.round(4 * density), 0, Math.round(6 * density));
+        container.addView(title);
+
+        TextView desc = new TextView(this);
+        desc.setText("Combines both parallel branches into one path.\n"
+                + "Stereo-aware: Y (L/R) split keeps two output channels.");
+        desc.setTextColor(Color.parseColor("#E6E6E6"));
+        desc.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 11.5f * density);
+        LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        dlp.setMargins(0, 0, 0, Math.round(6 * density));
+        desc.setLayoutParams(dlp);
+        desc.setBackgroundResource(R.drawable.glass_card_bg);
+        desc.setPadding(Math.round(12 * density), Math.round(12 * density),
+                Math.round(12 * density), Math.round(12 * density));
+        container.addView(desc);
     }
 
     /**
@@ -6898,7 +6938,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 addRoutingBlock(true);
                 dialog.dismiss();
             });
-            addPluginPickerRow(container, "MERGE (Sum to Mono)", "Combine parallel branches into 1 path", R.drawable.ic_routing_merge, dialog, v -> {
+            addPluginPickerRow(container, "MERGE (Stereo-Aware)", "Merge parallel branches into 1 path", R.drawable.ic_routing_merge, dialog, v -> {
                 addRoutingBlock(false);
                 dialog.dismiss();
             });
@@ -6968,8 +7008,8 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             });
             hits++;
         }
-        if ("merge (sum to mono)".contains(q) || "combine parallel branches into 1 path".contains(q)) {
-            addPluginPickerRow(container, "MERGE (Sum to Mono)", "Combine parallel branches into 1 path", R.drawable.ic_routing_merge, dialog, v -> {
+        if ("merge (stereo-aware)".contains(q) || "merge parallel branches into 1 path".contains(q) || "sum to mono".contains(q)) {
+            addPluginPickerRow(container, "MERGE (Stereo-Aware)", "Merge parallel branches into 1 path", R.drawable.ic_routing_merge, dialog, v -> {
                 addRoutingBlock(false);
                 dialog.dismiss();
             });

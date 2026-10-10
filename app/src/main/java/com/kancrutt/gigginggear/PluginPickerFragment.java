@@ -242,7 +242,7 @@ public class PluginPickerFragment extends BottomSheetDialogFragment {
                 || cat == CategoryHelper.Category.UTILITY) {
             // Routing utilities
             addRoutingRow("SPLIT (Parallel Branch)", "Split signal into 2 parallel paths", R.drawable.ic_routing_split, true);
-            addRoutingRow("MERGE (Sum to Mono)", "Combine parallel branches into 1 path", R.drawable.ic_routing_merge, false);
+            addRoutingRow("MERGE (Stereo-Aware)", "Merge parallel branches into 1 path", R.drawable.ic_routing_merge, false);
             if (cat == CategoryHelper.Category.SPLIT || cat == CategoryHelper.Category.MERGE) {
                 return;
             }
@@ -341,8 +341,8 @@ public class PluginPickerFragment extends BottomSheetDialogFragment {
             addRoutingRow("SPLIT (Parallel Branch)", "Split signal into 2 parallel paths", R.drawable.ic_routing_split, true);
             hits++;
         }
-        if ("merge (sum to mono)".contains(q) || "combine parallel branches into 1 path".contains(q)) {
-            addRoutingRow("MERGE (Sum to Mono)", "Combine parallel branches into 1 path", R.drawable.ic_routing_merge, false);
+        if ("merge (stereo-aware)".contains(q) || "merge parallel branches into 1 path".contains(q) || "sum to mono".contains(q)) {
+            addRoutingRow("MERGE (Stereo-Aware)", "Merge parallel branches into 1 path", R.drawable.ic_routing_merge, false);
             hits++;
         }
 

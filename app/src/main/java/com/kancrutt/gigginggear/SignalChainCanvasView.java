@@ -1260,16 +1260,13 @@ public class SignalChainCanvasView extends View {
                 // Manual wire creation removed: lines are auto-generated from
                 // block order + explicit SPLIT/MERGE (see NOTE in ACTION_DOWN).
                 // Auto-justify snap on DROP
-                if (dragNode != null && !dragNode.isAnchor() && dragStarted) {
-                    float density = getResources().getDisplayMetrics().density;
-                    float colWidth = (dragNode.width > 0 ? dragNode.width : 56 * density) + 12 * density;
-                    float rowHeight = (dragNode.height > 0 ? dragNode.height : 62 * density) + 10 * density;
-                    float yCenter = getHeight() / 2f - dragNode.height / 2f;
-                    int row = Math.round((dragNode.y - yCenter) / rowHeight);
-                    dragNode.y = yCenter + (row * rowHeight);
-                    int col = Math.round((dragNode.x - 8 * density) / colWidth);
-                    if (col < 0) col = 0;
-                    // Clamp snap ke dalam bounds canvas (phone: content bounds)
+                 if (dragNode != null && !dragNode.isAnchor() && dragStarted) {
+                     float density = getResources().getDisplayMetrics().density;
+                     float rowHeight = (dragNode.height > 0 ? dragNode.height : 62 * density) + 10 * density;
+                     float yCenter = getHeight() / 2f - dragNode.height / 2f;
+                     int row = Math.round((dragNode.y - yCenter) / rowHeight);
+                     dragNode.y = yCenter + (row * rowHeight);
+                     // Clamp snap ke dalam bounds canvas (phone: content bounds)
                     float snapW = (phoneScroll && contentWPx > 0) ? contentWPx : getWidth();
                     float snapH = (phoneScroll && contentHPx > 0) ? contentHPx : getHeight();
                     // NOTE: vertical position is LAYOUT ONLY. It never creates a
@@ -1279,21 +1276,57 @@ public class SignalChainCanvasView extends View {
                     // unchanged.
                     dragNode.x = Math.max(0, Math.min(dragNode.x, snapW - dragNode.width));
                     dragNode.y = Math.max(0, Math.min(dragNode.y, snapH - dragNode.height));
-                     // Build the new left-to-right order by removing the dragged
-                     // block and inserting it at the drop slot. This applies to
-                     // series and explicit SPLIT/MERGE rigs alike: the block
-                     // order is the signal order, while routing blocks alone
-                     // determine whether the plan is serial or parallel.
-                     java.util.List<Integer> order = new java.util.ArrayList<>();
-                     java.util.List<Node> others = new java.util.ArrayList<>();
+                     // Build the new left-to-right order. Zone-aware: the
+                     // pre-drag chain (engine slot order) assigns every block
+                     // a zone — trunk stretch, the SPLIT that opens a pair, the
+                     // branch content between SPLIT/MERGE, the MERGE, the next
+                     // trunk stretch. x only competes inside the same zone, so
+                     // a branch block can NEVER be dropped past its MERGE just
+                     // because the finger drifted vertically (r18 R4.1: a 25px
+                     // nudge ejected DELAY out of the branch). A purely
+                     // vertical move therefore no-ops: zones unchanged, x
+                     // unchanged -> identical order.
+                     java.util.List<Node> pre = new java.util.ArrayList<>();
                      for (Node n : nodes) {
-                         if (n == null || n.isAnchor() || n == dragNode) continue;
-                         others.add(n);
+                         if (n == null || n.isAnchor()) continue;
+                         pre.add(n);
                      }
-                     java.util.Collections.sort(others, (a, b) -> Float.compare(a.x, b.x));
-                     for (Node n : others) order.add(n.id);
-                     int target = Math.max(0, Math.min(col, order.size()));
-                     order.add(target, dragNode.id);
+                     java.util.Collections.sort(pre, (a, b) -> Integer.compare(a.id, b.id));
+                     java.util.Map<Integer, Integer> zoneOf = new java.util.HashMap<>();
+                     int z = 0, sharedTrunk = 0, branchZone = -1;
+                     boolean inPair = false;
+                     for (Node n : pre) {
+                         if (n.nodeType == NodeType.SPLIT) {
+                             z++;
+                             zoneOf.put(n.id, z);
+                             z++;
+                             branchZone = z;
+                             inPair = true;
+                         } else if (n.nodeType == NodeType.MERGE) {
+                             z++;
+                             zoneOf.put(n.id, z);
+                             z++;
+                             sharedTrunk = z;
+                             inPair = false;
+                             branchZone = -1;
+                         } else if (inPair) {
+                             zoneOf.put(n.id, branchZone);
+                         } else {
+                             zoneOf.put(n.id, sharedTrunk);
+                         }
+                     }
+                     zoneOf.putIfAbsent(dragNode.id, sharedTrunk);
+
+                     java.util.List<Node> allOrdered = new java.util.ArrayList<>(pre);
+                     allOrdered.sort((a, b) -> {
+                         int za = zoneOf.getOrDefault(a.id, 0);
+                         int zb = zoneOf.getOrDefault(b.id, 0);
+                         if (za != zb) return Integer.compare(za, zb);
+                         return Float.compare(a.x, b.x);
+                     });
+
+                     java.util.List<Integer> order = new java.util.ArrayList<>();
+                     for (Node n : allOrdered) order.add(n.id);
 
                      int[] newOrder = new int[order.size()];
                      boolean orderChanged = false;
@@ -1301,11 +1334,10 @@ public class SignalChainCanvasView extends View {
                          newOrder[k] = order.get(k);
                          if (newOrder[k] != k) orderChanged = true;
                      }
-                     // Reflow with the NEW order using canonical slot geometry
-                     // (same math as the rebuild). Hand-snapping the dragged
-                     // block to 8dp + col*colWidth collided with the INPUT
-                     // anchor and its neighbour: the dropped block visually
-                     // stacked on the first block at slot 0.
+                     // Reflow the NEW order using canonical slot geometry (same
+                     // math as the rebuild): re-snapping the dropped block to
+                     // 8dp + col*colWidth collided with the INPUT anchor and its
+                     // neighbour, stacking the drop on slot 0.
                      layoutSeriesSlots(order);
                      // layoutSeriesSlots() flattens every block into the single
                      // series row. A parallel rig must KEEP its two branch rows

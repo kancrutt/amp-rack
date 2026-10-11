@@ -146,7 +146,7 @@ public class MyPresetsAdapter extends RecyclerView.Adapter<MyPresetsAdapter.View
                 if (name == null)
                     continue;
                 CategoryHelper.Category cat = CategoryHelper.getCategory(name);
-                if (cat == CategoryHelper.Category.UNKNOWN || cat == CategoryHelper.Category.UTILITY)
+                if (cat == CategoryHelper.Category.OTHER || cat == CategoryHelper.Category.UTILITY)
                     continue;
                 specs.putIfAbsent(cat.code, cat.color);
             }

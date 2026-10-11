@@ -157,9 +157,8 @@ final class GuitarPluginCatalog {
             }
         }
 
-        // Hard blacklist wins over the curated list (same guard the add
-        // dialog and preset load already apply).
-        if (sBlacklistNames != null && sBlacklistNames.contains(n)) return false;
+        // Blacklist is enforced centrally now (Blacklist.java, keyed by
+        // stable key); nothing to do here.
 
         if (sCuratedNames != null) return sCuratedNames.contains(n);
 

@@ -248,16 +248,18 @@ public class PluginPickerFragment extends BottomSheetDialogFragment {
             }
         }
 
-        // Load blacklist
-        JSONObject blacklist = ConnectGuitar.loadJSONFromAssetFile(mainActivity, "blacklist.json");
-        boolean enableBlacklisted = mainActivity.defaultSharedPreferences.getBoolean("enableBlacklisted", false);
-
-        // Scan available LADSPA & LV2 plugins
+        // Scan available LADSPA & LV2 plugins — Step B4: one gate everywhere
+        // (curated AND not blacklisted AND not synth), keyed by stable key.
+        // The old per-surface blacklist.json name read (with its
+        // enableBlacklisted bypass) is gone: the bypass is DROPPED (B3) so a
+        // hidden plugin cannot be re-shown by a preference.
         JSONObject[] sources = {mainActivity.availablePlugins, mainActivity.availablePluginsLV2};
         ArrayList<String> loadedPluginNames = new ArrayList<>();
 
-        for (JSONObject source : sources) {
+        for (int si = 0; si < sources.length; si++) {
+            JSONObject source = sources[si];
             if (source == null) continue;
+            String srcKind = (si == 1) ? PluginKey.LV2 : PluginKey.LADSPA;
             Iterator<String> keys = source.keys();
             while (keys.hasNext()) {
                 String k = keys.next();
@@ -265,17 +267,14 @@ public class PluginPickerFragment extends BottomSheetDialogFragment {
                 if (obj == null) continue;
                 String pName = obj.optString("name", "");
                 if (pName.isEmpty() || loadedPluginNames.contains(pName)) continue;
-                if (!MainActivity.isGuitarPlugin(pName)) continue;
-                // MIDI-only synths can never sound in a guitar chain (no audio
-                // input to feed them) — hide instead of offering a crash/toast.
-                if (MainActivity.isUnsupportedSynth(pName)) continue;
-
-                // Blacklist check
-                String pNameKey = pName != null ? pName.toLowerCase().trim() : "";
-                if (blacklist != null && blacklist.has(pNameKey) && !enableBlacklisted) {
-                    Log.d(TAG, String.format ("[plugin picker] blacklisted: %s", pName));
-                    continue;
+                final String pluginKey;
+                if (srcKind.equals(PluginKey.LV2)) {
+                    pluginKey = PluginKey.make(PluginKey.LV2, obj.optString("library",""), obj.optInt("index", -1));
+                } else {
+                    pluginKey = PluginKey.make(PluginKey.LADSPA, obj.optString("library",""), obj.optInt("id", -1));
                 }
+                int ri = PluginCatalog.indexOfKey(pluginKey);
+                if (ri < 0 || !PluginCatalog.isVisible(ri)) continue;
 
                 CategoryHelper.Category pCat = CategoryHelper.getCategory(pName);
                 if (pCat == cat) {
@@ -296,7 +295,7 @@ public class PluginPickerFragment extends BottomSheetDialogFragment {
                     thumb.setColorFilter(CategoryHelper.getColor(pName), android.graphics.PorterDuff.Mode.SRC_IN);
 
                     row.setOnClickListener(v -> {
-                        mainActivity.addPluginByName(pName);
+                        mainActivity.addPluginByKey(pluginKey);
                         dismiss();
                     });
                     itemsContainer.addView(row);
@@ -347,23 +346,25 @@ public class PluginPickerFragment extends BottomSheetDialogFragment {
             hits++;
         }
 
-        JSONObject blacklist = ConnectGuitar.loadJSONFromAssetFile(mainActivity, "blacklist.json");
-        boolean enableBlacklisted = mainActivity.defaultSharedPreferences.getBoolean("enableBlacklisted", false);
-
         JSONObject[] sources = {mainActivity.availablePlugins, mainActivity.availablePluginsLV2};
         ArrayList<String> seen = new ArrayList<>();
-        for (JSONObject source : sources) {
+        for (int si = 0; si < sources.length; si++) {
+            JSONObject source = sources[si];
             if (source == null) continue;
+            String srcKind = (si == 1) ? PluginKey.LV2 : PluginKey.LADSPA;
             Iterator<String> keys = source.keys();
             while (keys.hasNext()) {
                 JSONObject obj = source.optJSONObject(keys.next());
                 if (obj == null) continue;
                 final String pName = obj.optString("name", "");
                 if (pName.isEmpty() || seen.contains(pName)) continue;
-                if (!MainActivity.isGuitarPlugin(pName)) continue;
-                if (MainActivity.isUnsupportedSynth(pName)) continue;
-                String pNameKey = pName.toLowerCase().trim();
-                if (blacklist != null && blacklist.has(pNameKey) && !enableBlacklisted) continue;
+                final String pluginKey;
+                if (srcKind.equals(PluginKey.LV2)) {
+                    pluginKey = PluginKey.make(PluginKey.LV2, obj.optString("library",""), obj.optInt("index", -1));
+                } else {
+                    pluginKey = PluginKey.make(PluginKey.LADSPA, obj.optString("library",""), obj.optInt("id", -1));
+                }
+                if (!PluginCatalog.isVisible(PluginCatalog.indexOfKey(pluginKey))) continue;
                 String desc = obj.optString("desc", obj.optString("description", "Built-in Effect"));
                 // Dash/underscore-insensitive: "oc2" must find "OC-2" (R16:
                 // the FAB picker kept its own unnormalized contains and the
@@ -384,7 +385,7 @@ public class PluginPickerFragment extends BottomSheetDialogFragment {
                 thumb.setImageResource(CategoryHelper.getIconRes(pName));
                 thumb.setColorFilter(CategoryHelper.getColor(pName), android.graphics.PorterDuff.Mode.SRC_IN);
                 row.setOnClickListener(v -> {
-                    mainActivity.addPluginByName(pName);
+                    mainActivity.addPluginByKey(pluginKey);
                     dismiss();
                 });
                 itemsContainer.addView(row);

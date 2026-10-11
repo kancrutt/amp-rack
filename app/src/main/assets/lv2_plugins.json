@@ -5,7 +5,7 @@
     "index": 9,
     "desc": "This effect features two alternating comb filters for a vocal/formant-like wah sound. It could be considered a combined flanger and phaser. It can be extreme or add very subtle shimmer",
     "library": "rkrlv2.so",
-    "category": "REVERB"
+    "category": "MODULATION"
   },
   "15005": {
     "name": "rkr Analog Phaser",
@@ -37,7 +37,7 @@
     "desc": "A flanger or chorus (depending on delay time) effect. Allows for fractional delays for a more intense effect.",
     "index": 4,
     "library": "rkrlv2.so",
-    "category": "DELAY"
+    "category": "MODULATION"
   },
   "15027": {
     "name": "rkr Coil Crafter",
@@ -109,7 +109,7 @@
     "id": 5014,
     "index": 36,
     "library": "rkrlv2.so",
-    "category": "AMP"
+    "category": "DELAY"
   },
   "15026": {
     "name": "rkr Echoverse",
@@ -149,7 +149,7 @@
     "desc": "Analog BJT modeled dynamic expander for subtler noise suppression than a gate typically offers. Can also be used for interesting evelope-triggered swell and fade effects.",
     "index": 21,
     "library": "rkrlv2.so",
-    "category": "MODULATION"
+    "category": "DYNAMICS"
   },
   "15043": {
     "name": "rkr NoiseGate",
@@ -157,7 +157,7 @@
     "desc": "Based on Gate, Steve Harris LADSPA plugin.",
     "index": 43,
     "library": "rkrlv2.so",
-    "category": "DYNAMICS"
+    "category": "GATE"
   },
   "15006": {
     "name": "rkr Harmonizer (no midi)",
@@ -189,7 +189,7 @@
     "index": 25,
     "desc": "State variable filter with envelope or LFO modulation. Allows it to act like a mixable blend of highpass, lowpass or bandpass filter. Similar to a mutron III. Also useful for classic wah pedal emulation when wah parameter is controlled by an expression pedal.",
     "library": "rkrlv2.so",
-    "category": "MODULATION"
+    "category": "EQ"
   },
   "15039": {
     "name": "rkr OpticalTrem",
@@ -197,7 +197,7 @@
     "index": 39,
     "desc": "An optical tremolo effect emulation such as often built into a guitar amplifier. This varies the signal volume through an LFO.",
     "library": "rkrlv2.so",
-    "category": "AMP"
+    "category": "MODULATION"
   },
   "15008": {
     "name": "rkr Pan",
@@ -229,7 +229,7 @@
     "index": 35,
     "desc": "Convolution-based reverb effect. IR samples can be converted to .rvb format and loaded into this effect for a less cpu-intensive convolution. Several files included.",
     "library": "rkrlv2.so",
-    "category": "AMP"
+    "category": "REVERB"
   },
   "15018": {
     "name": "rkr Ring",
@@ -237,7 +237,7 @@
     "desc": "A ring modulator with monophonic frequency recognition for synthesis.",
     "index": 18,
     "library": "rkrlv2.so",
-    "category": "EQ"
+    "category": "MODULATION"
   },
   "15031": {
     "name": "rkr Sequence",
@@ -245,7 +245,7 @@
     "index": 31,
     "desc": "8-step modulation sequencer. Each step is user-adjustable. Signal amplitude, filter cutoff frequency, or pitch shifting modulations available.",
     "library": "rkrlv2.so",
-    "category": "AMP"
+    "category": "PITCH"
   },
   "15028": {
     "name": "rkr Shelf Boost",
@@ -341,7 +341,7 @@
     "id": 6002,
     "index": 0,
     "library": "mda-Bandisto.so",
-    "category": "DYNAMICS"
+    "category": "DISTORTION"
   },
   "15300": {
     "name": "MDA BeatBox",
@@ -349,7 +349,7 @@
     "desc": "Contains three samples (kick, snare and hat) designed to be triggered by incoming audio in three frequency ranges.  The default samples are based on the Roland CR-78.",
     "index": 0,
     "library": "mda-BeatBox.so",
-    "category": "AMP"
+    "category": "UTILITY"
   },
   "15400": {
     "name": "MDA Combo",
@@ -357,7 +357,7 @@
     "desc": "This plug-in can sound quite subtle but comes alive when used on guitar with the drive turned up! ",
     "index": 0,
     "library": "mda-Combo.so",
-    "category": "DISTORTION"
+    "category": "AMP"
   },
   "15500": {
     "name": "MDA De-ess",
@@ -373,7 +373,7 @@
     "desc": "Sample quality reduction",
     "index": 0,
     "library": "mda-Degrade.so",
-    "category": "AMP"
+    "category": "DISTORTION"
   },
   "15700": {
     "name": "MDA Delay",
@@ -397,7 +397,7 @@
     "desc": "When a waveform is rounded to the nearest 16 (or whatever)-bit value this causes distortion. Dither allows you to exchange this rough sounding signal-dependant distortion for a smooth background hiss.",
     "index": 0,
     "library": "mda-Dither.so",
-    "category": "DISTORTION"
+    "category": "UTILITY"
   },
   "16000": {
     "name": "MDA DubDelay",
@@ -405,7 +405,7 @@
     "index": 0,
     "desc": "Delay with feedback saturation and time/pitch modulation",
     "library": "mda-DubDelay.so",
-    "category": "DISTORTION"
+    "category": "DELAY"
   },
   "16200": {
     "name": "MDA Dynamics",
@@ -429,7 +429,7 @@
     "index": 0,
     "desc": "Rotary speaker simulator. No overdrive or speaker cabinet simulation is added - you may want to combine this plug-in with Combo.  For a much thicker sound try combining two Leslie plug-ins in series!",
     "library": "mda-Leslie.so",
-    "category": "DISTORTION"
+    "category": "MODULATION"
   },
   "16700": {
     "name": "MDA Limiter",
@@ -445,7 +445,7 @@
     "index": 0,
     "desc": "Equal loudness contours for bass EQ and mix correction",
     "library": "mda-Loudness.so",
-    "category": "EQ"
+    "category": "UTILITY"
   },
   "16900": {
     "name": "MDA MultiBand",
@@ -501,7 +501,7 @@
     "desc": "Frequency/level crossover for setting up dynamic processing. This plug-in can split a signal based on frequency or level, for example for producing dynamic effects where only loud drum hits are sent to a reverb. Other functions include a simple \"spectral gate\" in INVERSE mode and a conventional gate and filter for separating drum sounds in NORMAL mode.",
     "index": 0,
     "library": "mda-Splitter.so",
-    "category": "AMP"
+    "category": "UTILITY"
   },
   "17800": {
     "name": "MDA Stereo",
@@ -525,7 +525,7 @@
     "index": 0,
     "desc": "Signal generator with pink and white noise, impulses and sweeps",
     "library": "mda-TestTone.so",
-    "category": "CABINET"
+    "category": "UTILITY"
   },
   "18200": {
     "name": "MDA ThruZero",
@@ -533,7 +533,7 @@
     "index": 0,
     "desc": "Classic tape-flanging simulation. This plug simulates tape-flanging, where two copies of a signal cancel out completely as the tapes pass each other. It can also be used for other modulated delay effects such as phasing and simple chorusing.",
     "library": "mda-ThruZero.so",
-    "category": "DELAY"
+    "category": "MODULATION"
   },
   "18300": {
     "name": "MDA Tracker",
@@ -541,7 +541,7 @@
     "desc": "Pitch tracking oscillator, or pitch tracking EQ",
     "index": 0,
     "library": "mda-Tracker.so",
-    "category": "EQ"
+    "category": "PITCH"
   },
   "18400": {
     "name": "MDA Transient",
@@ -556,7 +556,7 @@
     "index": 0,
     "desc": "Simulation of the Classic Silicon Pedal",
     "library": "libGxAxisFace.lv2.so",
-    "category": "UTILITY"
+    "category": "DISTORTION"
   },
   "18800": {
     "name": "Gx_bajatubedriver_",
@@ -700,7 +700,7 @@
     "id": 7020,
     "index": 0,
     "library": "libGxMicroAmp.lv2.so",
-    "category": "AMP"
+    "category": "DISTORTION"
   },
   "20700": {
     "name": "Gx_plexi_",
@@ -764,7 +764,7 @@
     "desc": "Attack-smoothing, auto-swelling pedal of the early 80s",
     "index": 0,
     "library": "libGxSlowGear.lv2.so",
-    "category": "UTILITY"
+    "category": "MODULATION"
   },
   "21500": {
     "name": "GxSunFace",
@@ -796,7 +796,7 @@
     "index": 0,
     "desc": "Analog simulation of a Tone Bender pedal as LV2 plugin",
     "library": "libGxSuppaToneBender.lv2.so",
-    "category": "UTILITY"
+    "category": "DISTORTION"
   },
   "21900": {
     "name": "Gx_ampegsvt_",
@@ -820,7 +820,7 @@
     "index": 0,
     "desc": "Analogous simulation of a classic Tone Machine Pedal as LV2 plugin",
     "library": "libGxToneMachine.lv2.so",
-    "category": "UTILITY"
+    "category": "DISTORTION"
   },
   "22200": {
     "name": "GxTubeDistortion",
@@ -884,7 +884,7 @@
     "index": 0,
     "desc": "This lo-fi delay subtracts a downsampled (aliased) delayed signal from the original. Makes gritty slapback sounds or surprisingly warm textures.",
     "library": "bentdelay.so",
-    "category": "AMP"
+    "category": "DELAY"
   },
   "23300": {
     "name": "the infamous cheap distortion",
@@ -906,7 +906,7 @@
     "id": 8006,
     "index": 0,
     "library": "ewham.so",
-    "category": "WAH"
+    "category": "PITCH"
   },
   "23600": {
     "name": "the infamous Hip2B",
@@ -921,7 +921,7 @@
     "id": 8009,
     "index": 0,
     "library": "lushlife.so",
-    "category": "UTILITY"
+    "category": "MODULATION"
   },
   "24000": {
     "name": "the infamous mindi",
@@ -935,7 +935,7 @@
     "id": 8012,
     "index": 0,
     "library": "octolo.so",
-    "category": "UTILITY"
+    "category": "PITCH"
   },
   "24300": {
     "name": "the infamous power cut",
@@ -943,14 +943,14 @@
     "desc": "This is a tape stop with up to 10 seconds of decay time. Curvature can be added for full customization of the effect.",
     "index": 0,
     "library": "powercut.so",
-    "category": "UTILITY"
+    "category": "MODULATION"
   },
   "24400": {
     "name": "the infamous power up",
     "id": 8015,
     "index": 0,
     "library": "powerup.so",
-    "category": "UTILITY"
+    "category": "MODULATION"
   },
   "24500": {
     "name": "the infamous stuck",
@@ -958,7 +958,7 @@
     "index": 0,
     "desc": "This effect samples the input, detects the primary waveform, and creates a drone of the note played when triggered. It is polyphonic and matches your tone. It may have pulsing/shimmering sounds on fuller chords.",
     "library": "stuck.so",
-    "category": "AMP"
+    "category": "UTILITY"
   },
   "24600": {
     "name": "Gx4BandEQ",
@@ -982,7 +982,7 @@
     "index": 0,
     "desc": "cascaded moving average filter to suppress input noise ",
     "library": "libGxDenoiser2.lv2.so",
-    "category": "EQ"
+    "category": "GATE"
   },
   "24900": {
     "name": "Gx_DistortionPlus_",
@@ -998,12 +998,12 @@
     "index": 0,
     "desc": "Distortion Simulation",
     "library": "libGxFenderizer.lv2.so",
-    "category": "DISTORTION"
+    "category": "AMP"
   },
   "25100": {
     "name": "GxOsMutantes",
     "id": 8022,
-    "desc": "Analogue simulation of Circuit developed in 70\u2019s",
+    "desc": "Analogue simulation of Circuit developed in 70’s",
     "index": 0,
     "library": "libGxOsMutantes.lv2.so",
     "category": "DISTORTION"
@@ -1062,7 +1062,7 @@
     "index": 0,
     "desc": "A 2 band boost plugin. With this plugin you can boost the high and the low frequencies independently",
     "library": "libgxbooster.lv2.so",
-    "category": "EQ"
+    "category": "DISTORTION"
   },
   "26000": {
     "name": "Gx_expander",
@@ -1070,7 +1070,7 @@
     "id": 8031,
     "index": 0,
     "library": "libgx_expander.lv2.so",
-    "category": "MODULATION"
+    "category": "DYNAMICS"
   },
   "26100": {
     "name": "Gx_flanger",
@@ -1110,7 +1110,7 @@
     "index": 0,
     "desc": "Distortion effect",
     "library": "libgx_gcb_95.lv2.so",
-    "category": "DISTORTION"
+    "category": "WAH"
   },
   "26600": {
     "name": "GxGraphicEQ",
@@ -1198,7 +1198,7 @@
     "index": 0,
     "desc": "Distortion pedal",
     "library": "libgx_oc_2.lv2.so",
-    "category": "DISTORTION"
+    "category": "PITCH"
   },
   "27700": {
     "name": "Gx_phaser",
@@ -1286,7 +1286,7 @@
     "desc": "Nice Filter Pedal",
     "index": 0,
     "library": "libgxtape.lv2.so",
-    "category": "EQ"
+    "category": "DELAY"
   },
   "28800": {
     "name": "Gx Tape Stereo",
@@ -1294,7 +1294,7 @@
     "desc": "Nice Filter Pedal",
     "index": 0,
     "library": "libgxtape_st.lv2.so",
-    "category": "EQ"
+    "category": "DELAY"
   },
   "28900": {
     "name": "GxTiltTone",
@@ -1326,7 +1326,7 @@
     "desc": "Model of a vactrol tremolo unit by transmogrify",
     "index": 0,
     "library": "libgxtubetremelo.lv2.so",
-    "category": "AMP"
+    "category": "MODULATION"
   },
   "29300": {
     "name": "GxTubeVibrato",
@@ -1334,7 +1334,7 @@
     "index": 0,
     "desc": "Attempt at a true vibrato and it works well! Sounds very sweet with tubes wrapped",
     "library": "libgxtubevibrato.lv2.so",
-    "category": "AMP"
+    "category": "MODULATION"
   },
   "29400": {
     "name": "Gx_vibe_mono",
@@ -1478,7 +1478,7 @@
     "desc": "The delayed signal added to output dependent of input signal amplitude. If the input signal is high. The delayed signal turned off, and vise versa. The switching controlled by envelope follower",
     "index": 0,
     "library": "libgx_duck_delay.lv2.so",
-    "category": "AMP"
+    "category": "DELAY"
   },
   "31200": {
     "name": "GxEchoCat",
@@ -1526,7 +1526,7 @@
     "desc": "Tube effect pedal",
     "index": 0,
     "library": "libgxts9.lv2.so",
-    "category": "AMP"
+    "category": "DISTORTION"
   },
   "31800": {
     "name": "bluesbreaker",

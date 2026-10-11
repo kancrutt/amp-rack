@@ -202,6 +202,7 @@ public class LocalPresetManager {
                 JSONObject pObj = new JSONObject();
                 pObj.put("index", i);
                 pObj.put("name", item.name);
+                if (item.key != null) pObj.put("key", item.key);
                 pObj.put("library", item.library);
                 pObj.put("unique_id", item.uniqueId);
                 pObj.put("enabled", item.enabled);
@@ -314,6 +315,7 @@ public class LocalPresetManager {
                 JSONObject pObj = pluginsArr.getJSONObject(i);
                 PluginItem item = new PluginItem();
                 item.name = pObj.optString("name", "");
+                item.key = pObj.optString("key", null);
                 item.library = pObj.optString("library", "");
                 item.uniqueId = pObj.optInt("unique_id", 0);
                 item.enabled = pObj.optBoolean("enabled", true);
@@ -492,6 +494,8 @@ public class LocalPresetManager {
 
     public static class PluginItem {
         public String name;
+        /** Step B1 stable key (source|lib|index); older presets carry only name. */
+        public String key;
         public String library;
         public int uniqueId;
         public boolean enabled = true;

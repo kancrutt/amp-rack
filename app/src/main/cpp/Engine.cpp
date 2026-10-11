@@ -456,6 +456,23 @@ void Engine::onErrorAfterClose(oboe::AudioStream *oboeStream,
         }).detach();
     }
 }
+static bool isLibBlacklistedNative(JavaVM* vm, const char* className, const std::string& lib) {
+    if (vm == nullptr || lib.empty()) return false;
+    JNIEnv* env = nullptr;
+    if (vm->GetEnv((void**) &env, JNI_VERSION_1_6) != JNI_OK || env == nullptr) {
+        if (vm->AttachCurrentThread(&env, nullptr) != JNI_OK || env == nullptr) return false;
+    }
+    jclass clazz = env->FindClass(className);
+    if (clazz == nullptr) { env->ExceptionClear(); return false; }
+    jmethodID mid = env->GetStaticMethodID(clazz, "isBlacklistedLib", "(Ljava/lang/String;)Z");
+    if (mid == nullptr) { env->ExceptionClear(); return false; }
+    jstring jlib = env->NewStringUTF(lib.c_str());
+    jboolean blocked = env->CallStaticBooleanMethod(clazz, mid, jlib);
+    env->DeleteLocalRef(jlib);
+    if (env->ExceptionCheck()) { env->ExceptionClear(); blocked = false; }
+    return blocked == JNI_TRUE;
+}
+
 void Engine::addPluginToRackLazy(char* library, int pluginIndex, SharedLibrary::PluginType _type) {
     // Fixed DSP arrays hold MAX_PLUGINS blocks (FullDuplexPass.h): publishing more
     // overruns them -> native force-close. Refuse loudly instead.
@@ -463,6 +480,12 @@ void Engine::addPluginToRackLazy(char* library, int pluginIndex, SharedLibrary::
         LOGE("addPluginToRackLazy: chain full (%d blocks max), refusing %s:%d", MAX_PLUGINS, library, pluginIndex);
         return;
     }
+    // Step B3: native loader guard — a blacklisted library never reaches dlopen.
+    if (isLibBlacklistedNative(vm, mainActivityClassName.c_str(), std::string(library))) {
+        LOGE("addPluginToRackLazy: library [%s] is blacklisted, refusing dlopen/load", library);
+        return;
+    }
+
     SharedLibrary * sharedLibrary = new SharedLibrary (library, _type);
     sharedLibrary -> vm = vm ;
 
@@ -795,6 +818,15 @@ void Engine::addPluginToRack (int libraryIndex, int pluginIndex) {
     if ((int) activePlugins.size() >= MAX_PLUGINS) {
         LOGE("addPluginToRack: chain full (%d blocks max), refusing %d:%d", MAX_PLUGINS, libraryIndex, pluginIndex);
         return ;
+    }
+    // Step B3: native loader guard (blacklisted library never loads).
+    {
+        const SharedLibrary* sl = libraries.at(libraryIndex);
+        std::string lib = sl ? sl->so_file : std::string();
+        if (isLibBlacklistedNative(vm, mainActivityClassName.c_str(), lib)) {
+            LOGE("addPluginToRack: library [%s] is blacklisted, refusing load", lib.c_str());
+            return;
+        }
     }
 
     Plugin * plugin = new Plugin (libraries.at(libraryIndex)->descriptors.at(pluginIndex), (long) mSampleRate);

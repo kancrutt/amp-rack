@@ -685,6 +685,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
          knobsLayout = ConnectGuitar.loadJSONFromAssetFile(this, "knobs.json");
          parameterMetadata = ParameterMetadata.loadFromAsset(this);
         GuitarPluginCatalog.init(this);
+        Blacklist.init(this);
         PluginCatalogInfo.init(this);
 
         Iterator<String> keys = availablePluginsLV2.keys();
@@ -1945,37 +1946,11 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             });
         }
 
-        JSONObject blacklist = ConnectGuitar.loadJSONFromAssetFile(this, "blacklist.json");
-        Log.d(TAG, String.format ("blacklist: %s", blacklist != null ? blacklist.toString() : "empty"));
-
-        int libraries = AudioEngine.getSharedLibraries();
-        Log.d(TAG, "Creating dialog for " + libraries + " libraries");
-        if (addPluginMenu != null) {
-            for (int i = 0; i < libraries; i++) {
-                SubMenu subMenu = addPluginMenu.getMenu().addSubMenu(AudioEngine.getLibraryName(i));
-                for (int plugin = 0; plugin < AudioEngine.getPlugins(i); plugin++) {
-                    String name = AudioEngine.getPluginName(i, plugin);
-                    String nameKey = name != null ? name.toLowerCase().trim() : "";
-                    if (blacklist != null && blacklist.has(nameKey)) {
-                        Log.d(TAG, String.format("[menu] blacklisted: %s", name));
-                        continue;
-                    }
-                    MenuItem menuItem = subMenu.add(name);
-                    int finalI = i;
-                    int finalPlugin = plugin;
-                    int pluginID = finalI * 100 + finalPlugin ;
-
-                    if (pluginDialogAdapter != null)
-                        pluginDialogAdapter.addItem(finalI * 100 + finalPlugin, name);
-
-                    menuItem.setOnMenuItemClickListener(item -> {
-                        int ret = AudioEngine.addPlugin(finalI, finalPlugin);
-                        if (dataAdapter != null) dataAdapter.addItem(finalI * 100 + finalPlugin, ret);
-                        return false;
-                    });
-                }
-            }
-        }
+        // Step B4: the legacy library->plugin PopupMenu population loop AND the
+        // load_plugin_dialog list it fed were dead UI (neither createPluginDialog
+        // nor addPluginMenu was ever .show()n) and they bypassed the curation
+        // gate (blacklist had to be checked by name, per surface). Removed; the
+        // live surfaces are the FAB picker and the SELECT MODEL dialog.
 
         if (fab != null) {
             fab.setOnClickListener(new View.OnClickListener() {
@@ -3620,6 +3595,16 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             try {
                 LocalPresetManager.PluginItem item = new LocalPresetManager.PluginItem();
                 item.name = AudioEngine.getActivePluginName(i);
+                try {
+                    if (dataAdapter != null) {
+                        String k = dataAdapter.getPluginKey(i);
+                        if (k != null) item.key = k;
+                    }
+                    if (item.key == null) {
+                        int[] _hits = PluginCatalogData.indicesForName(item.name);
+                        if (_hits.length == 1) item.key = PluginCatalogData.KEY[_hits[0]];
+                    }
+                } catch (Throwable ignore) {}
                 try { item.uniqueId = AudioEngine.getActivePluginID(i); } catch (Exception ignore) { item.uniqueId = 0; }
                 try { item.enabled = AudioEngine.getActivePluginEnabled(i); } catch (Exception ignore) { item.enabled = true; }
                 float[] values = null;
@@ -6106,18 +6091,46 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             }
 
             int ret = -1;
-            // Blacklist check: skip loading blacklisted plugins from presets
-            JSONObject blacklist = ConnectGuitar.loadJSONFromAssetFile(this, "blacklist.json");
-            String nameKey = name != null ? name.toLowerCase().trim() : "";
-            if (blacklist != null && blacklist.has(nameKey)) {
-                Log.d(TAG, String.format("[loadPreset] blacklisted: %s", name));
-                // Skip this plugin, don't add it to chain
+            // Step B3: preset load enforces the same single blacklist (now keyed
+            // by stable key). Skip the block, tell the user, app stays alive.
+            // Step B1: name-only presets resolve through the registry; an
+            // ambiguous name fails VISIBLY instead of silently picking one.
+            String presetKey = jo.optString("key", null);
+            if (presetKey != null && presetKey.isEmpty()) presetKey = null;
+            boolean presetBlocked = false;
+            if (presetKey != null && PluginKey.parse(presetKey) != null) {
+                if (Blacklist.isKeyBlacklisted(presetKey)) presetBlocked = true;
+            } else if (Blacklist.isNameBlacklisted(name)) {
+                presetBlocked = true;
+            }
+            if (presetBlocked) {
+                Log.d(TAG, String.format("[loadPreset] blacklisted, skipped: %s (key=%s)", name, presetKey));
+                final String skipped = name;
+                runOnUiThread(() -> toast("Preset block skipped (blacklist): " + skipped));
                 continue;
             }
-            if (!lazyLoad)
-                AudioEngine.addPluginByName(name);
-            else
-                addPluginByName(name);
+            if (presetKey != null && PluginKey.parse(presetKey) != null
+                    && PluginCatalog.indexOfKey(presetKey) >= 0) {
+                if (!lazyLoad) AudioEngine.addPluginByName(name);
+                else addPluginByKey(presetKey);
+            } else {
+                int _ri = PluginCatalog.resolveName(name);
+                if (_ri == -2) {
+                    String _problem = PluginCatalog.describeNameProblem(name);
+                    Log.e(TAG, "[loadPreset] ambiguous plugin name: " + _problem);
+                    final String amb = name;
+                    runOnUiThread(() -> toast("Preset name ambiguous, block skipped: " + amb));
+                    continue;
+                }
+                if (_ri == -1) {
+                    Log.w(TAG, "[loadPreset] unknown plugin name " + name);
+                    final String unk = name;
+                    runOnUiThread(() -> toast("Preset block skipped (not found): " + unk));
+                    continue;
+                }
+                if (!lazyLoad) AudioEngine.addPluginByName(name);
+                else addPluginByKey(PluginCatalogData.KEY[_ri]);
+            }
             Log.d(TAG, "loadPreset: Loaded plugin: " + name);
             String[] control = controls.split(";");
 
@@ -6696,13 +6709,14 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 CategoryHelper.Category.MODULATION,
                 CategoryHelper.Category.DELAY,
                 CategoryHelper.Category.REVERB,
-                CategoryHelper.Category.UTILITY
+                CategoryHelper.Category.UTILITY,
+                CategoryHelper.Category.OTHER
         };
 
         final String[] catLabels = {
                 "Amp/Head", "Cabinet", "Noise Gate", "Pitch/Synth", "Wah",
                 "Compressor", "OD/Dist", "EQ", "Modulation", "Delay",
-                "Reverb", "Utility"
+                "Reverb", "Utility", "Other"
         };
 
         final Runnable[] populateModelsForCat = new Runnable[1];
@@ -6899,13 +6913,14 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 CategoryHelper.Category.MODULATION,
                 CategoryHelper.Category.DELAY,
                 CategoryHelper.Category.REVERB,
-                CategoryHelper.Category.UTILITY
+                CategoryHelper.Category.UTILITY,
+                CategoryHelper.Category.OTHER
         };
 
         final String[] catLabels = {
                 "Amp/Head", "Cabinet", "Noise Gate", "Pitch/Synth", "Wah",
                 "Compressor", "OD/Dist", "EQ", "Modulation", "Delay",
-                "Reverb", "Utility"
+                "Reverb", "Utility", "Other"
         };
         // Active category holder — drives the global search fallback (empty query = this cat).
         final CategoryHelper.Category[] activePickerCat = {categories[0]};
@@ -7009,8 +7024,10 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         JSONObject[] sources = {availablePlugins, availablePluginsLV2};
         ArrayList<String> loadedPluginNames = new ArrayList<>();
 
-        for (JSONObject source : sources) {
+        for (int si = 0; si < sources.length; si++) {
+            JSONObject source = sources[si];
             if (source == null) continue;
+            String srcKind = (si == 1) ? PluginKey.LV2 : PluginKey.LADSPA;
             Iterator<String> keys = source.keys();
             while (keys.hasNext()) {
                 String k = keys.next();
@@ -7018,7 +7035,9 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 if (obj == null) continue;
                  String pName = obj.optString("name", "");
                  if (pName.isEmpty() || loadedPluginNames.contains(pName)) continue;
-                 if (!isGuitarPlugin(pName)) continue;
+                 final String pluginKey = catalogKeyFor(obj, srcKind);
+                 int ri = PluginCatalog.indexOfKey(pluginKey);
+                 if (ri < 0 || !PluginCatalog.isVisible(ri)) continue;
 
                 CategoryHelper.Category pCat = CategoryHelper.getCategory(pName);
                 if (pCat == cat) {
@@ -7026,9 +7045,8 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     String desc = obj.optString("desc", obj.optString("description", "Built-in Effect"));
                     if (desc.length() > 40) desc = desc.substring(0, 37) + "\u2026";
 
-                    final String pluginName = pName;
                     addPluginPickerRow(container, pName, desc, CategoryHelper.getIconRes(pName), dialog, v -> {
-                        addPluginByName(pluginName);
+                        addPluginByKey(pluginKey);
                         dialog.dismiss();
                     });
                 }
@@ -7076,27 +7094,33 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             hits++;
         }
 
-        // Every plugin across all categories
+        // Every plugin across all categories (Step B4: one gate everywhere —
+        // curated AND not blacklisted AND not synth; blacklisted/non-curated
+        // entries must not appear for ANY query).
         JSONObject[] sources = {availablePlugins, availablePluginsLV2};
         ArrayList<String> seen = new ArrayList<>();
         // Dash/underscore-insensitive: "oc2" must find "OC-2" (R14 OBS-4).
         String qNorm = q.replaceAll("[^a-z0-9]", "");
-        for (JSONObject source : sources) {
+        for (int si = 0; si < sources.length; si++) {
+            JSONObject source = sources[si];
             if (source == null) continue;
+            String srcKind = (si == 1) ? PluginKey.LV2 : PluginKey.LADSPA;
             Iterator<String> keys = source.keys();
             while (keys.hasNext()) {
                 JSONObject obj = source.optJSONObject(keys.next());
                 if (obj == null) continue;
                  final String pName = obj.optString("name", "");
                  if (pName.isEmpty() || seen.contains(pName)) continue;
-                 if (!isGuitarPlugin(pName)) continue;
+                 final String pluginKey = catalogKeyFor(obj, srcKind);
+                 if (PluginCatalog.indexOfKey(pluginKey) < 0) continue;
+                 if (!PluginCatalog.isVisible(PluginCatalog.indexOfKey(pluginKey))) continue;
                 String desc = obj.optString("desc", obj.optString("description", "Built-in Effect"));
                 String nameNorm = pName.toLowerCase().replaceAll("[^a-z0-9]", "");
                 if (!(nameNorm.contains(qNorm) || desc.toLowerCase().contains(q))) continue;
                 seen.add(pName);
                 String shortDesc = desc.length() > 40 ? desc.substring(0, 37) + "…" : desc;
                 addPluginPickerRow(container, pName, shortDesc, CategoryHelper.getIconRes(pName), dialog, v -> {
-                    addPluginByName(pName);
+                    addPluginByKey(pluginKey);
                     dialog.dismiss();
                 });
                 hits++;
@@ -7195,8 +7219,10 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             {
                 JSONObject[] pluginSources = {availablePlugins, availablePluginsLV2};
                 ArrayList<String> pluginNames = new ArrayList<>();
-                for (JSONObject source : pluginSources) {
+                for (int si = 0; si < pluginSources.length; si++) {
+                    JSONObject source = pluginSources[si];
                     if (source == null) continue;
+                    String srcKind = (si == 1) ? PluginKey.LV2 : PluginKey.LADSPA;
                     Iterator<String> keys = source.keys();
                     while (keys.hasNext()) {
                         String k = keys.next();
@@ -7204,10 +7230,11 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                         if (obj == null) continue;
                         String pName = obj.optString("name", "");
                         if (pName.isEmpty() || pluginNames.contains(pName)) continue;
-                        if (!isGuitarPlugin(pName)) continue;
+                        final String pickKey = catalogKeyFor(obj, srcKind);
+                        int ri = PluginCatalog.indexOfKey(pickKey);
+                        if (ri < 0 || !PluginCatalog.isVisible(ri)) continue;
                         if (CategoryHelper.getCategory(pName) != cat) continue;
                         pluginNames.add(pName);
-                        final String pick = pName;
                         View prow = getLayoutInflater().inflate(R.layout.item_model_browser_row, container, false);
                         ((TextView) prow.findViewById(R.id.item_model_title)).setText(pName);
                         String desc = obj.optString("desc", obj.optString("description", "Built-in Effect"));
@@ -7218,7 +7245,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                         pthumb.setColorFilter(CategoryHelper.getColor(pName), android.graphics.PorterDuff.Mode.SRC_IN);
                         prow.findViewById(R.id.item_model_star).setVisibility(View.GONE);
                         prow.setOnClickListener(v -> {
-                            swapActivePlugin(position, pick);
+                            swapActivePlugin(position, pickKey);
                             dialog.dismiss();
                         });
                         container.addView(prow);
@@ -7413,19 +7440,28 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             hits++;
         }
 
-        // Every built-in plugin across all categories
+        // Every built-in plugin across all categories — STEP B: same curation
+        // gate as the picker (curated AND not blacklisted AND not synth). The
+        // old loop was unfiltered, which re-exposed blacklisted/non-curated
+        // plugins (and MIDI synths) in SELECT MODEL search.
         JSONObject[] pluginSources = {availablePlugins, availablePluginsLV2};
         ArrayList<String> seen = new ArrayList<>();
-        for (JSONObject source : pluginSources) {
+        String qNorm2 = q.replaceAll("[^a-z0-9]", "");
+        for (int si = 0; si < pluginSources.length; si++) {
+            JSONObject source = pluginSources[si];
             if (source == null) continue;
+            String srcKind = (si == 1) ? PluginKey.LV2 : PluginKey.LADSPA;
             Iterator<String> keys = source.keys();
             while (keys.hasNext()) {
                 JSONObject obj = source.optJSONObject(keys.next());
                 if (obj == null) continue;
                 final String pName = obj.optString("name", "");
                 if (pName.isEmpty() || seen.contains(pName)) continue;
+                final String pickKey = catalogKeyFor(obj, srcKind);
+                int ri = PluginCatalog.indexOfKey(pickKey);
+                if (ri < 0 || !PluginCatalog.isVisible(ri)) continue;
                 String desc = obj.optString("desc", obj.optString("description", "Built-in Effect"));
-                if (!(pName.toLowerCase().replaceAll("[^a-z0-9]", "").contains(q.replaceAll("[^a-z0-9]", ""))
+                if (!(pName.toLowerCase().replaceAll("[^a-z0-9]", "").contains(qNorm2)
                         || desc.toLowerCase().contains(q))) continue;
                 seen.add(pName);
                 View row = getLayoutInflater().inflate(R.layout.item_model_browser_row, container, false);
@@ -7436,7 +7472,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 thumb.setImageResource(CategoryHelper.getIconRes(pName));
                 thumb.setColorFilter(CategoryHelper.getColor(pName), android.graphics.PorterDuff.Mode.SRC_IN);
                 row.setOnClickListener(v -> {
-                    swapActivePlugin(position, pName);
+                    swapActivePlugin(position, pickKey);
                     dialog.dismiss();
                 });
                 container.addView(row);
@@ -7490,9 +7526,21 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     }
 
     /** Swap the active plugin at a given slot with another plugin and refresh UI. */
-    public void swapActivePlugin(int position, String newPluginName) {
+    /** Step B1: the second argument is a stable key (picker rows); legacy
+     *  name-only callers still work via the registry resolver. */
+    public void swapActivePlugin(int position, String newPluginRef) {
+        String newPluginName = newPluginRef;
+        if (PluginKey.parse(newPluginRef) != null) {
+            int ri = PluginCatalog.indexOfKey(newPluginRef);
+            newPluginName = ri >= 0 ? PluginCatalog.nameOf(ri) : newPluginRef;
+            if (ri < 0 || !PluginCatalog.isVisible(ri)) {
+                Log.e(TAG, "swapActivePlugin: refusing key " + newPluginRef);
+                toast("Blocked by catalog policy");
+                return;
+            }
+        }
         // Guard: never destroy the current plugin for a name the engine can't resolve.
-        if (!isPluginKnown(newPluginName)) {
+        if (PluginKey.parse(newPluginRef) == null && !isPluginKnown(newPluginName)) {
             Log.e(TAG, "swapActivePlugin: unknown plugin name " + newPluginName);
             toast("Couldn't find " + newPluginName);
             return;
@@ -7517,7 +7565,8 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             // clearing the correct selection (new block not auto-selected).
             inSwapTransaction = true;
             try {
-                addPluginByName(newPluginName);
+                if (PluginKey.parse(newPluginRef) != null) addPluginByKey(newPluginRef);
+                else addPluginByName(newPluginName);
             } finally {
                 inSwapTransaction = false;
             }
@@ -8157,9 +8206,10 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         return false;
     }
 
-    /** Only expose reviewed, guitar-relevant processors in plugin pickers. */
+    /** Step B4: the ONE visibility gate used by every surface.
+     *  visible = curated AND not blacklisted AND not synth. */
     static boolean isGuitarPlugin(String pluginName) {
-        return GuitarPluginCatalog.isCurated(pluginName);
+        return PluginCatalog.isNameVisible(pluginName);
     }
 
     /** Refuse the add when the chain is full (native would overrun DSP arrays).
@@ -8212,158 +8262,99 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         } catch (Throwable ignore) {}
     }
 
-    public void addPluginByName(String pluginName) {
-        if (isUnsupportedSynth(pluginName)) {
-            Log.w(TAG, "addPluginByName: refusing MIDI-only synth " + pluginName);
-            toast(pluginName + " needs MIDI input — not supported in a guitar chain");
-            return;
+    /** Stable key for a JSON catalog entry (source-aware). */
+    private static String catalogKeyFor(JSONObject obj, String srcKind) {
+        String lib = obj.optString("library", "");
+        if (PluginKey.LV2.equals(srcKind)) {
+            return PluginKey.make(PluginKey.LV2, lib, obj.optInt("index", -1));
         }
-        if (!isGuitarPlugin(pluginName)) {
-            Log.w(TAG, "addPluginByName: refusing non-guitar catalog item " + pluginName);
-            toast("Not in the curated guitar catalog");
-            return;
-        }
-//        Log.d(TAG, "addPluginByName: " + pluginName);
-//        Log.d(TAG, "addPluginByName: " + availablePlugins.toString());
-        JSONObject plugins = availablePlugins;
-        if (plugins == null) { Log.e(TAG, "availablePlugins is null"); addPluginByNameLV2(pluginName); return; }
-        Iterator<String> keys = plugins.keys();
-
-        while (keys.hasNext()) {
-            String key = keys.next();
-            try {
-                if (plugins.get(key) instanceof JSONObject) {
-//                    Log.d(TAG, "onCreate: key " + key);
-                    JSONObject object = plugins.getJSONObject(key);
-                    // do something with jsonObject here
-                    String name = object.getString("name");
-                    String id = object.getString("id");
-                    int plugin = object.getInt("plugin");
-                    String lib = object.getString("library");
-
-//                    Log.d(TAG, String.format ("addPluginByName: comparing %s and %s", pluginName, name));
-
-                    if (pluginName.equals(name)) {
-                        Log.d(TAG, "addPluginByName: found plugin " + name);
-                        // Crash-triage trace: last LOADPLUGIN line before a SIGSEGV names
-                        // the culprit even though native dies before any "loaded ok".
-                        Log.i(TAG, "LOADPLUGIN ladspa name=\"" + name + "\" lib=" + lib + " idx=" + plugin);
-                        if (!chainHasRoom(name)) return;
-                        // Native drops unloadable plugins silently: only touch
-                        // UI state when the chain actually grew, or UI/engine
-                        // slots desync (stale indices, blank editors).
-                        int before = AudioEngine.getActivePlugins();
-                        AudioEngine.addPluginLazy(lib, plugin);
-                        if (AudioEngine.getActivePlugins() <= before) {
-                            Log.e(TAG, "addPluginByName: engine refused " + name);
-                            toast("Couldn't load " + name);
-                            return;
-                        }
-                        clearInternalBypassOnFreshAdd(before, name);
-                        if (dataAdapter != null) {
-                            int pluginID = 0;
-                            try { pluginID = Integer.parseInt(key); } catch (Exception ignored) {}
-                            dataAdapter.addItem(pluginID, dataAdapter.getItemCount());
-                        }
-                        if (signalChainCanvas != null && !inSwapTransaction) {
-                            // Select the freshly-added block and open its editor;
-                            // the panel used to keep showing the previously
-                            // selected block (round-3 note: "add octolo, panel
-                            // shows AMP").
-                            signalChainCanvas.post(() -> {
-                                signalChainCanvas.loadFromActivePlugins();
-                                signalChainCanvas.selectSlot(before);
-                                populateInlineParameterEditor(before, name);
-                            });
-                        }
-                        return;
-                    }
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-
-        // First-chance LADSPA miss is the normal path for LV2-only names.
-        Log.d(TAG, "addPluginByName: not a LADSPA name (" + pluginName + ") ... trying LV2 plugins ...");
-        addPluginByNameLV2(pluginName);
+        return PluginKey.make(PluginKey.LADSPA, lib, obj.optInt("id", -1));
     }
 
-    public void addPluginByNameLV2(String pluginName) {
-        if (isUnsupportedSynth(pluginName)) {
-            Log.w(TAG, "addPluginByNameLV2: refusing MIDI-only synth " + pluginName);
-            toast(pluginName + " needs MIDI input — not supported in a guitar chain");
+    /** Step B1: the canonical add path. No name fallback between LADSPA and
+     *  LV2 — the key carries source+lib+index. Enforces the single gate
+     *  (curated AND not blacklisted AND not synth). */
+    public void addPluginByKey(String pluginKey) {
+        if (pluginKey == null || PluginKey.parse(pluginKey) == null) {
+            Log.e(TAG, "addPluginByKey: malformed key " + pluginKey);
+            toast("Invalid plugin key");
             return;
         }
-        if (!isGuitarPlugin(pluginName)) {
-            Log.w(TAG, "addPluginByNameLV2: refusing non-guitar catalog item " + pluginName);
+        int ri = PluginCatalog.indexOfKey(pluginKey);
+        if (ri < 0) {
+            Log.e(TAG, "addPluginByKey: unknown key " + pluginKey);
+            toast("Unknown plugin: " + pluginKey);
+            return;
+        }
+        if (Blacklist.isKeyBlacklisted(pluginKey) || Blacklist.isLibBlacklisted(PluginCatalog.libOf(ri))) {
+            Log.w(TAG, "addPluginByKey: refusing blacklisted plugin " + pluginKey);
+            toast("Blocked (blacklist): " + PluginCatalog.nameOf(ri));
+            return;
+        }
+        if (!PluginCatalogData.CURATED[ri]) {
+            Log.w(TAG, "addPluginByKey: refusing non-curated plugin " + pluginKey);
             toast("Not in the curated guitar catalog");
             return;
         }
-//        Log.d(TAG, "addPluginByName: " + pluginName);
-        if (availablePluginsLV2 != null) Log.d(TAG, "addPluginByName: " + availablePluginsLV2.toString());
-        JSONObject plugins = availablePluginsLV2;
-        if (plugins == null) {
-            // Round-5 K2: catalog scan lands ~1.5s after launch; a `+` tap
-            // before that used to die silently.
-            Log.w(TAG, "addLV2 refused name=" + pluginName + " reason=scan-incomplete");
-            toast("Plugin catalog is still loading — try again in a moment");
+        if (PluginCatalogData.SYNTH[ri]) {
+            Log.w(TAG, "addPluginByKey: refusing MIDI-only synth " + pluginKey);
+            toast(PluginCatalog.nameOf(ri) + " needs MIDI input — not supported in a guitar chain");
             return;
         }
-        Iterator<String> keys = plugins.keys();
-
-        while (keys.hasNext()) {
-            String key = keys.next();
-            try {
-                if (plugins.get(key) instanceof JSONObject) {
-//                    Log.d(TAG, "onCreate: key " + key);
-                    JSONObject object = plugins.getJSONObject(key);
-                    // do something with jsonObject here
-                    String name = object.getString("name");
-                    String id = object.getString("id");
-                    int plugin = object.getInt("index");
-                    String lib = object.getString("library");
-
-//                    Log.d(TAG, String.format ("addPluginByName: comparing %s and %s", pluginName, name));
-
-                    if (pluginName.equals(name)) {
-                        Log.d(TAG, "addPluginByNameLV2: found plugin " + name);
-                        Log.i(TAG, "LOADPLUGIN lv2 name=\"" + name + "\" lib=" + lib + " idx=" + plugin);
-                        if (!chainHasRoom(name)) return;
-                        int before = AudioEngine.getActivePlugins();
-                        AudioEngine.addPluginLazyLV2(lib, plugin);
-                        if (AudioEngine.getActivePlugins() <= before) {
-                            Log.e(TAG, "addPluginByNameLV2: engine refused " + name);
-                            toast("Couldn't load " + name);
-                            return;
-                        }
-                        clearInternalBypassOnFreshAdd(before, name);
-                        if (dataAdapter != null) {
-                            int pluginID = 0;
-                            try { pluginID = Integer.parseInt(key); } catch (Exception ignored) {}
-                            dataAdapter.addItem(pluginID, dataAdapter.getItemCount());
-                        }
-                        if (signalChainCanvas != null && !inSwapTransaction) {
-                            // Select the freshly-added block and open its editor;
-                            // the panel used to keep showing the previously
-                            // selected block (round-3 note: "add octolo, panel
-                            // shows AMP").
-                            signalChainCanvas.post(() -> {
-                                signalChainCanvas.loadFromActivePlugins();
-                                signalChainCanvas.selectSlot(before);
-                                populateInlineParameterEditor(before, name);
-                            });
-                        }
-                        return;
-                    }
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
+        String name = PluginCatalog.nameOf(ri);
+        if (!chainHasRoom(name)) return;
+        int before = AudioEngine.getActivePlugins();
+        boolean lv2 = PluginCatalog.isLv2(ri);
+        if (lv2) AudioEngine.addPluginLazyLV2(PluginCatalog.libOf(ri), PluginCatalog.idxOf(ri));
+        else     AudioEngine.addPluginLazy(PluginCatalog.libOf(ri), PluginCatalog.idxOf(ri));
+        if (AudioEngine.getActivePlugins() <= before) {
+            Log.e(TAG, "addPluginByKey: engine refused " + pluginKey);
+            toast("Couldn't load " + name);
+            return;
         }
+        Log.i(TAG, "LOADPLUGIN key=" + pluginKey + " name=\"" + name + "\" lib=" + PluginCatalog.libOf(ri) + " idx=" + PluginCatalog.idxOf(ri));
+        clearInternalBypassOnFreshAdd(before, name);
+        if (dataAdapter != null) {
+            dataAdapter.addItem(ri, dataAdapter.getItemCount());
+            dataAdapter.setPluginKey(dataAdapter.getItemCount() - 1, pluginKey);
+        }
+        if (signalChainCanvas != null && !inSwapTransaction) {
+            signalChainCanvas.post(() -> {
+                signalChainCanvas.loadFromActivePlugins();
+                signalChainCanvas.selectSlot(before);
+                populateInlineParameterEditor(before, name);
+            });
+        }
+    }
 
-        Log.w(TAG, "add refused name=" + pluginName + " reason=not-in-loaded-catalog");
-        toast("Couldn't find " + pluginName + " in the plugin catalog");
+    /** Legacy display-name entry point (presets, shim rows). Resolves through
+     *  the registry: unknown -> error, ambiguous -> error with the candidate
+     *  keys listed. Never silently picks one. */
+    public void addPluginByName(String pluginName) {
+        int ri = PluginCatalog.resolveName(pluginName);
+        if (ri == -1) {
+            Log.w(TAG, "addPluginByName: unknown plugin name " + pluginName);
+            toast("Couldn't find " + pluginName + " in the plugin catalog");
+            return;
+        }
+        if (ri == -2) {
+            String problem = PluginCatalog.describeNameProblem(pluginName);
+            Log.w(TAG, "addPluginByName: " + problem);
+            toast("Ambiguous plugin name — pick it from the picker");
+            return;
+        }
+        addPluginByKey(PluginCatalogData.KEY[ri]);
+    }
+
+    /** @deprecated legacy LV2-by-name shim; routes through the stable-key path. */
+    @Deprecated
+    public void addPluginByNameLV2(String pluginName) {
+        addPluginByName(pluginName);
+    }
+
+    /** Step B3: native loader guard (Engine.cpp refuses dlopen when true). */
+    public static boolean isBlacklistedLib(String lib) {
+        return Blacklist.isLibBlacklisted(lib);
     }
 
     static public String readAssetFile(Context context, String filename) {

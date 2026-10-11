@@ -29,6 +29,14 @@ public class DataAdapter extends RecyclerView.Adapter<DataAdapter.ViewHolder> {
     HashMap<Integer, Integer> selectedModels = new HashMap<>();
     HashMap<Integer, String> audioFiles = new HashMap<>();
     HashMap<Integer, String> audioFilesR = new HashMap<>();
+    /** Step B1: stable key per chain slot (position -> source|lib|index). */
+    HashMap<Integer, String> pluginKeys = new HashMap<>();
+
+    void setPluginKey(int position, String key) {
+        if (key != null) pluginKeys.put(position, key); else pluginKeys.remove(position);
+    }
+
+    String getPluginKey(int position) { return pluginKeys.get(position); }
     MainActivity mainActivity;
     private int selectedPosition = 0;
 

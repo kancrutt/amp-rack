@@ -40,6 +40,8 @@ public class SignalChainCanvasView extends View {
         public int categoryColor;
         public int categoryIconRes;
         public String categoryCode;
+        /** Step B1: stable key (source|lib|index) when resolvable. */
+        public String pluginKey;
         public NodeType nodeType = NodeType.PLUGIN;
         public boolean bypassed;
         /** 0 = main trunk, 1 = upper parallel branch, 2 = lower parallel branch. */
@@ -597,6 +599,8 @@ public class SignalChainCanvasView extends View {
             n.categoryColor = getCategoryColor(name);
             n.categoryIconRes = getCategoryIconRes(name);
             n.categoryCode = getCategoryCode(name);
+            int[] _hits = PluginCatalogData.indicesForName(name);
+            if (_hits.length == 1) n.pluginKey = PluginCatalogData.KEY[_hits[0]];
             n.width = nodeW;
             n.height = nodeH;
 

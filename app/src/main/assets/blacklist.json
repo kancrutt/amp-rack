@@ -1,4 +1,8 @@
 {
-  "simple ir loader": 1,
-  "the infamous mindi": 1
+ "_comment": "Step B: one blacklist, keyed by stable key (source|lib|index) or by lib.",
+ "keys": [
+  "LV2|libir_cab.so|0",
+  "LV2|mindi.so|0"
+ ],
+ "libs": []
 }

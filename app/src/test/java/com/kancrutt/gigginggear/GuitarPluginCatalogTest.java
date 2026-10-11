@@ -81,34 +81,21 @@ public class GuitarPluginCatalogTest {
         assertFalse(GuitarPluginCatalog.isCurated(""));
     }
 
-    @Test public void blacklistOverridesCurated() throws Exception {
+    @Test public void blacklistOwnershipMovedToBlacklistJava() throws Exception {
+        // Step B3: the blacklist is owned by Blacklist.java (keyed by stable
+        // key). GuitarPluginCatalog.isCurated no longer consults it, so
+        // visibility is decided by exactly one gate.
+        String json = "{\"keys\":[\"LV2|mindi.so|0\"],\"libs\":[]}";
+        Blacklist.loadFromJson(json);
+        assertTrue(Blacklist.isKeyBlacklisted("LV2|mindi.so|0"));
+        assertFalse(Blacklist.isKeyBlacklisted("LV2|libfine.so|0"));
+        // curated policy still applies on its own
         loadBundledCatalog();
-        // Bundled blacklist hides Simple IR Loader (crashy ir-cab-sim bundle);
-        // octolo stays curated because it is not on the blacklist.
-        File bl = new File("src/main/assets/blacklist.json");
-        assertTrue("blacklist asset missing at " + bl.getAbsolutePath(), bl.exists());
-        GuitarPluginCatalog.loadBlacklistFromJson(
-                new String(Files.readAllBytes(bl.toPath()), "UTF-8"));
-        // Round-5 dedup: bare "octolo" left the curated names list entirely;
-        // only "the infamous octolo" remains curated.
-        assertFalse(GuitarPluginCatalog.isCurated("octolo"));
         assertTrue(GuitarPluginCatalog.isCurated("the infamous octolo"));
-        // Bundled blacklist hides the crashy ir-cab-sim bundle and mindi
-        // (MIDI-only, missing mindi.json manifest asset).
-        assertFalse(GuitarPluginCatalog.isCurated("Simple IR Loader"));
-        assertFalse(GuitarPluginCatalog.isCurated("the infamous mindi"));
-
-        // A non-empty blacklist hides even curated names, case-insensitively;
-        // entries with value 0 are ignored.
-        GuitarPluginCatalog.loadBlacklistFromJson(
-                "{\"octolo\": 1, \"The Infamous Octolo\": 1, \"disabled\": 0}");
-        assertFalse(GuitarPluginCatalog.isCurated("octolo"));
-        assertFalse(GuitarPluginCatalog.isCurated("THE INFAMOUS OCTOLO"));
-        assertTrue(GuitarPluginCatalog.isCurated("bluesbreaker"));
-        GuitarPluginCatalog.clearForTesting();
+        Blacklist.clearForTesting();
     }
 
-    @Test public void legacyFallbackWhenAssetMissing() {
+@Test public void legacyFallbackWhenAssetMissing() {
         GuitarPluginCatalog.clearForTesting();
         // Without the asset the legacy name-token heuristics must keep the
         // catalog alive (no empty browse list).

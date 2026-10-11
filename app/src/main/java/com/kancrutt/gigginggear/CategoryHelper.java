@@ -37,9 +37,12 @@ public class CategoryHelper {
         // same convention as CABINET staying uncolored.
         SPLIT("SPLIT", COLOR_ROUTING, R.drawable.ic_routing_split, R.drawable.ic_routing_split),
         MERGE("MERGE", COLOR_ROUTING, R.drawable.ic_routing_merge, R.drawable.ic_routing_merge),
-        /** Step B: unknown/unclassified entries land here and stay VISIBLE
-         *  (Other chip). Nothing is hidden for being unknown. */
-        OTHER("OTHER", COLOR_DEFAULT, R.drawable.ic_cat_volume, R.drawable.sl_cat_unknown);
+        /** R1 (Hery): there is NO "Other" category shown anywhere. This is an
+         *  internal fallback only — a name absent from the approved table.
+         *  Unclassified catalog entries are reported for Hery's decision by
+         *  tools/gen_catalog_data.py (WIP/audit_r24/UNCATEGORIZED.md), never
+         *  auto-categorised and never surfaced as a chip. */
+        UNKNOWN("UNKNOWN", COLOR_DEFAULT, R.drawable.ic_cat_volume, R.drawable.sl_cat_unknown);
 
         public final String code;
         public final int color;
@@ -61,12 +64,13 @@ public class CategoryHelper {
      *   2. PluginCatalogData approved table (Hery-approved 2026-10-11), which is
      *      itself resolved by the generator as: approved override by stable key
      *      > LV2 class URI / LADSPA documented category > Other
-     *   3. OTHER — unknown entries stay visible in browse, never hidden
+     *   3. UNKNOWN — internal fallback only; NEVER displayed as a chip (R1).
+     *      Unclassified entries go to the UNCATEGORIZED build report instead.
      * Ambiguous names resolve to the first (deterministic) catalog entry and
      * log a warning; identity decisions must go through the stable key.
      */
     public static Category getCategory(String pluginName) {
-        if (pluginName == null) return Category.OTHER;
+        if (pluginName == null) return Category.UNKNOWN;
         String n = pluginName.trim();
         // Enum-name passthrough (getIconRes("AMP")-style callers). valueOf
         // instead of a static values() map: a static initializer here would
@@ -79,7 +83,7 @@ public class CategoryHelper {
         if (lower.equals("merge") || lower.equals("signal merge")) return Category.UTILITY;
 
         int[] hits = PluginCatalogData.indicesForName(n);
-        if (hits.length == 0) return Category.OTHER;
+        if (hits.length == 0) return Category.UNKNOWN;
         if (hits.length > 1) {
             try { android.util.Log.w("CategoryHelper",
                     "ambiguous name '" + pluginName + "' (" + hits.length
@@ -89,7 +93,7 @@ public class CategoryHelper {
         try {
             return normalizeRouting(Category.valueOf(PluginCatalogData.CATEGORY[hits[0]]));
         } catch (IllegalArgumentException e) {
-            return Category.OTHER;
+            return Category.UNKNOWN;
         }
     }
 

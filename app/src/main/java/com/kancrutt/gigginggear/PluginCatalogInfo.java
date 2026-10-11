@@ -130,8 +130,14 @@ final class PluginCatalogInfo {
         if (i.manufacturer != null) sb.append(i.manufacturer).append('\n');
         String home = i.homepage != null ? i.homepage : i.source;
         if (home != null) sb.append(home).append('\n');
-        if (i.subcategory != null || i.category != null) {
-            sb.append(cap(i.subcategory != null ? i.subcategory : i.category));
+        // R2 (Hery): the category line follows the approved table, not the
+        // research catalog's stale sub-category strings.
+        CategoryHelper.Category c = CategoryHelper.getCategory(pluginName);
+        String catLine = c != null && c != CategoryHelper.Category.UNKNOWN
+                ? cap(c.name().toLowerCase(java.util.Locale.US))
+                : cap(i.subcategory != null ? i.subcategory : i.category);
+        if (catLine != null) {
+            sb.append(catLine);
             if (i.tags != null) sb.append("  ·  ").append(i.tags);
             sb.append('\n');
         }

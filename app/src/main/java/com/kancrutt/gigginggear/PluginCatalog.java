@@ -23,6 +23,8 @@ final class PluginCatalog {
     static boolean isLv2(int i) { return PluginKey.LV2.equals(PluginCatalogData.SOURCE[i]); }
     static String categoryOf(int i) { return PluginCatalogData.CATEGORY[i]; }
 
+    static String[] aliasesOf(int i) { return PluginCatalogData.ALIASES[i]; }
+
     /** The single curation gate. */
     static boolean isVisible(int i) {
         if (i < 0 || i >= PluginCatalogData.COUNT) return false;

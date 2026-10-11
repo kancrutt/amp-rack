@@ -4259,7 +4259,11 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 } else if (isAmp) {
                     subtitle.setText(canLoadNamModel(position) ? "AMP · NEURAL AMP (NAM)" : "AMP");
                 } else {
-                    subtitle.setText("EFFECT · STOMPBOX");
+                    // R2 (Hery): approved canonical category, never the generic
+                    // class-line. Only genuinely unknown names keep the fallback.
+                    CategoryHelper.Category c = CategoryHelper.getCategory(pluginName);
+                    subtitle.setText(c == CategoryHelper.Category.UNKNOWN
+                            ? "EFFECT · STOMPBOX" : c.name());
                 }
             }
             if (gearRender != null) {
@@ -6709,14 +6713,13 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 CategoryHelper.Category.MODULATION,
                 CategoryHelper.Category.DELAY,
                 CategoryHelper.Category.REVERB,
-                CategoryHelper.Category.UTILITY,
-                CategoryHelper.Category.OTHER
+                CategoryHelper.Category.UTILITY
         };
 
         final String[] catLabels = {
-                "Amp/Head", "Cabinet", "Noise Gate", "Pitch/Synth", "Wah",
+                "Amp", "Cabinet", "Noise Gate", "Pitch/Synth", "Wah",
                 "Compressor", "OD/Dist", "EQ", "Modulation", "Delay",
-                "Reverb", "Utility", "Other"
+                "Reverb", "Utility"
         };
 
         final Runnable[] populateModelsForCat = new Runnable[1];
@@ -6913,14 +6916,13 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 CategoryHelper.Category.MODULATION,
                 CategoryHelper.Category.DELAY,
                 CategoryHelper.Category.REVERB,
-                CategoryHelper.Category.UTILITY,
-                CategoryHelper.Category.OTHER
+                CategoryHelper.Category.UTILITY
         };
 
         final String[] catLabels = {
-                "Amp/Head", "Cabinet", "Noise Gate", "Pitch/Synth", "Wah",
+                "Amp", "Cabinet", "Noise Gate", "Pitch/Synth", "Wah",
                 "Compressor", "OD/Dist", "EQ", "Modulation", "Delay",
-                "Reverb", "Utility", "Other"
+                "Reverb", "Utility"
         };
         // Active category holder — drives the global search fallback (empty query = this cat).
         final CategoryHelper.Category[] activePickerCat = {categories[0]};

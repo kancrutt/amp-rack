@@ -68,7 +68,15 @@ def add(src, lib, ident, idx, name):
     key = f"{src}|{lib}|{ident}"
     if key in by_key:
         raise SystemExit(f"DUPLICATE STABLE KEY: {key}")
-    g = GOLD[key]
+    # R1 (Hery): an entry with no approved category is NEVER auto-"Other".
+    # It gets UNKNOWN + lands in the UNCATEGORIZED build report for Hery.
+    g = GOLD.get(key)
+    if g is None or not g.get("cat") or g["cat"] in ("OTHER", "UNKNOWN"):
+        uncategorized.append({"key": key, "name": name, "lib": lib,
+                              "reason": "key not in approved table" if g is None
+                              else "no approved category"})
+        g = {"cat": "UNKNOWN", "curated": g["curated"] if g else False,
+             "synth": False}
     aliases = set()
     aliases.add(name)
     if src == "LV2":
@@ -91,6 +99,8 @@ def add(src, lib, ident, idx, name):
         if key not in new_bl_keys:
             new_bl_keys.append(key)
 
+
+uncategorized = []
 
 for k, e in ladspa.items():
     if isinstance(e, dict) and e.get("name"):
@@ -134,7 +144,7 @@ for field in ["KEY", "NAME", "LIB", "SOURCE", "CATEGORY"]:
 L.append("    public static final int[] IDX = new int[COUNT];")
 L.append("    public static final boolean[] CURATED = new boolean[COUNT];")
 L.append("    public static final boolean[] SYNTH = new boolean[COUNT];")
-L.append("    private static final String[][] ALIASES = new String[COUNT][];")
+L.append("    static final String[][] ALIASES = new String[COUNT][];")
 for i, e in enumerate(entries):
     al = ", ".join(f'"{jesc(a)}"' for a in e["aliases"])
     L.append(
@@ -246,6 +256,20 @@ bl = {
     "libs": [],
 }
 json.dump(bl, open(os.path.join(A, "blacklist.json"), "w"), indent=1)
+
+# R1 report: entries awaiting Hery's category decision
+rep = ["# UNCATEGORIZED — entries without an approved category",
+       "", "Hery decides each one; nothing is auto-'Other'. Generator: tools/gen_catalog_data.py", ""]
+if uncategorized:
+    rep.append("| key | name | library | reason |")
+    rep.append("|---|---|---|---|")
+    for u in uncategorized:
+        rep.append(f"| {u['key']} | {u['name']} | {u['lib']} | {u['reason']} |")
+else:
+    rep.append("(none — every entry has an approved category)")
+open(os.path.join(ROOT, "WIP", "audit_r24", "UNCATEGORIZED.md"), "w").write("\n".join(rep) + "\n")
+print("UNCATEGORIZED entries:", len(uncategorized),
+      "-> WIP/audit_r24/UNCATEGORIZED.md")
 
 cnt = collections.Counter(e["cat"] for e in entries)
 before = {

@@ -18,7 +18,7 @@ public class StepBCatalogTest {
 
     private static final Set<String> CANONICAL = new HashSet<>(Arrays.asList(
             "AMP", "CABINET", "DISTORTION", "MODULATION", "DELAY", "REVERB",
-            "DYNAMICS", "GATE", "EQ", "PITCH", "WAH", "UTILITY", "OTHER"));
+            "DYNAMICS", "GATE", "EQ", "PITCH", "WAH", "UTILITY"));
 
     // ---------- B2: one category source, nothing UNKNOWN reachable ----------
 
@@ -31,18 +31,24 @@ public class StepBCatalogTest {
     }
 
     @Test public void noUnknownReachableForAnyAlias() {
+        // names/aliases resolve through the category table; keys resolve
+        // through the registry (getCategory is name-only by design)
         for (int i = 0; i < PluginCatalogData.COUNT; i++) {
-            for (String alias : new String[]{PluginCatalogData.NAME[i], PluginCatalogData.KEY[i]}) {
+            for (String alias : PluginCatalog.aliasesOf(i)) {
                 CategoryHelper.Category c = CategoryHelper.getCategory(alias);
                 assertNotNull("null category for " + alias, c);
                 assertTrue("UNKNOWN reachable for " + alias + " -> " + c,
-                        !"UNKNOWN".equals(c.name()));
+                        CANONICAL.contains(c.name()));
             }
+            int j = PluginCatalog.indexOfKey(PluginCatalogData.KEY[i]);
+            assertTrue("key not resolvable: " + PluginCatalogData.KEY[i], j >= 0);
+            assertTrue("non-canonical category via key " + PluginCatalogData.KEY[i],
+                    CANONICAL.contains(PluginCatalog.categoryOf(j)));
         }
     }
 
     @Test public void unknownNameLandsInOtherAndStaysVisible() {
-        assertEquals(CategoryHelper.Category.OTHER, CategoryHelper.getCategory("zzz-no-such-plugin"));
+        assertEquals(CategoryHelper.Category.UNKNOWN, CategoryHelper.getCategory("zzz-no-such-plugin"));
         // browsing Other must not hide anything: entry still classifiable
         assertNotNull(CategoryHelper.getCategory("GxEpic"));
     }

@@ -17,10 +17,10 @@ public class CategoryMovesR23Test {
     }
 
     /** No token heuristics at runtime: an unknown spelling is OTHER, not a guess. */
-    @Test public void unknownSpellingIsOtherNotGuessed() {
-        assertEquals(CategoryHelper.Category.OTHER,
+    @Test public void unknownSpellingIsNotGuessed() {
+        assertEquals(CategoryHelper.Category.UNKNOWN,
                 CategoryHelper.getCategory("x42 LV2 Convolution"));
-        assertEquals(CategoryHelper.Category.OTHER,
+        assertEquals(CategoryHelper.Category.UNKNOWN,
                 CategoryHelper.getCategory("Convolution"));
     }
 

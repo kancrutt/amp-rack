@@ -20,7 +20,7 @@ public final class PluginCatalogData {
     public static final int[] IDX = new int[COUNT];
     public static final boolean[] CURATED = new boolean[COUNT];
     public static final boolean[] SYNTH = new boolean[COUNT];
-    private static final String[][] ALIASES = new String[COUNT][];
+    static final String[][] ALIASES = new String[COUNT][];
     static { KEY[0]="LADSPA|libalias_1407.so|1407"; NAME[0]="Aliasing"; LIB[0]="libalias_1407.so"; IDX[0]=0; SOURCE[0]="LADSPA"; CATEGORY[0]="MODULATION"; CURATED[0]=false; SYNTH[0]=false; ALIASES[0]=new String[]{"Aliasing", "aliasing"}; }
     static { KEY[1]="LADSPA|liballpass_1895.so|1895"; NAME[1]="Allpass delay line, noninterpolating"; LIB[1]="liballpass_1895.so"; IDX[1]=0; SOURCE[1]="LADSPA"; CATEGORY[1]="MODULATION"; CURATED[1]=false; SYNTH[1]=false; ALIASES[1]=new String[]{"Allpass delay line, noninterpolating", "allpass delay line, noninterpolating"}; }
     static { KEY[2]="LADSPA|liballpass_1895.so|1896"; NAME[2]="Allpass delay line, linear interpolation"; LIB[2]="liballpass_1895.so"; IDX[2]=1; SOURCE[2]="LADSPA"; CATEGORY[2]="MODULATION"; CURATED[2]=false; SYNTH[2]=false; ALIASES[2]=new String[]{"Allpass delay line, linear interpolation", "allpass delay line, linear interpolation"}; }

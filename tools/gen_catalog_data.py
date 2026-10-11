@@ -30,14 +30,23 @@ def lv2_aliases(lib, catalog_name):
     d = os.path.join(A, "lv2", lib)
     aliases = {catalog_name}
     jsons = sorted(glob.glob(os.path.join(d, "*.json")))
+    engine_names = []
     for f in jsons:
         try:
             j = json.load(open(f))
             m = j.get("-1", {})
-            if isinstance(m, dict) and m.get("pluginName") == catalog_name:
-                aliases.add(m["pluginName"])
+            if isinstance(m, dict) and m.get("pluginName"):
+                engine_names.append(m["pluginName"])
         except Exception:
             pass
+    # the engine reports the bundle json's pluginName (getLV2Info), which can
+    # differ from the catalog name (e.g. libconvoLV2.so -> "x42 LV2
+    # Convolution" while the catalog says "convoLV2"). Single-plugin bundles
+    # alias it unconditionally; multi-plugin bundles only when it IS this entry.
+    if len(jsons) == 1 and engine_names:
+        aliases.add(engine_names[0])
+    else:
+        aliases.update(n for n in engine_names if n == catalog_name)
     ttls = sorted(glob.glob(os.path.join(d, "*.ttl")))
     if len(jsons) <= 1 and len(ttls) == 1:
         try:
@@ -256,6 +265,41 @@ bl = {
     "libs": [],
 }
 json.dump(bl, open(os.path.join(A, "blacklist.json"), "w"), indent=1)
+
+# Engine names with no registry entry at all (canvas shows them as unknown,
+# and they cannot be added by key). Hery decides whether to add them upstream.
+all_alias_lc = set()
+for e in entries:
+    all_alias_lc.update(a.lower() for a in e["aliases"])
+missing = []
+for lib in sorted(os.listdir(os.path.join(A, "lv2"))):
+    if lib.endswith(".backup"):
+        continue
+    for f in sorted(glob.glob(os.path.join(A, "lv2", lib, "*.json"))):
+        try:
+            j = json.load(open(f))
+        except Exception:
+            continue
+        m = j.get("-1", {})
+        n = m.get("pluginName") if isinstance(m, dict) else None
+        fn = os.path.basename(f)
+        if fn in ("gui.json", "manifest.json"):
+            continue  # pseudo-descriptors, not plugins
+        if n and n.lower() not in all_alias_lc:
+            missing.append((lib, fn, n))
+seen = set(); missing = [x for x in missing if not ((x[0], x[2]) in seen or seen.add((x[0], x[2])))]
+rep = ["# MISSING PLUGINS — engine names with no registry entry", "",
+       "Candidate plugins the engine exposes but the catalog has no entry for",
+       "(can't be added from the picker; canvas would show them unknown).", ""]
+if missing:
+    rep.append("| library | json | engine name |")
+    rep.append("|---|---|---|")
+    for lib, f, n in missing:
+        rep.append(f"| {lib} | {f} | {n} |")
+else:
+    rep.append("(none)")
+open(os.path.join(ROOT, "WIP", "audit_r24", "MISSING_PLUGINS.md"), "w").write("\n".join(rep) + "\n")
+print("MISSING_PLUGINS:", len(missing), "-> WIP/audit_r24/MISSING_PLUGINS.md")
 
 # R1 report: entries awaiting Hery's category decision
 rep = ["# UNCATEGORIZED — entries without an approved category",

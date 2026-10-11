@@ -2,7 +2,8 @@
  "_comment": "Step B: one blacklist, keyed by stable key (source|lib|index) or by lib.",
  "keys": [
   "LV2|libir_cab.so|0",
-  "LV2|mindi.so|0"
+  "LV2|mindi.so|0",
+  "LV2|rkrlv2.so|24"
  ],
  "libs": []
 }

@@ -120,7 +120,8 @@ public class PluginPickerFragment extends BottomSheetDialogFragment {
                         pickerClear.setVisibility(query.isEmpty() ? View.GONE : View.VISIBLE);
                     }
                     if (query.isEmpty()) {
-                        loadItemsForCategory(activeCat);
+                        if (favMode) loadFavItems();
+                        else loadItemsForCategory(activeCat);
                     } else {
                         loadItemsMatchingQuery(query);
                     }
@@ -130,6 +131,25 @@ public class PluginPickerFragment extends BottomSheetDialogFragment {
         }
 
         return view;
+    }
+
+    private boolean favMode = false;
+
+    private android.content.SharedPreferences favPrefs() {
+        return requireActivity().getPreferences(android.content.Context.MODE_PRIVATE);
+    }
+
+    private void bindStar(ImageView star, final String favKey) {
+        if (star == null || favKey == null) return;
+        star.setVisibility(View.VISIBLE);
+        star.setImageResource(FavStore.isFav(favPrefs(), favKey)
+                ? R.drawable.ic_star_gold : R.drawable.ic_star_border_gold);
+        star.setOnClickListener(v -> {
+            FavStore.toggle(favPrefs(), favKey);
+            star.setImageResource(FavStore.isFav(favPrefs(), favKey)
+                    ? R.drawable.ic_star_gold : R.drawable.ic_star_border_gold);
+            if (favMode) loadFavItems();
+        });
     }
 
     private void setupCategories() {
@@ -172,6 +192,25 @@ public class PluginPickerFragment extends BottomSheetDialogFragment {
         div.setBackgroundColor(Color.parseColor("#1E232A"));
         catContainer.addView(div);
 
+        // R24 (Hery): "Fav" pseudo-category — every starred block, any category.
+        View favView = getLayoutInflater().inflate(R.layout.item_model_category_row, catContainer, false);
+        ImageView favIcon = favView.findViewById(R.id.item_cat_icon);
+        TextView favTitle = favView.findViewById(R.id.item_cat_title);
+        favTitle.setText("Fav");
+        favTitle.setTextColor(Color.parseColor("#FFD700"));
+        favIcon.setImageResource(R.drawable.ic_star_border_gold);
+        favIcon.setColorFilter(Color.parseColor("#FFD700"), android.graphics.PorterDuff.Mode.SRC_IN);
+        favView.setBackgroundResource(R.drawable.glass_card_bg);
+        favView.setOnClickListener(v -> {
+            for (int c = 0; c < catContainer.getChildCount(); c++) {
+                catContainer.getChildAt(c).setBackgroundResource(R.drawable.glass_card_bg);
+            }
+            favView.setBackgroundResource(R.drawable.glass_category_selected_bg);
+            favMode = true;
+            loadFavItems();
+        });
+        catContainer.addView(favView);
+
         final CategoryHelper.Category[] categories = {
                 CategoryHelper.Category.AMP,
                 CategoryHelper.Category.CABINET,
@@ -213,6 +252,7 @@ public class PluginPickerFragment extends BottomSheetDialogFragment {
                     catContainer.getChildAt(c).setBackgroundResource(R.drawable.glass_card_bg);
                 }
                 catView.setBackgroundResource(R.drawable.glass_category_selected_bg);
+                favMode = false;
                 activeCat = cat;
                 loadItemsForCategory(cat);
             });
@@ -287,7 +327,7 @@ public class PluginPickerFragment extends BottomSheetDialogFragment {
                     TextView b = row.findViewById(R.id.item_model_brand);
                     ImageView thumb = row.findViewById(R.id.item_model_thumb);
                     ImageView star = row.findViewById(R.id.item_model_star);
-                    star.setVisibility(View.GONE);
+                    bindStar(star, pluginKey);
 
                     t.setText(PluginNaming.displayName(pName));
                     b.setText(PluginCatalogInfo.brandLine(pName, desc));
@@ -379,7 +419,7 @@ public class PluginPickerFragment extends BottomSheetDialogFragment {
                 TextView t = row.findViewById(R.id.item_model_title);
                 TextView b = row.findViewById(R.id.item_model_brand);
                 ImageView thumb = row.findViewById(R.id.item_model_thumb);
-                row.findViewById(R.id.item_model_star).setVisibility(View.GONE);
+                bindStar(row.findViewById(R.id.item_model_star), pluginKey);
                 t.setText(PluginNaming.displayName(pName));
                 b.setText(PluginCatalogInfo.brandLine(pName, shortDesc));
                 thumb.setImageResource(CategoryHelper.getIconRes(pName));
@@ -404,12 +444,72 @@ public class PluginPickerFragment extends BottomSheetDialogFragment {
         }
     }
 
+    /** R24 (Hery): the "Fav" list — every starred visible block. */
+    private void loadFavItems() {
+        if (itemsContainer == null || mainActivity == null) return;
+        itemsContainer.removeAllViews();
+        if (itemsContainer.getParent() instanceof android.widget.ScrollView) {
+            ((android.widget.ScrollView) itemsContainer.getParent()).scrollTo(0, 0);
+        }
+        java.util.Set<String> favs = FavStore.keys(favPrefs());
+        int hits = 0;
+        if (favs.contains(FavStore.SPLIT_KEY)) { addRoutingRow("Split", "Signal Split", R.drawable.ic_routing_split, true); hits++; }
+        if (favs.contains(FavStore.MERGE_KEY)) { addRoutingRow("Merge", "Signal Merge", R.drawable.ic_routing_merge, false); hits++; }
+
+        JSONObject[] sources = {mainActivity.availablePlugins, mainActivity.availablePluginsLV2};
+        ArrayList<String> seen = new ArrayList<>();
+        for (int si = 0; si < sources.length; si++) {
+            JSONObject source = sources[si];
+            if (source == null) continue;
+            String srcKind = (si == 1) ? PluginKey.LV2 : PluginKey.LADSPA;
+            Iterator<String> keys = source.keys();
+            while (keys.hasNext()) {
+                JSONObject obj = source.optJSONObject(keys.next());
+                if (obj == null) continue;
+                String pName = obj.optString("name", "");
+                if (pName.isEmpty() || seen.contains(pName)) continue;
+                final String pluginKey = srcKind.equals(PluginKey.LV2)
+                        ? PluginKey.make(PluginKey.LV2, obj.optString("library", ""), obj.optInt("index", -1))
+                        : PluginKey.make(PluginKey.LADSPA, obj.optString("library", ""), obj.optInt("id", -1));
+                if (!favs.contains(pluginKey)) continue;
+                if (!PluginCatalog.isVisible(PluginCatalog.indexOfKey(pluginKey))) continue;
+                seen.add(pName);
+                String desc = obj.optString("desc", obj.optString("description", "Built-in Effect"));
+                if (desc.length() > 40) desc = desc.substring(0, 37) + "…";
+
+                View row = getLayoutInflater().inflate(R.layout.item_model_browser_row, itemsContainer, false);
+                ((TextView) row.findViewById(R.id.item_model_title)).setText(PluginNaming.displayName(pName));
+                ((TextView) row.findViewById(R.id.item_model_brand)).setText(PluginCatalogInfo.brandLine(pName, desc));
+                ImageView thumb = row.findViewById(R.id.item_model_thumb);
+                thumb.setImageResource(CategoryHelper.getIconRes(pName));
+                thumb.setColorFilter(CategoryHelper.getColor(pName), android.graphics.PorterDuff.Mode.SRC_IN);
+                bindStar(row.findViewById(R.id.item_model_star), pluginKey);
+                row.setOnClickListener(v -> {
+                    mainActivity.addPluginByKey(pluginKey);
+                    dismiss();
+                });
+                itemsContainer.addView(row);
+                hits++;
+            }
+        }
+        if (hits == 0) {
+            TextView empty = new TextView(getContext());
+            empty.setText("Tap the star on any block to keep it here.");
+            empty.setTextColor(Color.parseColor("#A1A1AA"));
+            empty.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12f);
+            int pad = Math.round(12 * getResources().getDisplayMetrics().density);
+            empty.setPadding(pad, Math.round(16 * getResources().getDisplayMetrics().density), pad, Math.round(16 * getResources().getDisplayMetrics().density));
+            itemsContainer.addView(empty);
+        }
+    }
+
     private void addRoutingRow(String title, String desc, int iconRes, boolean isSplit) {
         View row = getLayoutInflater().inflate(R.layout.item_model_browser_row, itemsContainer, false);
         TextView t = row.findViewById(R.id.item_model_title);
         TextView b = row.findViewById(R.id.item_model_brand);
         ImageView thumb = row.findViewById(R.id.item_model_thumb);
-        row.findViewById(R.id.item_model_star).setVisibility(View.GONE);
+        bindStar(row.findViewById(R.id.item_model_star),
+                isSplit ? FavStore.SPLIT_KEY : FavStore.MERGE_KEY);
 
         t.setText(title);
         b.setText(desc);

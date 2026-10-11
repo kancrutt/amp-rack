@@ -6725,9 +6725,13 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         final Runnable[] populateModelsForCat = new Runnable[1];
         // Active category holder — drives the global search fallback (empty query = this cat).
         final CategoryHelper.Category[] activeModelCat = {currentCat};
+        // R24 (Hery): "Fav" pseudo-category (starred blocks, stable keys).
+        final boolean[] favMode = {false};
 
         if (catContainer != null) {
             catContainer.removeAllViews();
+            addFavCategoryRow(catContainer, favMode,
+                    () -> loadFavModelsIntoContainer(modelsContainer, position, dialog), null);
             for (int i = 0; i < categories.length; i++) {
                 final int catIdx = i;
                 final CategoryHelper.Category cat = categories[i];
@@ -6749,6 +6753,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     }
                     catView.setBackgroundResource(R.drawable.glass_category_selected_bg);
                     activeModelCat[0] = cat;
+                    favMode[0] = false;
                     EditText si = dialog.findViewById(R.id.model_search_input);
                     if (si != null && si.getText().length() > 0) {
                         si.setText(""); // watcher repopulates with the new category
@@ -6782,7 +6787,8 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                         searchClear.setVisibility(query.isEmpty() ? View.GONE : View.VISIBLE);
                     }
                     if (query.isEmpty()) {
-                        loadModelsIntoContainer(modelsContainer, activeModelCat[0], position, dialog);
+                        if (favMode[0]) loadFavModelsIntoContainer(modelsContainer, position, dialog);
+                        else loadModelsIntoContainer(modelsContainer, activeModelCat[0], position, dialog);
                     } else {
                         loadModelsMatchingQuery(modelsContainer, query, position, dialog, categories);
                     }
@@ -6926,9 +6932,13 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         };
         // Active category holder — drives the global search fallback (empty query = this cat).
         final CategoryHelper.Category[] activePickerCat = {categories[0]};
+        // R24 (Hery): "Fav" pseudo-category (starred blocks, stable keys).
+        final boolean[] favMode = {false};
 
         if (catContainer != null) {
             catContainer.removeAllViews();
+            addFavCategoryRow(catContainer, favMode,
+                    () -> loadFavPluginsIntoContainer(itemsContainer, dialog), null);
             for (int i = 0; i < categories.length; i++) {
                 final CategoryHelper.Category cat = categories[i];
                 View catView = getLayoutInflater().inflate(R.layout.item_model_category_row, catContainer, false);
@@ -6949,6 +6959,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     }
                     catView.setBackgroundResource(R.drawable.glass_category_selected_bg);
                     activePickerCat[0] = cat;
+                    favMode[0] = false;
                     EditText si = dialog.findViewById(R.id.picker_search_input);
                     if (si != null && si.getText().length() > 0) {
                         si.setText(""); // watcher repopulates with the new category
@@ -6981,7 +6992,8 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                         pickerClear.setVisibility(query.isEmpty() ? View.GONE : View.VISIBLE);
                     }
                     if (query.isEmpty()) {
-                        loadPluginsIntoContainer(itemsContainer, activePickerCat[0], dialog);
+                        if (favMode[0]) loadFavPluginsIntoContainer(itemsContainer, dialog);
+                        else loadPluginsIntoContainer(itemsContainer, activePickerCat[0], dialog);
                     } else {
                         loadPluginsMatchingQuery(itemsContainer, query, dialog, categories);
                     }
@@ -7010,11 +7022,11 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         // reachable via a direct "split"/"merge" text search).
         if (cat == CategoryHelper.Category.SPLIT || cat == CategoryHelper.Category.MERGE
                 || cat == CategoryHelper.Category.UTILITY) {
-            addPluginPickerRow(container, "Split", "Signal Split", R.drawable.ic_routing_split, CategoryHelper.COLOR_ROUTING, dialog, v -> {
+            addPluginPickerRow(container, "Split", "Signal Split", R.drawable.ic_routing_split, CategoryHelper.COLOR_ROUTING, FavStore.SPLIT_KEY, dialog, v -> {
                 addRoutingBlock(true);
                 dialog.dismiss();
             });
-            addPluginPickerRow(container, "Merge", "Signal Merge", R.drawable.ic_routing_merge, CategoryHelper.COLOR_ROUTING, dialog, v -> {
+            addPluginPickerRow(container, "Merge", "Signal Merge", R.drawable.ic_routing_merge, CategoryHelper.COLOR_ROUTING, FavStore.MERGE_KEY, dialog, v -> {
                 addRoutingBlock(false);
                 dialog.dismiss();
             });
@@ -7047,7 +7059,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     String desc = obj.optString("desc", obj.optString("description", "Built-in Effect"));
                     if (desc.length() > 40) desc = desc.substring(0, 37) + "\u2026";
 
-                    addPluginPickerRow(container, pName, desc, CategoryHelper.getIconRes(pName), dialog, v -> {
+                    addPluginPickerRow(container, pName, desc, CategoryHelper.getIconRes(pName), dialog, pluginKey, v -> {
                         addPluginByKey(pluginKey);
                         dialog.dismiss();
                     });
@@ -7081,7 +7093,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
         // Routing blocks on match
         if ("split".contains(q) || "signal split".contains(q) || "parallel branch".contains(q)) {
-            addPluginPickerRow(container, "Split", "Signal Split", R.drawable.ic_routing_split, CategoryHelper.COLOR_ROUTING, dialog, v -> {
+            addPluginPickerRow(container, "Split", "Signal Split", R.drawable.ic_routing_split, CategoryHelper.COLOR_ROUTING, FavStore.SPLIT_KEY, dialog, v -> {
                 addRoutingBlock(true);
                 dialog.dismiss();
             });
@@ -7089,7 +7101,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         }
         if ("merge".contains(q) || "signal merge".contains(q) || "parallel branch".contains(q)
                 || "sum to mono".contains(q) || "stereo-aware".contains(q)) {
-            addPluginPickerRow(container, "Merge", "Signal Merge", R.drawable.ic_routing_merge, CategoryHelper.COLOR_ROUTING, dialog, v -> {
+            addPluginPickerRow(container, "Merge", "Signal Merge", R.drawable.ic_routing_merge, CategoryHelper.COLOR_ROUTING, FavStore.MERGE_KEY, dialog, v -> {
                 addRoutingBlock(false);
                 dialog.dismiss();
             });
@@ -7121,7 +7133,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 if (!(nameNorm.contains(qNorm) || desc.toLowerCase().contains(q))) continue;
                 seen.add(pName);
                 String shortDesc = desc.length() > 40 ? desc.substring(0, 37) + "…" : desc;
-                addPluginPickerRow(container, pName, shortDesc, CategoryHelper.getIconRes(pName), dialog, v -> {
+                addPluginPickerRow(container, pName, shortDesc, CategoryHelper.getIconRes(pName), dialog, pluginKey, v -> {
                     addPluginByKey(pluginKey);
                     dialog.dismiss();
                 });
@@ -7142,16 +7154,81 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         }
     }
 
-    private void addPluginPickerRow(LinearLayout container, String title, String desc, int iconRes, androidx.appcompat.app.AlertDialog dialog, View.OnClickListener onClick) {
-        addPluginPickerRow(container, title, desc, iconRes, CategoryHelper.getColor(title), dialog, onClick);
+    // ---- R24 plugin favourites (Hery): stars work, "Fav" list is built ----
+
+    /** Toggles the star (stored by stable key, {@link FavStore}). The star is
+     *  its own click target, so tapping it never adds/swaps the row. */
+    private void bindPluginStar(ImageView star, final String favKey) {
+        if (star == null || favKey == null) return;
+        star.setVisibility(View.VISIBLE);
+        updatePluginStar(star, favKey);
+        star.setOnClickListener(v -> {
+            FavStore.toggle(getPreferences(MODE_PRIVATE), favKey);
+            updatePluginStar(star, favKey);
+        });
     }
 
-    private void addPluginPickerRow(LinearLayout container, String title, String desc, int iconRes, int tintColor, androidx.appcompat.app.AlertDialog dialog, View.OnClickListener onClick) {
+    private void updatePluginStar(ImageView star, String favKey) {
+        star.setImageResource(FavStore.isFav(getPreferences(MODE_PRIVATE), favKey)
+                ? R.drawable.ic_star_gold : R.drawable.ic_star_border_gold);
+    }
+
+    /** Visible plugin/routing keys the user favourited, in registry order. */
+    private ArrayList<String> favKeysVisible() {
+        java.util.Set<String> favs = FavStore.keys(getPreferences(MODE_PRIVATE));
+        ArrayList<String> out = new ArrayList<>();
+        if (favs.contains(FavStore.SPLIT_KEY)) out.add(FavStore.SPLIT_KEY);
+        if (favs.contains(FavStore.MERGE_KEY)) out.add(FavStore.MERGE_KEY);
+        for (int i = 0; i < PluginCatalogData.COUNT; i++) {
+            String k = PluginCatalogData.KEY[i];
+            if (favs.contains(k) && PluginCatalog.isVisible(i)) out.add(k);
+        }
+        return out;
+    }
+
+    private void addFavCategoryRow(android.widget.LinearLayout catContainer,
+                                   final boolean[] favMode,
+                                   Runnable loadFav,
+                                   Runnable clearFav) {
+        if (catContainer == null) return;
+        View favView = getLayoutInflater().inflate(R.layout.item_model_category_row, catContainer, false);
+        ImageView icon = favView.findViewById(R.id.item_cat_icon);
+        TextView title = favView.findViewById(R.id.item_cat_title);
+        title.setText("Fav");
+        icon.setImageResource(R.drawable.ic_star_border_gold);
+        icon.setColorFilter(Color.parseColor("#FFD700"), android.graphics.PorterDuff.Mode.SRC_IN);
+        favView.setBackgroundResource(R.drawable.glass_card_bg);
+        favView.setOnClickListener(v -> {
+            for (int c = 0; c < catContainer.getChildCount(); c++) {
+                catContainer.getChildAt(c).setBackgroundResource(R.drawable.glass_card_bg);
+            }
+            favView.setBackgroundResource(R.drawable.glass_category_selected_bg);
+            favMode[0] = true;
+            loadFav.run();
+        });
+        catContainer.addView(favView);
+        // inserted before the category rows below -> move to top
+        catContainer.removeView(favView);
+        catContainer.addView(favView, 0);
+    }
+
+    private void addPluginPickerRow(LinearLayout container, String title, String desc, int iconRes, androidx.appcompat.app.AlertDialog dialog, View.OnClickListener onClick) {
+        addPluginPickerRow(container, title, desc, iconRes, CategoryHelper.getColor(title), null, dialog, onClick);
+    }
+
+    /** R24 (Hery): row with a plugin-favourite star bound to a stable key. */
+    private void addPluginPickerRow(LinearLayout container, String title, String desc, int iconRes, androidx.appcompat.app.AlertDialog dialog, String favKey, View.OnClickListener onClick) {
+        addPluginPickerRow(container, title, desc, iconRes, CategoryHelper.getColor(title), favKey, dialog, onClick);
+    }
+
+    private void addPluginPickerRow(LinearLayout container, String title, String desc, int iconRes, int tintColor, String favKey, androidx.appcompat.app.AlertDialog dialog, View.OnClickListener onClick) {
         View row = getLayoutInflater().inflate(R.layout.item_model_browser_row, container, false);
         TextView t = row.findViewById(R.id.item_model_title);
         TextView b = row.findViewById(R.id.item_model_brand);
         ImageView thumb = row.findViewById(R.id.item_model_thumb);
-        row.findViewById(R.id.item_model_star).setVisibility(View.GONE);
+        ImageView star = row.findViewById(R.id.item_model_star);
+        if (favKey == null) star.setVisibility(View.GONE);
+        else bindPluginStar(star, favKey);
 
         t.setText(title);
         // Catalog manufacturer wins the card subtitle when known (research
@@ -7162,6 +7239,124 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
         row.setOnClickListener(onClick);
         container.addView(row);
+    }
+
+    /** R24 (Hery): ADD EFFECT picker "Fav" list — every starred visible block. */
+    private void loadFavPluginsIntoContainer(LinearLayout container, androidx.appcompat.app.AlertDialog dialog) {
+        if (container == null) return;
+        container.removeAllViews();
+        if (container.getParent() instanceof android.widget.ScrollView) {
+            ((android.widget.ScrollView) container.getParent()).scrollTo(0, 0);
+        }
+        java.util.Set<String> favs = FavStore.keys(getPreferences(MODE_PRIVATE));
+        int[] hits = {0};
+        if (favs.contains(FavStore.SPLIT_KEY)) {
+            addPluginPickerRow(container, "Split", "Signal Split", R.drawable.ic_routing_split, CategoryHelper.COLOR_ROUTING, FavStore.SPLIT_KEY, dialog, v -> {
+                addRoutingBlock(true);
+                dialog.dismiss();
+            });
+            hits[0]++;
+        }
+        if (favs.contains(FavStore.MERGE_KEY)) {
+            addPluginPickerRow(container, "Merge", "Signal Merge", R.drawable.ic_routing_merge, CategoryHelper.COLOR_ROUTING, FavStore.MERGE_KEY, dialog, v -> {
+                addRoutingBlock(false);
+                dialog.dismiss();
+            });
+            hits[0]++;
+        }
+        JSONObject[] sources = {availablePlugins, availablePluginsLV2};
+        ArrayList<String> seen = new ArrayList<>();
+        for (int si = 0; si < sources.length; si++) {
+            JSONObject source = sources[si];
+            if (source == null) continue;
+            String srcKind = (si == 1) ? PluginKey.LV2 : PluginKey.LADSPA;
+            Iterator<String> keys = source.keys();
+            while (keys.hasNext()) {
+                JSONObject obj = source.optJSONObject(keys.next());
+                if (obj == null) continue;
+                String pName = obj.optString("name", "");
+                if (pName.isEmpty() || seen.contains(pName)) continue;
+                final String pluginKey = catalogKeyFor(obj, srcKind);
+                if (!favs.contains(pluginKey)) continue;
+                if (!PluginCatalog.isVisible(PluginCatalog.indexOfKey(pluginKey))) continue;
+                seen.add(pName);
+                String desc = obj.optString("desc", obj.optString("description", "Built-in Effect"));
+                if (desc.length() > 40) desc = desc.substring(0, 37) + "\u2026";
+                addPluginPickerRow(container, pName, desc, CategoryHelper.getIconRes(pName), dialog, pluginKey, v -> {
+                    addPluginByKey(pluginKey);
+                    dialog.dismiss();
+                });
+                hits[0]++;
+            }
+        }
+        if (hits[0] == 0) {
+            TextView empty = new TextView(this);
+            empty.setText("Tap the star on any block to keep it here.");
+            empty.setTextColor(Color.parseColor("#A1A1AA"));
+            empty.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12f);
+            int pad = Math.round(12 * getResources().getDisplayMetrics().density);
+            empty.setPadding(pad, Math.round(16 * getResources().getDisplayMetrics().density), pad, Math.round(16 * getResources().getDisplayMetrics().density));
+            container.addView(empty);
+        }
+    }
+
+    /** R24 (Hery): SELECT MODEL "Fav" list — same stars, tap swaps the block. */
+    private void loadFavModelsIntoContainer(LinearLayout container, int position, androidx.appcompat.app.AlertDialog dialog) {
+        if (container == null) return;
+        container.removeAllViews();
+        if (container.getParent() instanceof android.widget.ScrollView) {
+            ((android.widget.ScrollView) container.getParent()).scrollTo(0, 0);
+        }
+        java.util.Set<String> favs = FavStore.keys(getPreferences(MODE_PRIVATE));
+        int[] hits = {0};
+        if (favs.contains(FavStore.SPLIT_KEY)) {
+            addPluginPickerRow(container, "Split", "Signal Split", R.drawable.ic_routing_split, CategoryHelper.COLOR_ROUTING, FavStore.SPLIT_KEY, dialog, v -> {
+                addRoutingBlock(true);
+                dialog.dismiss();
+            });
+            hits[0]++;
+        }
+        if (favs.contains(FavStore.MERGE_KEY)) {
+            addPluginPickerRow(container, "Merge", "Signal Merge", R.drawable.ic_routing_merge, CategoryHelper.COLOR_ROUTING, FavStore.MERGE_KEY, dialog, v -> {
+                addRoutingBlock(false);
+                dialog.dismiss();
+            });
+            hits[0]++;
+        }
+        JSONObject[] sources = {availablePlugins, availablePluginsLV2};
+        ArrayList<String> seen = new ArrayList<>();
+        for (int si = 0; si < sources.length; si++) {
+            JSONObject source = sources[si];
+            if (source == null) continue;
+            String srcKind = (si == 1) ? PluginKey.LV2 : PluginKey.LADSPA;
+            Iterator<String> keys = source.keys();
+            while (keys.hasNext()) {
+                JSONObject obj = source.optJSONObject(keys.next());
+                if (obj == null) continue;
+                String pName = obj.optString("name", "");
+                if (pName.isEmpty() || seen.contains(pName)) continue;
+                final String pickKey = catalogKeyFor(obj, srcKind);
+                if (!favs.contains(pickKey)) continue;
+                if (!PluginCatalog.isVisible(PluginCatalog.indexOfKey(pickKey))) continue;
+                seen.add(pName);
+                String desc = obj.optString("desc", obj.optString("description", "Built-in Effect"));
+                if (desc.length() > 40) desc = desc.substring(0, 37) + "\u2026";
+                addPluginPickerRow(container, pName, desc, CategoryHelper.getIconRes(pName), dialog, pickKey, v -> {
+                    swapActivePlugin(position, pickKey);
+                    dialog.dismiss();
+                });
+                hits[0]++;
+            }
+        }
+        if (hits[0] == 0) {
+            TextView empty = new TextView(this);
+            empty.setText("Tap the star on any block to keep it here.");
+            empty.setTextColor(Color.parseColor("#A1A1AA"));
+            empty.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12f);
+            int pad = Math.round(12 * getResources().getDisplayMetrics().density);
+            empty.setPadding(pad, Math.round(16 * getResources().getDisplayMetrics().density), pad, Math.round(16 * getResources().getDisplayMetrics().density));
+            container.addView(empty);
+        }
     }
 
     private void loadModelsIntoContainer(LinearLayout container, CategoryHelper.Category cat, int position, androidx.appcompat.app.AlertDialog dialog) {
@@ -7204,6 +7399,8 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     b.setText("Local Storage • " + cat.name());
                     thumb.setImageResource(CategoryHelper.getIconRes(cat.name()));
                     thumb.setColorFilter(CategoryHelper.getColor(cat.name()), android.graphics.PorterDuff.Mode.SRC_IN);
+                    // model files are not plugins — no stable key, no star
+                    row.findViewById(R.id.item_model_star).setVisibility(View.GONE);
 
                     row.setOnClickListener(v -> {
                         applyLocalModelToPlugin(position, f);
@@ -7245,7 +7442,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                         ImageView pthumb = prow.findViewById(R.id.item_model_thumb);
                         pthumb.setImageResource(CategoryHelper.getIconRes(pName));
                         pthumb.setColorFilter(CategoryHelper.getColor(pName), android.graphics.PorterDuff.Mode.SRC_IN);
-                        prow.findViewById(R.id.item_model_star).setVisibility(View.GONE);
+                        bindPluginStar(prow.findViewById(R.id.item_model_star), pickKey);
                         prow.setOnClickListener(v -> {
                             swapActivePlugin(position, pickKey);
                             dialog.dismiss();
@@ -7317,7 +7514,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 ImageView splitThumb = splitRow.findViewById(R.id.item_model_thumb);
                 splitThumb.setImageResource(R.drawable.ic_routing_split);
                 splitThumb.setColorFilter(CategoryHelper.COLOR_ROUTING, android.graphics.PorterDuff.Mode.SRC_IN);
-                splitRow.findViewById(R.id.item_model_star).setVisibility(View.GONE);
+                bindPluginStar(splitRow.findViewById(R.id.item_model_star), FavStore.SPLIT_KEY);
                 splitRow.setOnClickListener(v -> { addRoutingBlock(true); dialog.dismiss(); });
                 container.addView(splitRow);
 
@@ -7327,7 +7524,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 ImageView mergeThumb = mergeRow.findViewById(R.id.item_model_thumb);
                 mergeThumb.setImageResource(R.drawable.ic_routing_merge);
                 mergeThumb.setColorFilter(CategoryHelper.COLOR_ROUTING, android.graphics.PorterDuff.Mode.SRC_IN);
-                mergeRow.findViewById(R.id.item_model_star).setVisibility(View.GONE);
+                bindPluginStar(mergeRow.findViewById(R.id.item_model_star), FavStore.MERGE_KEY);
                 mergeRow.setOnClickListener(v -> { addRoutingBlock(false); dialog.dismiss(); });
                 container.addView(mergeRow);
             }
@@ -7335,17 +7532,22 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             // Built-in LADSPA/LV2 plugins
             JSONObject[] pluginSources = {availablePlugins, availablePluginsLV2};
             ArrayList<String> pluginNames = new ArrayList<>();
-            for (JSONObject source : pluginSources) {
+            for (int si = 0; si < pluginSources.length; si++) {
+                JSONObject source = pluginSources[si];
                 if (source == null) continue;
+                String srcKind = (si == 1) ? PluginKey.LV2 : PluginKey.LADSPA;
                 Iterator<String> keys = source.keys();
                 while (keys.hasNext()) {
                     String k = keys.next();
                     JSONObject obj = source.optJSONObject(k);
                     if (obj == null) continue;
-                        String pName = obj.optString("name", "");
-                        if (pName.isEmpty()) continue;
-                        if (!isGuitarPlugin(pName)) continue;
-                        CategoryHelper.Category pCat = CategoryHelper.getCategory(pName);
+                    String pName = obj.optString("name", "");
+                    if (pName.isEmpty()) continue;
+                    final String pickKey = catalogKeyFor(obj, srcKind);
+                    if (PluginCatalog.indexOfKey(pickKey) < 0) continue;
+                    if (!isGuitarPlugin(pName)) continue;
+
+                    CategoryHelper.Category pCat = CategoryHelper.getCategory(pName);
                     if (pCat == cat && !pluginNames.contains(pName)) {
                         pluginNames.add(pName);
                         View row = getLayoutInflater().inflate(R.layout.item_model_browser_row, container, false);
@@ -7359,9 +7561,10 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                         b.setText(desc);
                         thumb.setImageResource(CategoryHelper.getIconRes(pName));
                         thumb.setColorFilter(CategoryHelper.getColor(pName), android.graphics.PorterDuff.Mode.SRC_IN);
+                        bindPluginStar(row.findViewById(R.id.item_model_star), pickKey);
 
                         row.setOnClickListener(v -> {
-                            swapActivePlugin(position, pName);
+                            swapActivePlugin(position, pickKey);
                             dialog.dismiss();
                         });
                         container.addView(row);
@@ -7401,6 +7604,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                             ((TextView) row.findViewById(R.id.item_model_brand)).setText("Local Storage");
                             ImageView thumb = row.findViewById(R.id.item_model_thumb);
                             thumb.setImageResource(CategoryHelper.getIconRes(CategoryHelper.Category.AMP.name()));
+                            row.findViewById(R.id.item_model_star).setVisibility(View.GONE);
                             row.setOnClickListener(v -> {
                                 applyLocalModelToPlugin(position, f);
                                 TextView mn = findViewById(R.id.detail_model_name);
@@ -7424,7 +7628,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             ImageView splitThumb = splitRow.findViewById(R.id.item_model_thumb);
             splitThumb.setImageResource(R.drawable.ic_routing_split);
             splitThumb.setColorFilter(CategoryHelper.COLOR_ROUTING, android.graphics.PorterDuff.Mode.SRC_IN);
-            splitRow.findViewById(R.id.item_model_star).setVisibility(View.GONE);
+            bindPluginStar(splitRow.findViewById(R.id.item_model_star), FavStore.SPLIT_KEY);
             splitRow.setOnClickListener(v -> { addRoutingBlock(true); dialog.dismiss(); });
             container.addView(splitRow);
             hits++;
@@ -7436,7 +7640,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             ImageView mergeThumb = mergeRow.findViewById(R.id.item_model_thumb);
             mergeThumb.setImageResource(R.drawable.ic_routing_merge);
             mergeThumb.setColorFilter(CategoryHelper.COLOR_ROUTING, android.graphics.PorterDuff.Mode.SRC_IN);
-            mergeRow.findViewById(R.id.item_model_star).setVisibility(View.GONE);
+            bindPluginStar(mergeRow.findViewById(R.id.item_model_star), FavStore.MERGE_KEY);
             mergeRow.setOnClickListener(v -> { addRoutingBlock(false); dialog.dismiss(); });
             container.addView(mergeRow);
             hits++;
@@ -7473,6 +7677,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 ImageView thumb = row.findViewById(R.id.item_model_thumb);
                 thumb.setImageResource(CategoryHelper.getIconRes(pName));
                 thumb.setColorFilter(CategoryHelper.getColor(pName), android.graphics.PorterDuff.Mode.SRC_IN);
+                bindPluginStar(row.findViewById(R.id.item_model_star), pickKey);
                 row.setOnClickListener(v -> {
                     swapActivePlugin(position, pickKey);
                     dialog.dismiss();

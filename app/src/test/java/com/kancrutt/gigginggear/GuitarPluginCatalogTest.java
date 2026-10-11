@@ -65,8 +65,10 @@ public class GuitarPluginCatalogTest {
         assertFalse(GuitarPluginCatalog.isCurated("Neural Amp Modeler"));
         assertFalse(GuitarPluginCatalog.isCurated("AIDA-X"));
         assertTrue(GuitarPluginCatalog.isCurated("Neural Amp Modeler NG"));
-        // IR-cab policy: exactly one (x42 zconvo). Simple IR Loader and irdsp
-        // rejected (crashy/unverifiable); also removed from the curated list.
+        // IR-cab policy (R24): Simple IR Loader blacklisted (zero control
+        // ports, instant red-meter feedback on device); rkr Reverbtron and
+        // SWH/rkr/darc entries rejected. convoLV2 is curated as the cab-IR
+        // loader (CABINET, R24), zconvo curated as the reverb convolver.
         assertFalse(GuitarPluginCatalog.isCurated("Impulse Loader"));
         assertFalse(GuitarPluginCatalog.isCurated("SWH Impulse convolver"));
         assertFalse(GuitarPluginCatalog.isCurated("rkr Reverbtron"));
@@ -74,7 +76,8 @@ public class GuitarPluginCatalogTest {
         assertFalse(GuitarPluginCatalog.isCurated("Simple IR Loader"));
         assertFalse(GuitarPluginCatalog.isCurated("irdsp"));
         assertTrue(GuitarPluginCatalog.isCurated("x42 - IR Convolver Mono => Stereo"));
-        // Reverb-IR policy: convoLV2 is the sole reverb-IR convolver.
+        // Reverb-IR policy: zconvo is the curated reverb-side convolver;
+        // convoLV2 is curated but categorized CABINET (R24, Bang Hery).
         assertTrue(GuitarPluginCatalog.isCurated("convoLV2"));
         // Empty input.
         assertFalse(GuitarPluginCatalog.isCurated(null));

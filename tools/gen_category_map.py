@@ -329,6 +329,7 @@ LADSPA_CATEGORY_OVERRIDES = {
 }
 LV2_CATEGORY_OVERRIDES = {
     "convolv2": "REVERB",  # convoLV2 = convolution reverb (re-sited CABINET->REVERB for the single-convolver curation)
+    "x42irconvolvermono=>stereo": "REVERB",  # R23 (Hery): x42 LV2 convolution = reverb, not cab
     "ts9sim": "DISTORTION",
     "mdatesttone": "UTILITY",
     "microamp": "DISTORTION",  # R11 audit: Micro Amp Booster -> OD/Dist

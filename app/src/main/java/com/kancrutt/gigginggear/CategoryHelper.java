@@ -367,6 +367,7 @@ public class CategoryHelper {
         OVERRIDES.put("theinfamouspowerup", Category.UTILITY); // cf. "powerup"
         OVERRIDES.put("theinfamousstuck", Category.UTILITY); // waveform drone; cf. "stuck"
         OVERRIDES.put("convolv2", Category.REVERB); // convoLV2 = convolution reverb (single conv-reverb slot)
+        OVERRIDES.put("x42irconvolvermono=>stereo", Category.REVERB); // R23 (Hery): x42 LV2 convolution = reverb, not cab
     }
 
     /** Direct id -> category lookup (normalized name), null when not overridden. */

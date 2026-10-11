@@ -1765,6 +1765,6 @@
     "index": 3,
     "desc": "Impulse response loader",
     "library": "libzconvo.so",
-    "category": "CABINET"
+    "category": "REVERB"
   }
 }

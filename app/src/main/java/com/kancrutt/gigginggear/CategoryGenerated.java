@@ -589,7 +589,7 @@ public final class CategoryGenerated {
         v.put("wah", "WAH");
         v.put("wahwah", "WAH");
         v.put("x42darc", "DYNAMICS");
-        v.put("x42irconvolvermono=>stereo", "CABINET");
+        v.put("x42irconvolvermono=>stereo", "REVERB");
         v.put("xdarkterror", "AMP");
         v.put("xtinyterror", "AMP");
         v.put("zitarev1stereo", "REVERB");

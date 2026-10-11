@@ -30,5 +30,15 @@ public class ControlLabelsTest {
         assertEquals("Overdrive", LabelFormatter.formatControlLabel("Over"));
         assertEquals("Overdrive 2", LabelFormatter.formatControlLabel("over2"));
         assertEquals("Cutoff Freq", LabelFormatter.formatControlLabel("Fc"));
+        // T8 (r20): short labels expanded.
+        assertEquals("Alt Voicing", LabelFormatter.formatControlLabel("alt"));
+        assertEquals("Damping", LabelFormatter.formatControlLabel("damp"));
+        assertEquals("Damping", LabelFormatter.formatControlLabel("DAMP"));
+    }
+
+    @Test public void ultraCabTopEnd() {
+        // T8 (r20): GxUltraCab "TOP" -> "Top End"; other plugins keep bare "Top".
+        assertEquals("Top End", ControlLabels.display("GxUltraCab", "Top"));
+        assertEquals("Top", ControlLabels.display("Some Amp", "Top"));
     }
 }

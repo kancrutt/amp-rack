@@ -22,6 +22,11 @@ object ControlLabels {
         if (key == "t" && (p.contains("chorusi") || p.contains("c* chorus"))) {
             return "Time"
         }
+        // T8 (r20): GxUltraCab "TOP" (0..1) = high-frequency cab character.
+        // Plugin-scoped because a bare "top" port could mean position elsewhere.
+        if (key == "top" && p.contains("ultracab")) {
+            return "Top End"
+        }
         return main
     }
 }

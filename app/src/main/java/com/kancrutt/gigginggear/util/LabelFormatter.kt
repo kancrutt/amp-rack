@@ -90,7 +90,12 @@ object LabelFormatter {
         "over" to "Overdrive",
         "over2" to "Overdrive 2",
         // "Fc" is the universal LADSPA cutoff-frequency short form.
-        "fc" to "Cutoff Freq"
+        "fc" to "Cutoff Freq",
+        // T8 (r20 audit): CAPS CabinetIII "alt" = alternate-voicing toggle
+        // (Off/On scale points; the only "alt" port in the bundle).
+        "alt" to "Alt Voicing",
+        // T8 (r20 audit): Freeverb/Reverb/MonoAmp short form of "damping".
+        "damp" to "Damping"
     )
 
     /** Split result: main label for the UI + raw enum hint for helper text/tooltip. */
@@ -315,8 +320,11 @@ object LabelFormatter {
         val words = spaced.split(Regex("\\s+"))
         val titled = words.joinToString(" ") { word ->
             val lower = word.lowercase()
-            // Check typo map first (e.g. fluter -> Flutter)
-            TYPO_MAP[lower]?.let { return@joinToString it }
+            // Check typo map first (e.g. fluter -> Flutter). Multi-word
+            // canonicals (already expanded in step 4) are skipped here so a
+            // word that is itself a key never re-expands ("alt" in
+            // "Alt Voicing" must not become "Alt Voicing Voicing").
+            TYPO_MAP[lower]?.let { if (!it.contains(' ')) return@joinToString it }
             // Preserve known acronyms uppercased
             if (lower == "db") return@joinToString "dB"
             if (lower == "hz") return@joinToString "Hz"

@@ -3,6 +3,8 @@ package com.kancrutt.gigginggear.util;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 public class LabelFormatterTest {
     @Test public void eqBypassKeepsAcronym() {
@@ -171,5 +173,19 @@ public class LabelFormatterTest {
         assertEquals("Makeup Threshold 1", LabelFormatter.formatControlLabel("MAKEUPTHRESHOLD1"));
         assertEquals("Room Size 2", LabelFormatter.formatControlLabel("ROOMSIZE2"));
         assertEquals("Octave 1", LabelFormatter.formatControlLabel("OCTAVE1"));
+    }
+
+    @Test public void onOffPairDetection() {
+        assertTrue(LabelFormatter.isOnOffPair(new String[]{"Off", "On"}));
+        assertTrue(LabelFormatter.isOnOffPair(new String[]{"On", "Off"}));
+        assertTrue(LabelFormatter.isOnOffPair(new String[]{"off", "on"}));
+        assertTrue(LabelFormatter.isOnOffPair(new String[]{"OFF", "ON"}));
+        assertTrue(LabelFormatter.isOnOffPair(new String[]{"  Off ", "On\t"}));
+        assertFalse(LabelFormatter.isOnOffPair(null));
+        assertFalse(LabelFormatter.isOnOffPair(new String[]{"Off"}));
+        assertFalse(LabelFormatter.isOnOffPair(new String[]{"Off", "On", "Auto"}));
+        assertFalse(LabelFormatter.isOnOffPair(new String[]{"On", "On"}));
+        assertFalse(LabelFormatter.isOnOffPair(new String[]{"Yes", "No"}));
+        assertFalse(LabelFormatter.isOnOffPair(new String[]{"", "On"}));
     }
 }

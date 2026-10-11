@@ -3,6 +3,7 @@ package com.kancrutt.gigginggear;
 import org.junit.Test;
 
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -50,5 +51,13 @@ public class RoutingNameTest {
         assertFalse(PluginNaming.isRoutingName("SPLIT"));
         assertFalse(PluginNaming.isRoutingName("MERGE"));
         assertFalse(PluginNaming.isRoutingName("Giggin Gear"));
+    }
+
+    @Test public void displayNameDropsGigginGearPrefix() {
+        // R19 TEMUAN #3 / r20 (Hery): the "Giggin Gear ..." prefix never
+        // reaches any UI label (info card title, model name, picker).
+        assertEquals("Split", PluginNaming.displayName("Giggin Gear SPLIT"));
+        assertEquals("Merge", PluginNaming.displayName("Giggin Gear MERGE"));
+        assertEquals("C* Chorus I", PluginNaming.displayName("C* Chorus I"));
     }
 }

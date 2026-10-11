@@ -82,7 +82,15 @@ object LabelFormatter {
         // Real upstream typo in rkr Shifter ("Thresold" next to Attack/Decay).
         "thresold" to "Threshold",
         // Gxdigital_delay "HOWPASS" sits next to HIGHPASS: the low-pass mate.
-        "howpass" to "Low Pass"
+        "howpass" to "Low Pass",
+        // R19 TEMUAN #5 (Hery): unclear/abbreviated port names made readable.
+        // "MIDS" (GxUltraCab) was being shredded into the broken "Mid S".
+        "mids" to "Mid",
+        // C* Amp VTS / CabIV / Compress "Over" = the overdrive stage.
+        "over" to "Overdrive",
+        "over2" to "Overdrive 2",
+        // "Fc" is the universal LADSPA cutoff-frequency short form.
+        "fc" to "Cutoff Freq"
     )
 
     /** Split result: main label for the UI + raw enum hint for helper text/tooltip. */
@@ -214,6 +222,20 @@ object LabelFormatter {
         val expected = (lo..maxVal.toInt()).toList()
         if (pairs.map { it.first } != expected) return null
         return pairs.map { it.second }.toTypedArray()
+    }
+
+    /**
+     * True when the labels are exactly an Off/On pair in any order, case or
+     * surrounding whitespace ("Off"/"On", "off"/"on", "OFF"/"ON").
+     * Guitarix-style 0..1 ENUMs carrying such labels render as toggles.
+     * Anything else (single label, 3+ options, other words) stays a dropdown.
+     */
+    @JvmStatic
+    fun isOnOffPair(labels: Array<String>?): Boolean {
+        if (labels == null || labels.size != 2) return false
+        val norm = labels.map { it.trim().lowercase() }
+        if (norm.any { it.isEmpty() }) return false
+        return norm.toSet() == setOf("off", "on")
     }
 
     @JvmStatic

@@ -739,13 +739,6 @@
     "plugin": 1,
     "library": "libSaturate.so"
   },
-  "10302": {
-    "name": "C* SpiceX2 - Not an exciter either",
-    "id": 2607,
-    "desc": "Stereo version of Spice. Bass compression is governed by the sum of both channels",
-    "plugin": 2,
-    "library": "libSaturate.so"
-  },
   "10400": {
     "name": "C* Scape - Stereo delay with chromatic resonances",
     "desc": "Stereo delay with chromatic resonances. A stereo delay with resonant filters and fractally modulated panning. With every beat, the filter resonance frequencies are retuned to random steps on an equal-tempered chromatic scale",

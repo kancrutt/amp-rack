@@ -304,7 +304,7 @@ public class CategoryHelper {
         // ---- the infamous / famous singles ----
         OVERRIDES.put("cheapdist", Category.DISTORTION);
         OVERRIDES.put("coldfire", Category.DISTORTION);
-        OVERRIDES.put("hip2b", Category.GATE); // R11 audit: decimator-style cleaner
+        OVERRIDES.put("hip2b", Category.DISTORTION); // Hery r21: hysteresis square-wave dist (TTL: lv2:DistortionPlugin)
         OVERRIDES.put("octolo", Category.PITCH);
         OVERRIDES.put("powercut", Category.MODULATION);
         OVERRIDES.put("powerup", Category.UTILITY);
@@ -360,12 +360,13 @@ public class CategoryHelper {
         OVERRIDES.put("vstb", Category.DISTORTION); // libGxSuppaToneBender: Tone Bender pedal sim
         // "the infamous X" family (norm keeps the prefix: "theinfamousewham")
         OVERRIDES.put("theinfamousewham", Category.PITCH); // cf. "ewham"
-        OVERRIDES.put("theinfamouship2b", Category.GATE); // cf. "hip2b"
+        OVERRIDES.put("theinfamouship2b", Category.DISTORTION); // Hery r21: cf. "hip2b", was GATE
         OVERRIDES.put("theinfamouslushlife", Category.MODULATION); // cf. "lushlife"
         OVERRIDES.put("theinfamousmindi", Category.UTILITY); // cf. "mindi"
         OVERRIDES.put("theinfamousoctolo", Category.PITCH); // cf. "octolo"
         OVERRIDES.put("theinfamouspowerup", Category.UTILITY); // cf. "powerup"
         OVERRIDES.put("theinfamousstuck", Category.UTILITY); // waveform drone; cf. "stuck"
+        OVERRIDES.put("convolv2", Category.REVERB); // convoLV2 = convolution reverb (single conv-reverb slot)
     }
 
     /** Direct id -> category lookup (normalized name), null when not overridden. */

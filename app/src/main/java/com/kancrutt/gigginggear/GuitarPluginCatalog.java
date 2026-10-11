@@ -132,17 +132,27 @@ final class GuitarPluginCatalog {
         String n = pluginName.toLowerCase(Locale.US).trim();
 
         // Policy rules, always applied independent of the asset:
-        // Keep exactly one NAM loader. NG is the selected A2-capable loader;
-        // legacy NAM and AIDA-X must not create duplicate choices.
+        // Keep exactly one NAM loader. NG is the selected A2-capable loader
+        // (mikeoliphant/neural-amp-modeler-lv2, NeuralAudio engine); legacy
+        // NAM and AIDA-X must not create duplicate choices.
         if (n.contains("neural amp modeler") && !n.contains("ng")) return false;
         if (n.equals("aida-x")) return false;
-        // Keep exactly two IR loaders. Note: "convolution" is deliberately NOT
-        // a reject token - ConvoLV2 "Convolution Reverb" is a guitar reverb.
+        // Deep-research curation (Hery): exactly ONE IR-cab loader and ONE
+        // convolution reverb, the best-feature / most-updated of each.
+        //   cab IR loader  -> "x42 - IR Convolver Mono => Stereo" (zconvo.lv2,
+        //       Robin Gareus' current convolver; supersedes the deprecated
+        //       convoLV2 & zeroconvo). All other IR/impulse loaders are out:
+        //       Simple IR Loader (crashy brnv bundle), brummer10 Impulse
+        //       Loader, Reverbtron, swh impulse, irdsp (unverifiable origin).
+        //   conv reverb    -> "convolv2" (convoLV2, the shipped+working
+        //       convolution reverb; recategorized CABINET -> REVERB).
+        // Note: "convolution" is deliberately NOT a reject token - ConvoLV2
+        // "Convolution Reverb" is the kept guitar reverb.
         if (n.contains("ir loader") || n.contains("impulse loader")
                 || n.contains("ir convolver")
-                || n.contains("reverbtron") || n.contains("swh impulse")) {
-            if (!n.equals("simple ir loader")
-                    && !n.equals("x42 - ir convolver mono => stereo")) {
+                || n.contains("reverbtron") || n.contains("swh impulse")
+                || n.equals("irdsp")) {
+            if (!n.equals("x42 - ir convolver mono => stereo")) {
                 return false;
             }
         }

@@ -141,10 +141,10 @@ public class PluginPickerFragment extends BottomSheetDialogFragment {
         ImageView t3kIcon = t3kView.findViewById(R.id.item_cat_icon);
         TextView t3kTitle = t3kView.findViewById(R.id.item_cat_title);
         t3kTitle.setText("TONE3000");
-        t3kTitle.setTextColor(Color.parseColor("#FFFFFF"));
+        t3kTitle.setTextColor(Color.parseColor("#E0708A"));
         if (t3kIcon != null) {
             t3kIcon.setImageResource(R.drawable.ic_cat_amp);
-            t3kIcon.setColorFilter(Color.parseColor("#FFFFFF"), android.graphics.PorterDuff.Mode.SRC_IN);
+            t3kIcon.setColorFilter(Color.parseColor("#E0708A"), android.graphics.PorterDuff.Mode.SRC_IN);
         }
         t3kView.setBackgroundResource(R.drawable.glass_card_bg);
         t3kView.setOnClickListener(v -> {
@@ -241,8 +241,8 @@ public class PluginPickerFragment extends BottomSheetDialogFragment {
         if (cat == CategoryHelper.Category.SPLIT || cat == CategoryHelper.Category.MERGE
                 || cat == CategoryHelper.Category.UTILITY) {
             // Routing utilities
-            addRoutingRow("SPLIT (Parallel Branch)", "Split signal into 2 parallel paths", R.drawable.ic_routing_split, true);
-            addRoutingRow("MERGE (Stereo-Aware)", "Merge parallel branches into 1 path", R.drawable.ic_routing_merge, false);
+            addRoutingRow("Split", "Signal Split", R.drawable.ic_routing_split, true);
+            addRoutingRow("Merge", "Signal Merge", R.drawable.ic_routing_merge, false);
             if (cat == CategoryHelper.Category.SPLIT || cat == CategoryHelper.Category.MERGE) {
                 return;
             }
@@ -291,7 +291,7 @@ public class PluginPickerFragment extends BottomSheetDialogFragment {
                     star.setVisibility(View.GONE);
 
                     t.setText(PluginNaming.displayName(pName));
-                    b.setText(desc);
+                    b.setText(PluginCatalogInfo.brandLine(pName, desc));
                     thumb.setImageResource(CategoryHelper.getIconRes(pName));
                     thumb.setColorFilter(CategoryHelper.getColor(pName), android.graphics.PorterDuff.Mode.SRC_IN);
 
@@ -337,12 +337,13 @@ public class PluginPickerFragment extends BottomSheetDialogFragment {
         String q = query.toLowerCase();
         int hits = 0;
 
-        if ("split (parallel branch)".contains(q) || "split signal into 2 parallel paths".contains(q)) {
-            addRoutingRow("SPLIT (Parallel Branch)", "Split signal into 2 parallel paths", R.drawable.ic_routing_split, true);
+        if ("split".contains(q) || "signal split".contains(q) || "parallel branch".contains(q)) {
+            addRoutingRow("Split", "Signal Split", R.drawable.ic_routing_split, true);
             hits++;
         }
-        if ("merge (stereo-aware)".contains(q) || "merge parallel branches into 1 path".contains(q) || "sum to mono".contains(q)) {
-            addRoutingRow("MERGE (Stereo-Aware)", "Merge parallel branches into 1 path", R.drawable.ic_routing_merge, false);
+        if ("merge".contains(q) || "signal merge".contains(q) || "parallel branch".contains(q)
+                || "sum to mono".contains(q) || "stereo-aware".contains(q)) {
+            addRoutingRow("Merge", "Signal Merge", R.drawable.ic_routing_merge, false);
             hits++;
         }
 
@@ -379,7 +380,7 @@ public class PluginPickerFragment extends BottomSheetDialogFragment {
                 ImageView thumb = row.findViewById(R.id.item_model_thumb);
                 row.findViewById(R.id.item_model_star).setVisibility(View.GONE);
                 t.setText(PluginNaming.displayName(pName));
-                b.setText(shortDesc);
+                b.setText(PluginCatalogInfo.brandLine(pName, shortDesc));
                 thumb.setImageResource(CategoryHelper.getIconRes(pName));
                 thumb.setColorFilter(CategoryHelper.getColor(pName), android.graphics.PorterDuff.Mode.SRC_IN);
                 row.setOnClickListener(v -> {
@@ -412,7 +413,10 @@ public class PluginPickerFragment extends BottomSheetDialogFragment {
         t.setText(title);
         b.setText(desc);
         thumb.setImageResource(iconRes);
-        thumb.setColorFilter(Color.parseColor("#FFFFFF"), android.graphics.PorterDuff.Mode.SRC_IN);
+        // Category-list rows tint the icon with the category color; routing
+        // tiles are UTILITY grey (the old hardcoded #FFFFFF made Split/Merge
+        // icons render white-on-white in the Utility list).
+        thumb.setColorFilter(CategoryHelper.COLOR_ROUTING, android.graphics.PorterDuff.Mode.SRC_IN);
 
         row.setOnClickListener(v -> {
             if (mainActivity != null) mainActivity.addRoutingBlock(isSplit);

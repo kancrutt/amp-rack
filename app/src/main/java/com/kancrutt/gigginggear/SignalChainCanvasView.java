@@ -159,6 +159,9 @@ public class SignalChainCanvasView extends View {
     private long lastTapTime = 0;
     private int lastTapNodeId = -1;
     private Map<String, float[]> pendingCustomPos = null;
+    /** R19: node count at last rebuild — grow == a block was added (scroll
+     *  the phone canvas to the new tail); first layout uses -1 (no scroll). */
+    private int prevNodeCount = -1;
     private static final float DRAG_THRESHOLD = 8f;
     // Single-flight guard: coalesce redundant rebuilds within 800ms
     private long lastLoadMs = 0;
@@ -244,9 +247,7 @@ public class SignalChainCanvasView extends View {
     // Anchor colors
     private static final int COLOR_INPUT  = Color.parseColor("#22C55E");
     private static final int COLOR_OUTPUT = Color.parseColor("#EF4444");
-    private static final int COLOR_MERGE  = Color.parseColor("#FF8A00");
     private static final int COLOR_ROUTING = Color.parseColor("#A1A1AA");
-    private static final int COLOR_SPLIT  = COLOR_ROUTING;
     // R17 §2.3: Helix-style branch colors — upper branch (A) blue, lower
     // branch (B) amber. Wires, port dots and tile borders carry them so the
     // two parallel paths are readable at a glance (previously only a thin
@@ -603,7 +604,9 @@ public class SignalChainCanvasView extends View {
             String nlow = name.toLowerCase();
             if (nlow.contains("split")) {
                 n.nodeType = NodeType.SPLIT;
-                n.categoryColor = COLOR_SPLIT;
+                // R19 TEMUAN #2 (Hery): tile color = the Utility category color
+                // (the old orange MERGE / distinct grays are gone).
+                n.categoryColor = CategoryHelper.COLOR_ROUTING;
                 n.categoryIconRes = R.drawable.ic_routing_split;
                 n.name = "SPLIT";
                 // R16: the tile badge derives from the raw name ("Giggin Gear
@@ -612,7 +615,7 @@ public class SignalChainCanvasView extends View {
                 n.categoryCode = "SPLIT";
             } else if (nlow.contains("merge")) {
                 n.nodeType = NodeType.MERGE;
-                n.categoryColor = COLOR_MERGE;
+                n.categoryColor = CategoryHelper.COLOR_ROUTING;
                 n.categoryIconRes = R.drawable.ic_routing_merge;
                 n.name = "MERGE";
                 n.categoryCode = "MERGE";
@@ -779,9 +782,12 @@ public class SignalChainCanvasView extends View {
         // layout stays correct even when edges were restored from a preset.
         assignBranchLabels(walk);
 
-        // Lay out parallel branches as two rows between each SPLIT and its MERGE.
+        // R19: parallel rigs use the columnar two-row layout — lane A blocks
+        // in the upper row, lane B in the lower, each A_i/B_i pair sharing
+        // one x column ("sejajar", no diagonal stagger). Series chains stay
+        // on the single trunk row.
         if (hasRoutingBlock) {
-            layoutBranchRows(nodeH, spacing, yCenter);
+            layoutRoutingSlots(walk, yCenter);
         } else {
             layoutSeriesSlots();
         }
@@ -797,6 +803,30 @@ public class SignalChainCanvasView extends View {
             setCustomNodePositions(pendingCustomPos);
             pendingCustomPos = null;
         }
+
+        // R19: when a block (incl. SPLIT/MERGE) is ADDED, scroll the phone
+        // canvas so the new tail block is in view. Only fires on count
+        // growth — first layout and same-count rebuilds never scroll.
+        if (phoneScroll && prevNodeCount >= 0 && nodes.size() > prevNodeCount) {
+            post(new Runnable() {
+                @Override public void run() {
+                    Node last = null;
+                    for (Node n : nodes) if (!n.isAnchor()) last = n;
+                    if (last == null) return;
+                    android.view.ViewParent p = getParent();
+                    while (p != null && !(p instanceof android.widget.HorizontalScrollView)) {
+                        p = p.getParent();
+                    }
+                    if (p instanceof android.widget.HorizontalScrollView) {
+                        android.widget.HorizontalScrollView hsv =
+                                (android.widget.HorizontalScrollView) p;
+                        int target = Math.round(last.x + last.width / 2f - getWidth() / 2f);
+                        hsv.smoothScrollTo(Math.max(0, target), hsv.getScrollY());
+                    }
+                }
+            });
+        }
+        prevNodeCount = nodes.size();
         StringBuilder sbAfter = new StringBuilder();
         for (Node n : nodes) {
             sbAfter.append(n.id).append("/").append(n.name).append("/").append(n.x).append("/").append(n.y).append(";sel=").append(n.selected).append(";");
@@ -848,6 +878,15 @@ public class SignalChainCanvasView extends View {
      *     continues as a single row afterwards.
      */
     private void autoWireRespectingRouting(Node inputNode, Node outputNode, java.util.List<Node> walk) {
+        edges.addAll(deriveWiringEdges(inputNode, outputNode, walk));
+    }
+
+    /** Pure edge derivation (package-private for RoutingWiresTest). The
+     *  algorithm is the exact pre-R19 wiring: the one-row layout change only
+     *  moves geometry, never topology — this test pins that invariant. */
+    static java.util.List<Edge> deriveWiringEdges(Node inputNode, Node outputNode,
+                                                  java.util.List<Node> walk) {
+        java.util.List<Edge> out = new java.util.ArrayList<>();
         boolean hasSplit = false;
         boolean hasMerge = false;
         for (Node n : walk) {
@@ -862,12 +901,12 @@ public class SignalChainCanvasView extends View {
             int tail = inputNode.id;
             for (Node n : walk) {
                 if (n == null) continue;
-                edges.add(new Edge(tail, n.id));
+                out.add(new Edge(tail, n.id));
                 tail = n.id;
                 n.branch = 0;
             }
-            edges.add(new Edge(tail, outputNode.id));
-            return;
+            out.add(new Edge(tail, outputNode.id));
+            return out;
         }
         int trunkTail = inputNode.id;   // last node on the single (non-split) path
         int upperTail = -1;             // last node on upper branch (-1 = none yet)
@@ -880,7 +919,7 @@ public class SignalChainCanvasView extends View {
 
             if (n.nodeType == NodeType.SPLIT) {
                 // SPLIT consumes the current trunk and opens two branches.
-                edges.add(new Edge(trunkTail, n.id));
+                out.add(new Edge(trunkTail, n.id));
                 inSplit = true;
                 upperTail = n.id;
                 lowerTail = n.id;
@@ -892,10 +931,10 @@ public class SignalChainCanvasView extends View {
             if (n.nodeType == NodeType.MERGE) {
                 // MERGE recombines both branch tails (2 inputs) into one trunk.
                 if (inSplit) {
-                    edges.add(new Edge(upperTail, n.id));
-                    if (lowerTail != upperTail) edges.add(new Edge(lowerTail, n.id));
+                    out.add(new Edge(upperTail, n.id));
+                    if (lowerTail != upperTail) out.add(new Edge(lowerTail, n.id));
                 } else {
-                    edges.add(new Edge(trunkTail, n.id));
+                    out.add(new Edge(trunkTail, n.id));
                 }
                 inSplit = false;
                 trunkTail = n.id;
@@ -908,17 +947,17 @@ public class SignalChainCanvasView extends View {
             if (inSplit) {
                 // Alternate effect blocks between the two branches so both populate.
                 if (nextGoesUpper) {
-                    edges.add(new Edge(upperTail, n.id));
+                    out.add(new Edge(upperTail, n.id));
                     upperTail = n.id;
                     n.branch = 1;
                 } else {
-                    edges.add(new Edge(lowerTail, n.id));
+                    out.add(new Edge(lowerTail, n.id));
                     lowerTail = n.id;
                     n.branch = 2;
                 }
                 nextGoesUpper = !nextGoesUpper;
             } else {
-                edges.add(new Edge(trunkTail, n.id));
+                out.add(new Edge(trunkTail, n.id));
                 trunkTail = n.id;
                 n.branch = 0;
             }
@@ -926,31 +965,12 @@ public class SignalChainCanvasView extends View {
 
         // Terminate: any dangling branch tails also reach OUTPUT (implicit sum).
         if (inSplit) {
-            edges.add(new Edge(upperTail, outputNode.id));
-            if (lowerTail != upperTail) edges.add(new Edge(lowerTail, outputNode.id));
+            out.add(new Edge(upperTail, outputNode.id));
+            if (lowerTail != upperTail) out.add(new Edge(lowerTail, outputNode.id));
         } else {
-            edges.add(new Edge(trunkTail, outputNode.id));
+            out.add(new Edge(trunkTail, outputNode.id));
         }
-    }
-
-    /**
-     * Visually branch the canvas into an upper and lower row between a SPLIT and
-     * its MERGE. Only applies to blocks whose branch != 0 (set by auto-wiring),
-     * so manually repositioned blocks in the trunk keep their coordinates.
-     */
-    private void layoutBranchRows(float nodeH, float spacing, float yCenter) {
-        float offset = (nodeH * 0.62f) + (spacing * 0.35f);
-        for (Node n : nodes) {
-            if (n.isAnchor()) continue;
-            if (n.branch == 1) {
-                n.y = yCenter - nodeH / 2f - offset;
-            } else if (n.branch == 2) {
-                n.y = yCenter - nodeH / 2f + offset;
-            }
-            if (getHeight() > 0) {
-                n.y = Math.max(0, Math.min(n.y, getHeight() - n.height));
-            }
-        }
+        return out;
     }
 
     /** Keep every block in a deterministic non-overlapping slot after a drop.
@@ -995,6 +1015,106 @@ public class SignalChainCanvasView extends View {
 
     private void layoutSeriesSlots() {
         layoutSeriesSlots(null);
+    }
+
+    /** R19 columnar two-row parallel layout (r18 complaint: lane A/B zigzag
+     *  diagonally because x followed chain order interleaved A,B,A,B).
+     *  Lane A blocks go in the upper row, lane B in the lower row, and each
+     *  A_i/B_i pair shares ONE x column ("sejajar") — top and bottom blocks
+     *  line up vertically. Trunk prefix/suffix stay on the center baseline;
+     *  SPLIT/MERGE sit on the trunk between the columns.
+     *  @param walk chain-order nodes (branch labels already assigned)
+     *  @param yCenter trunk baseline (center row) */
+    private void layoutRoutingSlots(java.util.List<Node> walk, float yCenter) {
+        float d = density();
+        float spacing = 12f * d;
+        float x = inputAnchor != null ? inputAnchor.x + inputAnchor.width + spacing : 8f * d;
+        float maxH = 0f;
+        for (Node n : walk) {
+            if (n != null && !n.isAnchor() && n.height > maxH) maxH = n.height;
+        }
+        float offset = (maxH * 0.62f) + (spacing * 0.35f);
+
+        java.util.List<Node> laneA = new java.util.ArrayList<>();
+        java.util.List<Node> laneB = new java.util.ArrayList<>();
+        boolean inSplit = false;
+
+        for (Node n : walk) {
+            if (n == null || n.isAnchor()) continue;
+
+            if (n.nodeType == NodeType.SPLIT) {
+                n.x = x;
+                n.y = Math.max(0f, yCenter - n.height / 2f);
+                x += n.width + spacing;
+                laneA.clear();
+                laneB.clear();
+                inSplit = true;
+                continue;
+            }
+
+            if (n.nodeType == NodeType.MERGE) {
+                x = layOutLaneColumns(laneA, laneB, x, yCenter, offset);
+                n.x = x;
+                n.y = Math.max(0f, yCenter - n.height / 2f);
+                x += n.width + spacing;
+                laneA.clear();
+                laneB.clear();
+                inSplit = false;
+                continue;
+            }
+
+            if (inSplit && (n.branch == 1 || n.branch == 2)) {
+                if (n.branch == 1) laneA.add(n);
+                else laneB.add(n);
+            } else {
+                // Trunk (before SPLIT / after MERGE, or lone-routing fallback).
+                n.x = x;
+                n.y = Math.max(0f, yCenter - n.height / 2f);
+                x += n.width + spacing;
+            }
+        }
+        // Dangling lanes (SPLIT without its MERGE mid-rebuild): park them on
+        // the center row after everything else so nothing is left at old x.
+        x = layOutLaneColumns(laneA, laneB, x, yCenter, 0f);
+
+        float maxRight = x;
+        if (outputAnchor != null) {
+            outputAnchor.x = Math.max(x, outputAnchor.x);
+            outputAnchor.y = Math.max(0f, yCenter - outputAnchor.height / 2f);
+            maxRight = outputAnchor.x + outputAnchor.width;
+        }
+        if (phoneScroll) {
+            contentWPx = Math.max(contentWPx, maxRight + 16f * d);
+        }
+    }
+
+    /** Place paired lane columns: A_i upper row, B_i lower row, same x.
+     *  @return x cursor after the last column */
+    private float layOutLaneColumns(java.util.List<Node> laneA, java.util.List<Node> laneB,
+                                    float x, float yCenter, float offset) {
+        float d = density();
+        float spacing = 12f * d;
+        int cols = Math.max(laneA.size(), laneB.size());
+        for (int i = 0; i < cols; i++) {
+            float colW = 0f;
+            if (i < laneA.size()) colW = Math.max(colW, laneA.get(i).width);
+            if (i < laneB.size()) colW = Math.max(colW, laneB.get(i).width);
+            if (i < laneA.size()) {
+                Node a = laneA.get(i);
+                a.x = x;
+                // offset == 0 (dangling fallback): park on the center row.
+                a.y = Math.max(0f, offset == 0f ? yCenter - a.height / 2f
+                        : yCenter - a.height / 2f - offset);
+            }
+            if (i < laneB.size()) {
+                Node b = laneB.get(i);
+                b.x = x;
+                b.y = Math.max(0f, offset == 0f ? yCenter - b.height / 2f
+                        : yCenter - b.height / 2f + offset);
+            }
+            x += colW + spacing;
+        }
+        return x;
     }
 
     private void syncGraphToAudioEngine() {
@@ -1292,6 +1412,29 @@ public class SignalChainCanvasView extends View {
                          pre.add(n);
                      }
                      java.util.Collections.sort(pre, (a, b) -> Integer.compare(a.id, b.id));
+                     // R20 (r19 R2.5): columnar layout gives lane A_i and B_i the
+                     // SAME x, so a cross-lane drop onto the other row ties on
+                     // (zone, x) and the stable sort restores the old chain —
+                     // A<->B swaps were impossible. A drop that lands ON another
+                     // block's slot (x and y both match after the row snap
+                     // above) is a direct slot swap: exchange the two chain
+                     // positions up front. The later stable sort keeps the swap
+                     // because every key ties. Purely vertical drags land in
+                     // empty slots (rows differ), so they stay no-ops.
+                     final float slotEps = 6f * density;
+                     for (Node n : pre) {
+                         if (n == dragNode || n.isAnchor()) continue;
+                         if (Math.abs(n.x - dragNode.x) < slotEps
+                                 && Math.abs(n.y - dragNode.y) < slotEps) {
+                             int pi = pre.indexOf(dragNode);
+                             int ni = pre.indexOf(n);
+                             if (pi >= 0 && ni >= 0) {
+                                 pre.set(pi, n);
+                                 pre.set(ni, dragNode);
+                             }
+                             break;
+                         }
+                     }
                      java.util.Map<Integer, Integer> zoneOf = new java.util.HashMap<>();
                      int z = 0, sharedTrunk = 0, branchZone = -1;
                      boolean inPair = false;
@@ -1322,7 +1465,12 @@ public class SignalChainCanvasView extends View {
                          int za = zoneOf.getOrDefault(a.id, 0);
                          int zb = zoneOf.getOrDefault(b.id, 0);
                          if (za != zb) return Integer.compare(za, zb);
-                         return Float.compare(a.x, b.x);
+                         int cx = Float.compare(a.x, b.x);
+                         if (cx != 0) return cx;
+                         // Same column (columnar lanes): upper row (smaller y)
+                         // sorts first — lets a lane-crossing drop keep its new
+                         // row when x ties.
+                         return Float.compare(a.y, b.y);
                      });
 
                      java.util.List<Integer> order = new java.util.ArrayList<>();
@@ -1334,43 +1482,41 @@ public class SignalChainCanvasView extends View {
                          newOrder[k] = order.get(k);
                          if (newOrder[k] != k) orderChanged = true;
                      }
-                     // Reflow the NEW order using canonical slot geometry (same
-                     // math as the rebuild): re-snapping the dropped block to
-                     // 8dp + col*colWidth collided with the INPUT anchor and its
-                     // neighbour, stacking the drop on slot 0.
-                     layoutSeriesSlots(order);
-                     // layoutSeriesSlots() flattens every block into the single
-                     // series row. A parallel rig must KEEP its two branch rows
-                     // after a drop (geometry only changes; topology stays
-                     // SPLIT/MERGE-driven) — otherwise dragging any block, even
-                     // a pure vertical move inside one branch, visually reset
-                     // the canvas to series.
-                     java.util.List<Node> walk = new java.util.ArrayList<>();
-                     for (Integer id : order) {
-                         Node wn = nodeMap.get(id);
-                         if (wn != null) walk.add(wn);
-                     }
-                     boolean walkHasRouting = false;
-                     for (Node wn : walk) {
-                         if (wn.nodeType == NodeType.SPLIT || wn.nodeType == NodeType.MERGE) {
-                             walkHasRouting = true;
-                             break;
-                         }
-                     }
-                     if (walkHasRouting && inputAnchor != null && outputAnchor != null) {
-                         edges.clear();
-                         autoWireRespectingRouting(inputAnchor, outputAnchor, walk);
-                         assignBranchLabels(walk);
-                         float dropNodeH = 0f;
-                         for (Node wn : walk) if (wn.height > dropNodeH) dropNodeH = wn.height;
-                         float dropDensity = getResources().getDisplayMetrics().density;
-                         float dropYCenter = phoneScroll ? contentHPx / 2f
-                                 : (getHeight() > 0 ? getHeight() / 2f : 48f * dropDensity);
-                         layoutBranchRows(dropNodeH, 12f * dropDensity, dropYCenter);
-                     }
+                      // Reflow the NEW order using canonical slot geometry (same
+                      // math as the rebuild): re-snapping the dropped block to
+                      // 8dp + col*colWidth collided with the INPUT anchor and its
+                      // neighbour, stacking the drop on slot 0.
+                      // R19: columnar two-row — layoutRoutingSlots() owns all
+                      // geometry for SPLIT/MERGE chains; drop just re-derives
+                      // wires + labels, then re-columns the lanes.
+                      layoutSeriesSlots(order);
+                      java.util.List<Node> walk = new java.util.ArrayList<>();
+                      for (Integer id : order) {
+                          Node wn = nodeMap.get(id);
+                          if (wn != null) walk.add(wn);
+                      }
+                      boolean walkHasRouting = false;
+                      for (Node wn : walk) {
+                          if (wn.nodeType == NodeType.SPLIT || wn.nodeType == NodeType.MERGE) {
+                              walkHasRouting = true;
+                              break;
+                          }
+                      }
+                      if (walkHasRouting && inputAnchor != null && outputAnchor != null) {
+                          edges.clear();
+                          autoWireRespectingRouting(inputAnchor, outputAnchor, walk);
+                          assignBranchLabels(walk);
+                          float dropYCenter = phoneScroll ? contentHPx / 2f
+                                  : (getHeight() > 0 ? getHeight() / 2f : 48f * density());
+                          layoutRoutingSlots(walk, dropYCenter);
+                      }
                      if (orderChanged && reorderListener != null) {
+                         Log.i("SignalChainCanvas", "[DROP] commit order=" + order
+                                 + " drag=" + dragNode.name + " @x=" + dragNode.x);
                          reorderListener.onReorder(newOrder);
                      } else {
+                         Log.i("SignalChainCanvas", "[DROP] no-op order=" + order
+                                 + " drag=" + dragNode.name + " @x=" + dragNode.x);
                          syncGraphToAudioEngine();
                      }
                 }
@@ -1681,15 +1827,19 @@ public class SignalChainCanvasView extends View {
         int branchAccent = branchAccentColor(n.branch);
 
         if (n.selected) {
+            // Selected glow follows the branch accent inside parallel
+            // branches (same rule as the unselected border below);
+            // trunk blocks keep the category color.
+            int glowColor = branchAccent != 0 ? branchAccent : drawColor;
             Paint glowBg = new Paint(Paint.ANTI_ALIAS_FLAG);
             glowBg.setStyle(Paint.Style.FILL);
-            glowBg.setColor(Color.argb(40, Color.red(drawColor), Color.green(drawColor), Color.blue(drawColor)));
+            glowBg.setColor(Color.argb(40, Color.red(glowColor), Color.green(glowColor), Color.blue(glowColor)));
             canvas.drawRoundRect(r, 12, 12, glowBg);
 
             Paint selGlow = new Paint(Paint.ANTI_ALIAS_FLAG);
             selGlow.setStyle(Paint.Style.STROKE);
             selGlow.setStrokeWidth(4f);
-            selGlow.setColor(drawColor);
+            selGlow.setColor(glowColor);
             canvas.drawRoundRect(r, 12, 12, selGlow);
         } else {
             Paint normBorder = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -1792,8 +1942,7 @@ public class SignalChainCanvasView extends View {
         }
     }
 
-    private void drawBezierWire(Canvas canvas, float x1, float y1, float x2, float y2, int color) {
-        Path path = new Path();
+    private void drawBezierWire(Canvas canvas, float x1, float y1, float x2, float y2, int color) {        Path path = new Path();
         path.moveTo(x1, y1);
         float dx = Math.abs(x2 - x1) * 0.5f;
         path.cubicTo(x1 + dx, y1, x2 - dx, y2, x2, y2);

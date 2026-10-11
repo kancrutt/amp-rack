@@ -27,6 +27,16 @@ public class GuitarPluginCatalogTest {
         // identical .so/index) was removed from the curated names list —
         // exactly ONE picker tile may remain for that library.
         assertFalse(GuitarPluginCatalog.isCurated("octolo"));
+        // Hery r21 dedup: bare "hip2b"/"lushlife" aliases (lv2_plugins keys
+        // 23700/23900, identical .so/index) removed like octolo — exactly ONE
+        // picker tile per library.
+        assertFalse(GuitarPluginCatalog.isCurated("hip2b"));
+        assertFalse(GuitarPluginCatalog.isCurated("lushlife"));
+        // Hery dedup: "C* SpiceX2 - Not an exciter either" (all_plugins key
+        // 10302, libSaturate.so stereo variant) removed like octolo — the
+        // mono "C* Spice - Not an exciter" is the single tile (mono chain).
+        assertFalse(GuitarPluginCatalog.isCurated("c* spicex2 - not an exciter either"));
+        assertTrue(GuitarPluginCatalog.isCurated("C* Spice - Not an exciter"));
         assertTrue(GuitarPluginCatalog.isCurated("the infamous Hip2B"));
         assertTrue(GuitarPluginCatalog.isCurated("the infamous ewham"));
         assertTrue(GuitarPluginCatalog.isCurated("the infamous mindi"));
@@ -34,7 +44,9 @@ public class GuitarPluginCatalogTest {
         assertTrue(GuitarPluginCatalog.isCurated("Harmonic Exciter"));
         assertTrue(GuitarPluginCatalog.isCurated("MDA Bandisto"));
         assertTrue(GuitarPluginCatalog.isCurated("MDA ThruZero"));
-        assertTrue(GuitarPluginCatalog.isCurated("Tamg Amp"));
+        // Hery: Tamg Amp removed entirely (lv2_plugins key 34900,
+        // libtamgamp.so entry deleted) — must not be curated.
+        assertFalse(GuitarPluginCatalog.isCurated("Tamg Amp"));
         assertTrue(GuitarPluginCatalog.isCurated("convoLV2"));
         // Case-insensitive.
         assertTrue(GuitarPluginCatalog.isCurated("THE INFAMOUS OCTOLO"));
@@ -53,13 +65,17 @@ public class GuitarPluginCatalogTest {
         assertFalse(GuitarPluginCatalog.isCurated("Neural Amp Modeler"));
         assertFalse(GuitarPluginCatalog.isCurated("AIDA-X"));
         assertTrue(GuitarPluginCatalog.isCurated("Neural Amp Modeler NG"));
-        // IR loader policy: exactly Simple IR Loader + x42 convolver.
+        // IR-cab policy: exactly one (x42 zconvo). Simple IR Loader and irdsp
+        // rejected (crashy/unverifiable); also removed from the curated list.
         assertFalse(GuitarPluginCatalog.isCurated("Impulse Loader"));
         assertFalse(GuitarPluginCatalog.isCurated("SWH Impulse convolver"));
         assertFalse(GuitarPluginCatalog.isCurated("rkr Reverbtron"));
         assertFalse(GuitarPluginCatalog.isCurated("x42 DARC"));
-        assertTrue(GuitarPluginCatalog.isCurated("Simple IR Loader"));
+        assertFalse(GuitarPluginCatalog.isCurated("Simple IR Loader"));
+        assertFalse(GuitarPluginCatalog.isCurated("irdsp"));
         assertTrue(GuitarPluginCatalog.isCurated("x42 - IR Convolver Mono => Stereo"));
+        // Reverb-IR policy: convoLV2 is the sole reverb-IR convolver.
+        assertTrue(GuitarPluginCatalog.isCurated("convoLV2"));
         // Empty input.
         assertFalse(GuitarPluginCatalog.isCurated(null));
         assertFalse(GuitarPluginCatalog.isCurated(""));
@@ -67,8 +83,8 @@ public class GuitarPluginCatalogTest {
 
     @Test public void blacklistOverridesCurated() throws Exception {
         loadBundledCatalog();
-        // Bundled blacklist is empty after the octolo atom-port fix: nothing
-        // blocked, both octolo names stay curated.
+        // Bundled blacklist hides Simple IR Loader (crashy ir-cab-sim bundle);
+        // octolo stays curated because it is not on the blacklist.
         File bl = new File("src/main/assets/blacklist.json");
         assertTrue("blacklist asset missing at " + bl.getAbsolutePath(), bl.exists());
         GuitarPluginCatalog.loadBlacklistFromJson(
@@ -77,6 +93,8 @@ public class GuitarPluginCatalogTest {
         // only "the infamous octolo" remains curated.
         assertFalse(GuitarPluginCatalog.isCurated("octolo"));
         assertTrue(GuitarPluginCatalog.isCurated("the infamous octolo"));
+        // Bundled blacklist hides the crashy ir-cab-sim bundle.
+        assertFalse(GuitarPluginCatalog.isCurated("Simple IR Loader"));
 
         // A non-empty blacklist hides even curated names, case-insensitively;
         // entries with value 0 are ignored.

@@ -348,6 +348,12 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     RecyclerView recyclerView;
     SignalChainCanvasView signalChainCanvas;
     DataAdapter dataAdapter;
+    // Swap guard: swapActivePlugin() calls addPluginByName() internally, whose
+    // deferred canvas post (selectSlot(before)/populate(before)) would fire
+    // AFTER the swap completes and clobber the correct selection with the
+    // stale pre-delete slot — the new block ends up unselected. While true,
+    // addPluginByName() skips its own post; the swap does the refresh itself.
+    boolean inSwapTransaction = false;
 
     private final Map<String, float[]> savedNodePositions = new HashMap<>();
 
@@ -679,6 +685,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
          knobsLayout = ConnectGuitar.loadJSONFromAssetFile(this, "knobs.json");
          parameterMetadata = ParameterMetadata.loadFromAsset(this);
         GuitarPluginCatalog.init(this);
+        PluginCatalogInfo.init(this);
 
         Iterator<String> keys = availablePluginsLV2.keys();
 
@@ -3207,9 +3214,12 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 dataAdapter.addItem(isSplit ? ROUTING_ID_SPLIT : ROUTING_ID_MERGE, n - 1);
             }
             if (signalChainCanvas != null) {
+                final int newSlot = n - 1;
+                final String addedName = AudioEngine.getActivePluginName(newSlot);
                 signalChainCanvas.post(() -> {
                     signalChainCanvas.loadFromActivePlugins();
-                    signalChainCanvas.selectSlot(n - 1);
+                    signalChainCanvas.selectSlot(newSlot);
+                    populateInlineParameterEditor(newSlot, addedName != null ? addedName : "");
                 });
             }
             toast(isSplit ? "SPLIT added — chain branches into two paths"
@@ -4283,6 +4293,12 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 String fullDesc = getPluginFullDescription(pluginName);
                 if (fullDesc != null && !fullDesc.isEmpty()) {
                     gearInfoDesc.setText(fullDesc);
+                } else if (PluginNaming.isRoutingSplit(pluginName)) {
+                    // R20 (Hery): routing blocks show a short functional
+                    // description here — never the raw "Giggin Gear ..." name.
+                    gearInfoDesc.setText("Splits the signal into 2 parallel paths.");
+                } else if (PluginNaming.isRoutingName(pluginName) && PluginNaming.isRoutingMerge(pluginName)) {
+                    gearInfoDesc.setText("Combines both parallel branches back into one path.");
                 } else {
                     gearInfoDesc.setText(pluginName != null ? pluginName : "Standard Model");
                 }
@@ -4529,14 +4545,16 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 } catch (Throwable ignored) {}
 
                 for (int i = 0; i < numControls; i++) {
-                    String rawName = AudioEngine.getControlName(position, i);
+                     String rawName = AudioEngine.getControlName(position, i);
                     // Zero-Trust label: main name for UI, enum hint for helper/picker.
                     // LADSPA embeds enums in the port name ("Modulation depth
                     // (0=none, 1=AM, 2=RM)") — the parens never reach the UI.
                     com.kancrutt.gigginggear.util.LabelFormatter.ControlLabel parsed =
                             com.kancrutt.gigginggear.util.LabelFormatter.parseControlLabel(rawName);
-                     String cName = parsed.getMain();
-                     if (cName == null || cName.isEmpty()) continue;
+                    // R19 TEMUAN #5: plugin-scoped display fixes ("T" -> "Time"
+                    // on C* Chorus I) after the generic formatter.
+                    String cName = com.kancrutt.gigginggear.util.ControlLabels.display(pluginName, parsed.getMain());
+                    if (cName == null || cName.isEmpty()) continue;
                      final String cHint = parsed.getHint();
                      ParameterMetadata.PortMeta metadata = null;
                      int nativePortIndex = AudioEngine.getControlPortIndex(position, i);
@@ -4615,8 +4633,42 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                              ctrlType == TYPE_TOGGLE,
                              metadata == null ? null : metadata.enumValues,
                              metadata == null ? null : metadata.enumLabels);
-                    // Boolean / Toggle: show On/Off, never 0-1% or -100% (fixes Aida Enabled 0-1)
-                     if (ctrlType == TYPE_TOGGLE || (metadata != null && metadata.controlType == ParameterMetadata.ControlType.TOGGLE)) {
+                     // On/Off-as-ENUM: guitarix-style 0..1 ENUMs carrying Off/On
+                     // scale-point labels (CABSWITCH, FILTER, DRIVE, TONE...)
+                     // render as dropdowns; treat them as toggles instead.
+                     boolean forceToggle = false;
+                     if (ctrlType == TYPE_ENUM
+                             || (metadata != null && metadata.controlType == ParameterMetadata.ControlType.ENUM_PICKER)) {
+                         if (minVal == 0f && maxVal == 1f) {
+                             String[] ooLabels = metadata != null && metadata.enumLabels != null
+                                     ? metadata.enumLabels : fHintEnumLabels;
+                             try {
+                                 String[] nativeLabels = AudioEngine.getControlEnumLabels(position, i);
+                                 if (nativeLabels != null && nativeLabels.length > 0) ooLabels = nativeLabels;
+                             } catch (Throwable ignored) {}
+                             forceToggle = com.kancrutt.gigginggear.util.LabelFormatter.isOnOffPair(ooLabels);
+                         }
+                     }
+                     // Model-as-dropdown: integer "Model" selectors (C*
+                     // CabinetIII 0..16, C* ToneStack 0..8, "Impulse Model"
+                     // 0..1) render as sliders/steppers; route them into
+                     // the enum branch, whose unlabeled path already builds
+                     // a numeric 0..N dropdown.
+                     boolean forceEnumDropdown = false;
+                     if (!forceToggle && fHintEnumLabels == null
+                             && (metadata == null || metadata.controlType != ParameterMetadata.ControlType.ENUM_PICKER)
+                             && ctrlType != TYPE_ENUM && isIntegerParam) {
+                         String cn = cName == null ? "" : cName.trim().toLowerCase(java.util.Locale.US);
+                         if (cn.equals("model") || cn.equals("impulse model")) {
+                             float span = maxVal - minVal;
+                             if (span >= 1f && span <= 24f
+                                     && minVal == Math.round(minVal) && maxVal == Math.round(maxVal)) {
+                                 forceEnumDropdown = true;
+                             }
+                         }
+                     }
+                     // Boolean / Toggle: show On/Off, never 0-1% or -100% (fixes Aida Enabled 0-1)
+                     if (forceToggle || ctrlType == TYPE_TOGGLE || (metadata != null && metadata.controlType == ParameterMetadata.ControlType.TOGGLE)) {
                         // Render as Switch row — proportional & safe padding, aligned
                         LinearLayout toggleRow = new LinearLayout(this);
                         toggleRow.setOrientation(LinearLayout.HORIZONTAL);
@@ -4682,7 +4734,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     // Enumeration: render as a discrete picker row backed by native scalePoint labels.
                     // LADSPA has no scale-points, so an INT control carrying an enum hint
                     // ("0=none, 1=AM, 2=RM") takes the same path with hint-derived labels.
-                    if (ctrlType == TYPE_ENUM || (metadata != null && metadata.controlType == ParameterMetadata.ControlType.ENUM_PICKER) || fHintEnumLabels != null) {
+                     if (forceEnumDropdown || ctrlType == TYPE_ENUM || (metadata != null && metadata.controlType == ParameterMetadata.ControlType.ENUM_PICKER) || fHintEnumLabels != null) {
                         unit = ""; // enumeration has no unit
                         String[] enumLabels = metadata != null && metadata.enumLabels != null ? metadata.enumLabels : fHintEnumLabels;
                         float[] enumValues = metadata != null ? metadata.enumValues : null;
@@ -6466,6 +6518,13 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     /** Lookup full description from all_plugins.json or lv2_plugins.json */
     public String getPluginFullDescription(String pluginName) {
         if (pluginName == null) return null;
+        // Research catalog wins: manufacturer / homepage / sub-category / tags
+        // / description for every curated plugin. Falls through to the legacy
+        // per-plugin desc when the catalog has no entry (routing blocks, etc.).
+        try {
+            String catalog = PluginCatalogInfo.describe(pluginName);
+            if (catalog != null && !catalog.trim().isEmpty()) return catalog;
+        } catch (Throwable ignored) {}
         try {
             if (availablePlugins != null) {
                 Iterator<String> keys = availablePlugins.keys();
@@ -6934,11 +6993,11 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         // reachable via a direct "split"/"merge" text search).
         if (cat == CategoryHelper.Category.SPLIT || cat == CategoryHelper.Category.MERGE
                 || cat == CategoryHelper.Category.UTILITY) {
-            addPluginPickerRow(container, "SPLIT (Parallel Branch)", "Split signal into 2 parallel paths", R.drawable.ic_routing_split, dialog, v -> {
+            addPluginPickerRow(container, "Split", "Signal Split", R.drawable.ic_routing_split, CategoryHelper.COLOR_ROUTING, dialog, v -> {
                 addRoutingBlock(true);
                 dialog.dismiss();
             });
-            addPluginPickerRow(container, "MERGE (Stereo-Aware)", "Merge parallel branches into 1 path", R.drawable.ic_routing_merge, dialog, v -> {
+            addPluginPickerRow(container, "Merge", "Signal Merge", R.drawable.ic_routing_merge, CategoryHelper.COLOR_ROUTING, dialog, v -> {
                 addRoutingBlock(false);
                 dialog.dismiss();
             });
@@ -7001,15 +7060,16 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         int hits = 0;
 
         // Routing blocks on match
-        if ("split (parallel branch)".contains(q) || "split signal into 2 parallel paths".contains(q)) {
-            addPluginPickerRow(container, "SPLIT (Parallel Branch)", "Split signal into 2 parallel paths", R.drawable.ic_routing_split, dialog, v -> {
+        if ("split".contains(q) || "signal split".contains(q) || "parallel branch".contains(q)) {
+            addPluginPickerRow(container, "Split", "Signal Split", R.drawable.ic_routing_split, CategoryHelper.COLOR_ROUTING, dialog, v -> {
                 addRoutingBlock(true);
                 dialog.dismiss();
             });
             hits++;
         }
-        if ("merge (stereo-aware)".contains(q) || "merge parallel branches into 1 path".contains(q) || "sum to mono".contains(q)) {
-            addPluginPickerRow(container, "MERGE (Stereo-Aware)", "Merge parallel branches into 1 path", R.drawable.ic_routing_merge, dialog, v -> {
+        if ("merge".contains(q) || "signal merge".contains(q) || "parallel branch".contains(q)
+                || "sum to mono".contains(q) || "stereo-aware".contains(q)) {
+            addPluginPickerRow(container, "Merge", "Signal Merge", R.drawable.ic_routing_merge, CategoryHelper.COLOR_ROUTING, dialog, v -> {
                 addRoutingBlock(false);
                 dialog.dismiss();
             });
@@ -7057,6 +7117,10 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     }
 
     private void addPluginPickerRow(LinearLayout container, String title, String desc, int iconRes, androidx.appcompat.app.AlertDialog dialog, View.OnClickListener onClick) {
+        addPluginPickerRow(container, title, desc, iconRes, CategoryHelper.getColor(title), dialog, onClick);
+    }
+
+    private void addPluginPickerRow(LinearLayout container, String title, String desc, int iconRes, int tintColor, androidx.appcompat.app.AlertDialog dialog, View.OnClickListener onClick) {
         View row = getLayoutInflater().inflate(R.layout.item_model_browser_row, container, false);
         TextView t = row.findViewById(R.id.item_model_title);
         TextView b = row.findViewById(R.id.item_model_brand);
@@ -7064,9 +7128,11 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         row.findViewById(R.id.item_model_star).setVisibility(View.GONE);
 
         t.setText(title);
-        b.setText(desc);
+        // Catalog manufacturer wins the card subtitle when known (research
+        // catalog); routing/unknown rows keep the passed description fallback.
+        b.setText(PluginCatalogInfo.brandLine(title, desc));
         thumb.setImageResource(iconRes);
-        thumb.setColorFilter(CategoryHelper.getColor(title), android.graphics.PorterDuff.Mode.SRC_IN);
+        thumb.setColorFilter(tintColor, android.graphics.PorterDuff.Mode.SRC_IN);
 
         row.setOnClickListener(onClick);
         container.addView(row);
@@ -7146,7 +7212,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                         ((TextView) prow.findViewById(R.id.item_model_title)).setText(pName);
                         String desc = obj.optString("desc", obj.optString("description", "Built-in Effect"));
                         if (desc.length() > 40) desc = desc.substring(0, 37) + "…";
-                        ((TextView) prow.findViewById(R.id.item_model_brand)).setText(desc);
+                        ((TextView) prow.findViewById(R.id.item_model_brand)).setText(PluginCatalogInfo.brandLine(pName, desc));
                         ImageView pthumb = prow.findViewById(R.id.item_model_thumb);
                         pthumb.setImageResource(CategoryHelper.getIconRes(pName));
                         pthumb.setColorFilter(CategoryHelper.getColor(pName), android.graphics.PorterDuff.Mode.SRC_IN);
@@ -7311,7 +7377,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 View row = getLayoutInflater().inflate(R.layout.item_model_browser_row, container, false);
                 ((TextView) row.findViewById(R.id.item_model_title)).setText(pName);
                 String shortDesc = desc.length() > 40 ? desc.substring(0, 37) + "…" : desc;
-                ((TextView) row.findViewById(R.id.item_model_brand)).setText(shortDesc);
+                ((TextView) row.findViewById(R.id.item_model_brand)).setText(PluginCatalogInfo.brandLine(pName, shortDesc));
                 ImageView thumb = row.findViewById(R.id.item_model_thumb);
                 thumb.setImageResource(CategoryHelper.getIconRes(pName));
                 thumb.setColorFilter(CategoryHelper.getColor(pName), android.graphics.PorterDuff.Mode.SRC_IN);
@@ -7392,7 +7458,15 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             // the add fails, and the stale addedPos math below can then move
             // an innocent block into place (wrong order / wrong sound).
             int before = AudioEngine.getActivePlugins();
-            addPluginByName(newPluginName);
+            // Suppress addPluginByName()'s deferred select/populate post: it
+            // captures the pre-delete slot and would fire after this swap,
+            // clearing the correct selection (new block not auto-selected).
+            inSwapTransaction = true;
+            try {
+                addPluginByName(newPluginName);
+            } finally {
+                inSwapTransaction = false;
+            }
             if (AudioEngine.getActivePlugins() != before + 1) {
                 Log.e(TAG, "swapActivePlugin: add failed for " + newPluginName + ", old block kept");
                 toast("Couldn't load " + newPluginName);
@@ -7414,12 +7488,14 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             }
             try { AudioEngine.togglePlugin(position, wasEnabled); } catch (Exception ignore) {}
 
-            // Refresh signal chain canvas and force re-select the current node so its icon & color update
+            // Refresh signal chain canvas and force re-select the current node so its icon & color update.
+            // selectSlot takes a slot index; selectNode takes a pluginId
+            // (shared by duplicate LV2 blocks) and never matches a slot.
             if (signalChainCanvas != null) {
                 signalChainCanvas.clearT3kBadges();
                 signalChainCanvas.loadFromActivePlugins(true);
                 signalChainCanvas.post(() -> reapplyT3kBadgesToCanvas());
-                signalChainCanvas.selectNode(position);
+                signalChainCanvas.selectSlot(position);
                 signalChainCanvas.invalidate();
             }
 
@@ -8135,7 +8211,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                             try { pluginID = Integer.parseInt(key); } catch (Exception ignored) {}
                             dataAdapter.addItem(pluginID, dataAdapter.getItemCount());
                         }
-                        if (signalChainCanvas != null) {
+                        if (signalChainCanvas != null && !inSwapTransaction) {
                             // Select the freshly-added block and open its editor;
                             // the panel used to keep showing the previously
                             // selected block (round-3 note: "add octolo, panel
@@ -8213,7 +8289,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                             try { pluginID = Integer.parseInt(key); } catch (Exception ignored) {}
                             dataAdapter.addItem(pluginID, dataAdapter.getItemCount());
                         }
-                        if (signalChainCanvas != null) {
+                        if (signalChainCanvas != null && !inSwapTransaction) {
                             // Select the freshly-added block and open its editor;
                             // the panel used to keep showing the previously
                             // selected block (round-3 note: "add octolo, panel
@@ -8942,7 +9018,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         AlertDialog.Builder builder = new AlertDialog.Builder(mainActivity);
         builder.setView(midiLayout);
         if (scope == MIDIControl.Scope.PLUGIN)
-            builder.setTitle("Set MIDI Control for " + AudioEngine.getActivePluginName(plugin) + " " + AudioEngine.getControlName(plugin, control));
+            builder.setTitle("Set MIDI Control for " + PluginNaming.displayName(AudioEngine.getActivePluginName(plugin)) + " " + prettyControlName(AudioEngine.getControlName(plugin, control)));
         else
             builder.setTitle("Set MIDI Control");
 

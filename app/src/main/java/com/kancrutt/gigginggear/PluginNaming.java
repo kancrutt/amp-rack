@@ -181,6 +181,10 @@ public final class PluginNaming {
         NAMES.put("mkii", "Mk II");
         NAMES.put("metal", "Metal");
         NAMES.put("metalhead", "Metal Head");
+        // R19 TEMUAN #3 (Hery): synthetic routing blocks display as plain
+        // "Split"/"Merge" — never the "Giggin Gear ..." descriptor prefix.
+        NAMES.put("giggingearsplit", "Split");
+        NAMES.put("giggingearmerge", "Merge");
     }
 
     /**
@@ -226,6 +230,12 @@ public final class PluginNaming {
     public static boolean isRoutingSplit(String name) {
         return name != null
                 && name.toLowerCase(java.util.Locale.ROOT).contains("giggin gear split");
+    }
+
+    /** Whether a routing name ({@link #isRoutingName}) is the MERGE block (vs SPLIT). */
+    public static boolean isRoutingMerge(String name) {
+        return isRoutingName(name)
+                && name.toLowerCase(java.util.Locale.ROOT).contains("giggin gear merge");
     }
 
     /** Generic cleaner: strips prefixes/separators, splits camel case, capitalizes words. */

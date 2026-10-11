@@ -371,7 +371,7 @@ public final class CategoryGenerated {
         v.put("clubdrive", "DISTORTION");
         v.put("collisiondrive", "DISTORTION");
         v.put("compressor", "DYNAMICS");
-        v.put("convolv2", "CABINET");
+        v.put("convolv2", "REVERB");
         v.put("creammachine", "AMP");
         v.put("cstb", "DISTORTION");
         v.put("delaystereo", "DELAY");
@@ -408,7 +408,7 @@ public final class CategoryGenerated {
         v.put("harmonicexciter", "DISTORTION");
         v.put("heathkit", "DISTORTION");
         v.put("hfbrightener", "DISTORTION");
-        v.put("hip2b", "GATE");
+        v.put("hip2b", "DISTORTION");
         v.put("hogsfoot", "DISTORTION");
         v.put("hornet", "DISTORTION");
         v.put("hotbox", "DISTORTION");
@@ -559,7 +559,7 @@ public final class CategoryGenerated {
         v.put("theinfamouscheapdistortion", "DISTORTION");
         v.put("theinfamousenvelopefollower", "WAH");
         v.put("theinfamousewham", "PITCH");
-        v.put("theinfamouship2b", "GATE");
+        v.put("theinfamouship2b", "DISTORTION");
         v.put("theinfamouslushlife", "MODULATION");
         v.put("theinfamousmindi", "UTILITY");
         v.put("theinfamousoctolo", "PITCH");

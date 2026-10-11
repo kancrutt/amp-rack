@@ -328,6 +328,7 @@ LADSPA_CATEGORY_OVERRIDES = {
     9010: "MODULATION",
 }
 LV2_CATEGORY_OVERRIDES = {
+    "convolv2": "REVERB",  # convoLV2 = convolution reverb (re-sited CABINET->REVERB for the single-convolver curation)
     "ts9sim": "DISTORTION",
     "mdatesttone": "UTILITY",
     "microamp": "DISTORTION",  # R11 audit: Micro Amp Booster -> OD/Dist
@@ -351,8 +352,8 @@ LV2_CATEGORY_OVERRIDES = {
     "mdapiano": "PITCH",
     "theinfamouspowerup": "MODULATION",
     "theinfamousstuck": "UTILITY",  # R11 audit: clip looper/drone, not pitch
-    "hip2b": "GATE",  # R11 audit: decimator-style noise suppressor
-    "theinfamouship2b": "GATE",  # R11 audit: cf. hip2b
+    "hip2b": "DISTORTION",  # Hery r21: hysteresis square-wave dist (was wrongly GATE)
+    "theinfamouship2b": "DISTORTION",  # Hery r21: cf. hip2b
     "lushlife": "MODULATION",
     "theinfamouslushlife": "MODULATION",
     "octolo": "PITCH",
@@ -362,15 +363,15 @@ LV2_CATEGORY_OVERRIDES = {
     # R11 category audit (Bang Hery): explicit corrections over TTL/token guesses.
     # OC-2 + ewham stay PITCH — TTL "Distortion pedal" for OC-2 is upstream junk
     # but the plugin is a pitch/octave pedal (confirmed by Hery, do not move).
-    "tape": "DISTORTION",           # GxTape tape saturation, not an EQ
-    "tapestereo": "DISTORTION",     # Gx Tape Stereo
-    "rkrpan": "MODULATION",         # rkr Pan auto-panner (autopan family) -- not a utility
-    "rkrexciter": "DISTORTION",     # align with "harmonic exciter" (also DISTORTION)
-    "rkrexpander": "DYNAMICS",      # expander = dynamics; align with generic "expander"
+    "tape": "DISTORTION",  # GxTape tape saturation, not an EQ
+    "tapestereo": "DISTORTION",  # Gx Tape Stereo
+    "rkrpan": "MODULATION",  # rkr Pan auto-panner (autopan family) -- not a utility
+    "rkrexciter": "DISTORTION",  # align with "harmonic exciter" (also DISTORTION)
+    "rkrexpander": "DYNAMICS",  # expander = dynamics; align with generic "expander"
     "gxexpander": "DYNAMICS",
-    "c*spicenotanexciter": "DYNAMICS",        # desc: bass compressor + limiter
+    "c*spicenotanexciter": "DYNAMICS",  # desc: bass compressor + limiter
     "c*spicex2notanexcitereither": "DYNAMICS",
-    "mydsp": "UTILITY",             # Guitarix Multi Effect Pedal (multi-fx, not an amp)
+    "mydsp": "UTILITY",  # Guitarix Multi Effect Pedal (multi-fx, not an amp)
 }
 
 

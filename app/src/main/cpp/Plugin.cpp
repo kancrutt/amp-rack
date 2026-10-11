@@ -344,6 +344,13 @@ void Plugin::load () {
         } else if (jsonPort.find ("OutputPort") != jsonPort.end() && jsonPort.find("ControlPort") != jsonPort.end()) {
             LOGD("[%s %d]: found possible monitor port", lv2Descriptor->URI, port);
             lv2Descriptor->connect_port(handle, port, &dummy_output_control_port);
+        } else if (jsonPort.find ("CVPort") != jsonPort.end()) {
+            // CV ports (e.g. envfollower CV Out): the guitar chain never
+            // reads them, but the handle slot must point somewhere valid —
+            // an unconnected CV slot holds malloc garbage and run() derefs
+            // it on the first callback (SIGSEGV on add).
+            LOGD("[%s %d]: found CV port, sinking to dummy", lv2Descriptor->URI, port);
+            lv2Descriptor->connect_port(handle, port, &dummy_output_control_port);
         } else if (hasClassKey(jsonPort, "AtomPort") && jsonPort.find ("InputPort") != jsonPort.end()) {
             LOGD ("configuring atom control port");
             if (filePort == nullptr) {
@@ -397,6 +404,19 @@ void Plugin::load () {
         }
 
 //        std::cout << "key: " << el.key() << ", value:" << el.value() << '\n';
+    }
+
+    // Simple IR Loader (brnv ir-cab-sim) hides its IR buffer ports (99=size,
+    // 100=data) from the manifest: run() derefs handle+0x10, which stays
+    // malloc garbage unless port 100 ran — SIGSEGV on the first callback
+    // after add. Feed size 0 + empty data so the slot becomes a valid empty
+    // buffer (port 99 clamps size and mallocs, port 100 skips the copy when
+    // size < 1 and publishes the buffer). No IR can be loaded through the
+    // phone UI anyway; this just stops the add from crashing the audio thread.
+    if (lv2Descriptor != nullptr && lv2Descriptor->URI != nullptr
+            && std::string(lv2Descriptor->URI).find("ir-cab-sim") != std::string::npos) {
+        lv2Descriptor->connect_port(handle, 99, &dummy_output_control_port);
+        lv2Descriptor->connect_port(handle, 100, &dummy_output_control_port);
     }
 
     // this is here because activate may use "ports" which are allocated above

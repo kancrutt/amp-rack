@@ -430,10 +430,17 @@ public class CategoryHelper {
         // Routing utilities (structural, not effects) — checked first.
         if (toks.contains("split")) return Category.UTILITY;
         if (toks.contains("merge")) return Category.UTILITY;
-        if (hasAny(toks, "cabinet", "cab", "impulse", "convolver", "convolution",
+        // R23 (Hery): "convolver"/"convolution" moved CABINET -> REVERB. The only
+        // convolver-name plugins in the catalogs are reverb tools (convoLV2,
+        // x42 IR Convolver — both REVERB), and the x42 engine block kept the
+        // Cab icon whenever its runtime name dropped the "x42 - " catalog prefix
+        // (bare "IR Convolver" fell through to this token rule). Genuine cab
+        // loaders stay matched via "cabinet"/"cab"/"impulse"/"ir".
+        if (hasAny(toks, "cabinet", "cab", "impulse",
                 "speaker", "celestion", "greenback", "creamback", "v30")) return Category.CABINET;
         if (hasAny(toks, "reverb", "gverb", "freeverb", "ambience", "cathedral",
-                "chapel", "spring", "plate", "shimmer")) return Category.REVERB;
+                "chapel", "spring", "plate", "shimmer", "convolver", "convolution"))
+            return Category.REVERB;
         if (hasAny(toks, "delay", "echo", "slapback", "dub", "ping", "pong"))
             return Category.DELAY;
         if (hasAny(toks, "chorus", "flanger", "flange", "phaser", "phase",

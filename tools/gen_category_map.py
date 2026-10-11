@@ -390,12 +390,13 @@ def token_cat(name, desc="", lib=""):
     libt = (lib or "").lower()
     has = lambda *ws: any(w in toks for w in ws)
     # order matters: most specific families first
+    # R23 (Hery): convolver/convolution moved CABINET -> REVERB (keep in sync
+    # with CategoryHelper.classifyTokens). Cab loaders still match via
+    # cabinet/cab/impulse.
     if has(
         "cabinet",
         "cab",
         "impulse",
-        "convolver",
-        "convolution",
         "speaker",
         "celestion",
         "greenback",
@@ -413,6 +414,8 @@ def token_cat(name, desc="", lib=""):
         "spring",
         "plate",
         "shimmer",
+        "convolver",
+        "convolution",
     ):
         return "REVERB"
     if has("delay", "echo", "slapback", "dub", "ping", "pong", "pingpong"):

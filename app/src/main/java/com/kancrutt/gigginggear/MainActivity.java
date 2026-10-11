@@ -7276,6 +7276,33 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             container.addView(storageRow);
 
         } else {
+            // Split/Merge routing rows for the SELECT MODEL browser — same
+            // reachability fix as the ADD EFFECT BLOCK picker (round-13 R2.5):
+            // without this they were only reachable via global search. Tap
+            // ADDS the routing block (chain-append), mirroring the picker.
+            if (cat == CategoryHelper.Category.UTILITY || cat == CategoryHelper.Category.SPLIT
+                    || cat == CategoryHelper.Category.MERGE) {
+                View splitRow = getLayoutInflater().inflate(R.layout.item_model_browser_row, container, false);
+                ((TextView) splitRow.findViewById(R.id.item_model_title)).setText("Split");
+                ((TextView) splitRow.findViewById(R.id.item_model_brand)).setText("Signal Split");
+                ImageView splitThumb = splitRow.findViewById(R.id.item_model_thumb);
+                splitThumb.setImageResource(R.drawable.ic_routing_split);
+                splitThumb.setColorFilter(CategoryHelper.COLOR_ROUTING, android.graphics.PorterDuff.Mode.SRC_IN);
+                splitRow.findViewById(R.id.item_model_star).setVisibility(View.GONE);
+                splitRow.setOnClickListener(v -> { addRoutingBlock(true); dialog.dismiss(); });
+                container.addView(splitRow);
+
+                View mergeRow = getLayoutInflater().inflate(R.layout.item_model_browser_row, container, false);
+                ((TextView) mergeRow.findViewById(R.id.item_model_title)).setText("Merge");
+                ((TextView) mergeRow.findViewById(R.id.item_model_brand)).setText("Signal Merge");
+                ImageView mergeThumb = mergeRow.findViewById(R.id.item_model_thumb);
+                mergeThumb.setImageResource(R.drawable.ic_routing_merge);
+                mergeThumb.setColorFilter(CategoryHelper.COLOR_ROUTING, android.graphics.PorterDuff.Mode.SRC_IN);
+                mergeRow.findViewById(R.id.item_model_star).setVisibility(View.GONE);
+                mergeRow.setOnClickListener(v -> { addRoutingBlock(false); dialog.dismiss(); });
+                container.addView(mergeRow);
+            }
+
             // Built-in LADSPA/LV2 plugins
             JSONObject[] pluginSources = {availablePlugins, availablePluginsLV2};
             ArrayList<String> pluginNames = new ArrayList<>();
@@ -7358,6 +7385,33 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 }
             }
         } catch (Exception ignore) {}
+
+        // Split/Merge routing rows — searchable by name (same reachability
+        // fix as the ADD EFFECT picker). Tap adds the routing block.
+        if (!q.isEmpty() && "split".contains(q)) {
+            View splitRow = getLayoutInflater().inflate(R.layout.item_model_browser_row, container, false);
+            ((TextView) splitRow.findViewById(R.id.item_model_title)).setText("Split");
+            ((TextView) splitRow.findViewById(R.id.item_model_brand)).setText("Signal Split");
+            ImageView splitThumb = splitRow.findViewById(R.id.item_model_thumb);
+            splitThumb.setImageResource(R.drawable.ic_routing_split);
+            splitThumb.setColorFilter(CategoryHelper.COLOR_ROUTING, android.graphics.PorterDuff.Mode.SRC_IN);
+            splitRow.findViewById(R.id.item_model_star).setVisibility(View.GONE);
+            splitRow.setOnClickListener(v -> { addRoutingBlock(true); dialog.dismiss(); });
+            container.addView(splitRow);
+            hits++;
+        }
+        if (!q.isEmpty() && "merge".contains(q)) {
+            View mergeRow = getLayoutInflater().inflate(R.layout.item_model_browser_row, container, false);
+            ((TextView) mergeRow.findViewById(R.id.item_model_title)).setText("Merge");
+            ((TextView) mergeRow.findViewById(R.id.item_model_brand)).setText("Signal Merge");
+            ImageView mergeThumb = mergeRow.findViewById(R.id.item_model_thumb);
+            mergeThumb.setImageResource(R.drawable.ic_routing_merge);
+            mergeThumb.setColorFilter(CategoryHelper.COLOR_ROUTING, android.graphics.PorterDuff.Mode.SRC_IN);
+            mergeRow.findViewById(R.id.item_model_star).setVisibility(View.GONE);
+            mergeRow.setOnClickListener(v -> { addRoutingBlock(false); dialog.dismiss(); });
+            container.addView(mergeRow);
+            hits++;
+        }
 
         // Every built-in plugin across all categories
         JSONObject[] pluginSources = {availablePlugins, availablePluginsLV2};

@@ -313,7 +313,7 @@ LV2_LIB_RULES = [
 # by stable LADSPA UID or normalized LV2 name, never by a UI label substring.
 LADSPA_CATEGORY_OVERRIDES = {
     1190: "EQ",
-    4068: "UTILITY",  # R11 audit: mydsp multi-fx pedal beats rdf SimulatorPlugin
+    4068: "AMP",  # Hery H2: guitarix amp engine (was R11 multi-fx call)
     1207: "UTILITY",
     1210: "UTILITY",
     1218: "MODULATION",
@@ -363,15 +363,17 @@ LV2_CATEGORY_OVERRIDES = {
     # R11 category audit (Bang Hery): explicit corrections over TTL/token guesses.
     # OC-2 + ewham stay PITCH — TTL "Distortion pedal" for OC-2 is upstream junk
     # but the plugin is a pitch/octave pedal (confirmed by Hery, do not move).
-    "tape": "DISTORTION",  # GxTape tape saturation, not an EQ
-    "tapestereo": "DISTORTION",  # Gx Tape Stereo
+    "gcb95": "WAH",  # Hery H2: GCB-95 = wah pedal (TTL DistortionPlugin is junk)
+    "tape": "DELAY",  # Hery H2: GxTape = tape-delay family (was DISTORTION)
+    "tapestereo": "DELAY",  # Hery H2: Gx Tape Stereo, cf "tape"
     "rkrpan": "MODULATION",  # rkr Pan auto-panner (autopan family) -- not a utility
     "rkrexciter": "DISTORTION",  # align with "harmonic exciter" (also DISTORTION)
     "rkrexpander": "DYNAMICS",  # expander = dynamics; align with generic "expander"
     "gxexpander": "DYNAMICS",
     "c*spicenotanexciter": "DYNAMICS",  # desc: bass compressor + limiter
     "c*spicex2notanexcitereither": "DYNAMICS",
-    "mydsp": "UTILITY",  # Guitarix Multi Effect Pedal (multi-fx, not an amp)
+    "mydsp": "AMP",  # Hery H2: raw guitarix amp engine (was R11 multi-fx call)
+    "simpleamplifier": "AMP",  # Hery H2: plain gain block
 }
 
 

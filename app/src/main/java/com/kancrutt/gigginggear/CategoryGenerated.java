@@ -122,7 +122,7 @@ public final class CategoryGenerated {
         n.put("modulatabledelay", "DELAY");
         n.put("monotostereosplitter", "UTILITY");
         n.put("multivoicechorus", "MODULATION");
-        n.put("mydsp", "UTILITY");
+        n.put("mydsp", "AMP");
         n.put("platereverb", "REVERB");
         n.put("pointercastdistortion", "DISTORTION");
         n.put("rateshifter", "PITCH");
@@ -143,7 +143,7 @@ public final class CategoryGenerated {
         n.put("rtmlsbasedstereodecorrelation", "UTILITY");
         n.put("rtparametriceq", "EQ");
         n.put("signalsifter", "UTILITY");
-        n.put("simpleamplifier", "UTILITY");
+        n.put("simpleamplifier", "AMP");
         n.put("simpledelayline,cubicsplineinterpolation", "DELAY");
         n.put("simpledelayline,linearinterpolation", "DELAY");
         n.put("simpledelayline,noninterpolating", "DELAY");
@@ -398,7 +398,7 @@ public final class CategoryGenerated {
         v.put("fuzzmaster", "DISTORTION");
         v.put("fz1b", "DISTORTION");
         v.put("fz1s", "DISTORTION");
-        v.put("gcb95", "DISTORTION");
+        v.put("gcb95", "WAH");
         v.put("gnuitardistortion", "DISTORTION");
         v.put("gnuitaroverdrivev2", "DISTORTION");
         v.put("gnuitartubeamplifier", "DISTORTION");
@@ -551,8 +551,8 @@ public final class CategoryGenerated {
         v.put("switchedtremolo", "MODULATION");
         v.put("switchlesswah", "WAH");
         v.put("tamgamp", "AMP");
-        v.put("tape", "DISTORTION");
-        v.put("tapestereo", "DISTORTION");
+        v.put("tape", "DELAY");
+        v.put("tapestereo", "DELAY");
         v.put("tapir", "CABINET");
         v.put("theinfamousbentdelay", "DELAY");
         v.put("theinfamouscellularautomatonsynth", "PITCH");

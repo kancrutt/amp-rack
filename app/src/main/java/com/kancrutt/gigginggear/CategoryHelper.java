@@ -196,7 +196,7 @@ public class CategoryHelper {
         OVERRIDES.put("wah", Category.WAH);
         OVERRIDES.put("wahwah", Category.WAH);
         OVERRIDES.put("switchlesswah", Category.WAH);
-        OVERRIDES.put("gcb95", Category.DISTORTION); // TTL: Gx_gcb_95_ is a Distortion effect
+        OVERRIDES.put("gcb95", Category.WAH); // Hery H2: GCB-95 = wah pedal (TTL DistortionPlugin is upstream junk)
         OVERRIDES.put("colwah", Category.WAH);
         OVERRIDES.put("autowah", Category.WAH);
         // ---- Gx: Volume / swell ----

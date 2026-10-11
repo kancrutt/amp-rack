@@ -93,8 +93,10 @@ public class GuitarPluginCatalogTest {
         // only "the infamous octolo" remains curated.
         assertFalse(GuitarPluginCatalog.isCurated("octolo"));
         assertTrue(GuitarPluginCatalog.isCurated("the infamous octolo"));
-        // Bundled blacklist hides the crashy ir-cab-sim bundle.
+        // Bundled blacklist hides the crashy ir-cab-sim bundle and mindi
+        // (MIDI-only, missing mindi.json manifest asset).
         assertFalse(GuitarPluginCatalog.isCurated("Simple IR Loader"));
+        assertFalse(GuitarPluginCatalog.isCurated("the infamous mindi"));
 
         // A non-empty blacklist hides even curated names, case-insensitively;
         // entries with value 0 are ignored.

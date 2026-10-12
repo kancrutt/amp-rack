@@ -1,35 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
-    android:viewportWidth="24"
-    android:viewportHeight="24">
+    android:viewportWidth="96"
+    android:viewportHeight="96">
 
-    <!-- Ghost bell: salinan main yang digeser kiri (the sweep) — seluruh glyph naik 1u agar centroid R2 pusat -->
+    <!-- Wah pedal: raised ribbed rocker -->
     <path
-        android:pathData="M3,17 C3,12.5 4.5,7 6.5,7 C8.5,7 10,12.5 10,17"
-        android:strokeColor="#AB47BC"
-        android:strokeWidth="1.2"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:fillColor="@android:color/transparent"
-        android:strokeAlpha="0.4" />
-
-    <!-- Main resonant bell -->
+        android:fillColor="#1F455C"
+        android:pathData="M29,12 C26,12 23.5,14.2 23,17.2 L13.5,56.5 C13,59.1 14.8,61.5 17.5,61.5 H78.5 C81.2,61.5 83,59.1 82.5,56.5 L73,17.2 C72.5,14.2 70,12 67,12 Z" />
     <path
-        android:pathData="M12.5,17 C12.5,12.5 14,7 16,7 C18,7 19.5,12.5 19.5,17"
-        android:strokeColor="#AB47BC"
-        android:strokeWidth="2"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:fillColor="@android:color/transparent" />
-
-    <!-- Rail -->
+        android:fillColor="#4EA8DE"
+        android:pathData="M29,14.5 H67 C69.1,14.5 70.8,16 71.2,18.1 L80.1,55.2 C80.5,57 79.2,58.5 77.3,58.5 H18.7 C16.8,58.5 15.5,57 15.9,55.2 L24.8,18.1 C25.2,16 26.9,14.5 29,14.5 Z" />
     <path
-        android:pathData="M3,17 L19.5,17"
-        android:strokeColor="#AB47BC"
-        android:strokeWidth="1.5"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:fillColor="@android:color/transparent" />
+        android:fillColor="#1F455C"
+        android:pathData="M30,17 H66 C68,17 69.4,18.3 69.8,20.2 L77.8,53.2 C78.1,54.7 77,56 75.4,56 H20.6 C19,56 17.9,54.7 18.2,53.2 L26.2,20.2 C26.6,18.3 28,17 30,17 Z" />
 
+    <!-- Raised rubber grip ribs -->
+    <path android:fillColor="#1F455C" android:pathData="M29,20 H67 Q68,20 68.3,21.2 L68.8,22.3 H27.2 L27.7,21.2 Q28,20 29,20 Z" />
+    <path android:fillColor="#1F455C" android:pathData="M27.1,24.1 H68.9 L69.4,26 H26.6 Z" />
+    <path android:fillColor="#1F455C" android:pathData="M26.1,27.8 H69.9 L70.4,29.7 H25.6 Z" />
+    <path android:fillColor="#1F455C" android:pathData="M25.2,31.5 H70.8 L71.3,33.4 H24.7 Z" />
+    <path android:fillColor="#1F455C" android:pathData="M24.3,35.2 H71.7 L72.2,37.1 H23.8 Z" />
+    <path android:fillColor="#1F455C" android:pathData="M23.4,38.9 H72.6 L73.1,40.8 H22.9 Z" />
+    <path android:fillColor="#1F455C" android:pathData="M22.5,42.6 H73.5 L74,44.5 H22 Z" />
+    <path android:fillColor="#1F455C" android:pathData="M21.6,46.3 H74.4 L74.9,48.2 H21.1 Z" />
+    <path android:fillColor="#1F455C" android:pathData="M20.7,50 H75.3 L75.8,51.9 H20.2 Z" />
+
+    <!-- Front lip and hinge gap -->
+    <path
+        android:fillColor="#1F455C"
+        android:pathData="M17.5,59.5 H78.5 L84,72.5 C84.7,74.2 83.4,76 81.5,76 H14.5 C12.6,76 11.3,74.2 12,72.5 Z" />
+    <path
+        android:fillColor="#4EA8DE"
+        android:pathData="M17.2,62 H78.8 L81.5,70.2 H14.5 Z" />
+    <path
+        android:fillColor="#1F455C"
+        android:pathData="M23,63.5 H73 L77.5,70 H18.5 Z" />
+
+    <!-- Lower cast-metal base -->
+    <path
+        android:fillColor="#1F455C"
+        android:pathData="M14.5,70 H81.5 L86,82.2 C86.7,84.1 85.3,86 83.2,86 H12.8 C10.7,86 9.3,84.1 10,82.2 Z" />
+    <path
+        android:fillColor="#4EA8DE"
+        android:pathData="M15.5,72.2 H80.5 L83.3,81.1 Q83.7,83 81.5,83 H14.5 Q12.3,83 12.7,81.1 Z" />
+    <path
+        android:fillColor="#1F455C"
+        android:pathData="M15.5,72.2 H80.5 L81.2,74 H14.8 Z" />
+
+    <!-- Central hinge / pivot bolt -->
+    <path
+        android:fillColor="#1F455C"
+        android:pathData="M42,61.5 H54 L57.2,70.2 Q57.8,72 56,73 H40 Q38.2,72 38.8,70.2 Z" />
+    <path
+        android:pathData="M42.5,68.2 a5.5,5.5 0 1,0 11,0 a5.5,5.5 0 1,0 -11,0"
+        android:fillColor="#1F455C" />
+    <path
+        android:pathData="M43.8,68.2 a4.2,4.2 0 1,0 8.4,0 a4.2,4.2 0 1,0 -8.4,0"
+        android:fillColor="#4EA8DE" />
+    <path
+        android:pathData="M44.9,68.2 a3.1,3.1 0 1,0 6.2,0 a3.1,3.1 0 1,0 -6.2,0"
+        android:fillColor="#1F455C" />
+    <path
+        android:fillColor="#4EA8DE"
+        android:pathData="M46.2,65.8 C47.1,64.9 48.2,64.8 49.1,65.2 C47.8,65.5 47,66.3 46.7,67.3 C46.1,67.1 45.8,66.4 46.2,65.8 Z" />
+
+    <!-- Rubber feet -->
+    <path android:fillColor="#1F455C" android:pathData="M15,85 H27 V88 Q27,90 24.5,90 H18 Q15,90 15,87 Z" />
+    <path android:fillColor="#1F455C" android:pathData="M69,85 H81 V87 Q81,90 78,90 H72 Q69,90 69,88 Z" />
 </vector>

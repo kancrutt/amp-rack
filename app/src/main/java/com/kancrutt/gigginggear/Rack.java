@@ -92,6 +92,13 @@ public class Rack extends Fragment {
     MainActivity mainActivity ;
     int currentPresetNumber = 1 ;
     int currentSceneIndex = 0 ;
+    TextView[] scenePillViews;
+    // Pill palette per scene slot (SCENE 1..4): red / yellow / green / orange.
+    static final int[] SCENE_COLORS = {
+            android.graphics.Color.parseColor("#E53935"),
+            android.graphics.Color.parseColor("#FDD835"),
+            android.graphics.Color.parseColor("#43A047"),
+            android.graphics.Color.parseColor("#FB8C00") };
     LinearProgressIndicator quickPatchProgress ;
     Dialog youtubePlayer ;
     String TAG = getClass().getSimpleName();
@@ -599,63 +606,24 @@ public class Rack extends Fragment {
             quickSaveBtn.setOnClickListener(v -> showQuickSaveDialog());
         }
 
-        com.google.android.material.button.MaterialButton sceneBtn = view.findViewById(R.id.top_scene_dropdown);
-        SharedPreferences scenePrefs = getContext().getSharedPreferences("giggingear_scenes", android.content.Context.MODE_PRIVATE);
-        String[] defaultSceneNames = getContext().getResources().getStringArray(R.array.scene_slots);
-        final java.util.ArrayList<String> sceneNames = new java.util.ArrayList<>();
-        for (int i = 0; i < defaultSceneNames.length; i++) {
-            sceneNames.add(scenePrefs.getString("scene_name_" + i, defaultSceneNames[i]));
-        }
-        if (sceneBtn != null) {
-            sceneBtn.setText(sceneNames.get(0));
-            sceneBtn.setOnClickListener(v -> {
-                AlertDialog.Builder sceneBuilder = new AlertDialog.Builder(getContext());
-                sceneBuilder
-                        .setTitle("Scene Options (" + sceneNames.get(currentSceneIndex) + ")")
-                        .setSingleChoiceItems(sceneNames.toArray(new CharSequence[0]), currentSceneIndex, (d, which) -> {
-                            currentSceneIndex = which;
-                            sceneBtn.setText(sceneNames.get(which));
-                            String json = scenePrefs.getString("scene_" + which, null);
-                            if (json != null && !json.isEmpty() && mainActivity != null) {
-                                mainActivity.loadPreset(json);
-                            }
-                            d.dismiss();
-                        })
-                        .setPositiveButton("Save To Current Scene", (d, w) -> {
-                            saveCurrentChainToScene();
-                        })
-                        .setNeutralButton("Rename", (d, w) -> {
-                                int which = currentSceneIndex;
-                                AlertDialog.Builder rb = new AlertDialog.Builder(getContext());
-                                rb.setTitle("Rename " + sceneNames.get(which));
-                                final EditText input = new EditText(getContext());
-                                input.setSingleLine(true);
-                                input.setText(sceneNames.get(which));
-                                input.setSelectAllOnFocus(true);
-                                rb.setView(input);
-                                rb.setNegativeButton("Cancel", null);
-                                rb.setPositiveButton("Rename", (rd, rw) -> {
-                                    String nm = input.getText().toString().trim();
-                                    if (!nm.isEmpty()) {
-                                        sceneNames.set(which, nm);
-                                        scenePrefs.edit().putString("scene_name_" + which, nm).apply();
-                                        sceneBtn.setText(nm);
-                                    }
-                                });
-                                AlertDialog rd = rb.create();
-                                rd.show();
-                                MainActivity.colorDialogButtons(rd);
-                            })
-                        .setNegativeButton("Close", null);
-                AlertDialog sceneDialog = sceneBuilder.create();
-                sceneDialog.show();
-                MainActivity.colorDialogButtons(sceneDialog);
-            });
-            sceneBtn.setOnLongClickListener(v -> {
-                saveCurrentChainToScene();
+        // ---- Scene pill bar: tap = switch scene (same path as the old dropdown),
+        // long-press = anchored Save / Rename sheet (standard long-click semantics).
+        scenePillViews = new TextView[] {
+                view.findViewById(R.id.top_scene_1),
+                view.findViewById(R.id.top_scene_2),
+                view.findViewById(R.id.top_scene_3),
+                view.findViewById(R.id.top_scene_4) };
+        for (int i = 0; i < scenePillViews.length; i++) {
+            final TextView pill = scenePillViews[i];
+            final int slot = i;
+            if (pill == null) continue;
+            pill.setOnClickListener(v -> activateScene(slot));
+            pill.setOnLongClickListener(v -> {
+                showScenePillActions(slot, pill);
                 return true;
             });
         }
+        refreshScenePills();
 
         // ---- Safe-area / rounded-corner insets (B4) ----
         ViewCompat.setOnApplyWindowInsetsListener(view, (v, insets) -> {
@@ -2250,7 +2218,115 @@ public class Rack extends Fragment {
         MainActivity.colorDialogButtons(d);
     }
 
+    /** Header-pill display name for a slot: stored rename or default "SCENE N". */
+    private String sceneNameForSlot(int slot) {
+        if (getContext() == null) return "SCENE " + (slot + 1);
+        try {
+            SharedPreferences p = getContext().getSharedPreferences("giggingear_scenes", android.content.Context.MODE_PRIVATE);
+            String[] defs = getContext().getResources().getStringArray(R.array.scene_slots);
+            String def = defs.length > slot ? defs[slot] : "SCENE " + (slot + 1);
+            return p.getString("scene_name_" + slot, def);
+        } catch (Exception e) {
+            return "SCENE " + (slot + 1);
+        }
+    }
+
+    /** Paint the 4 header pills: active = solid slot color, inactive = ghost. */
+    private void refreshScenePills() {
+        if (scenePillViews == null || getContext() == null) return;
+        float radius = getResources().getDimension(R.dimen.scene_pill_height) / 2f;
+        for (int i = 0; i < scenePillViews.length; i++) {
+            TextView pill = scenePillViews[i];
+            if (pill == null) continue;
+            int color = SCENE_COLORS[i % SCENE_COLORS.length];
+            android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+            bg.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+            bg.setCornerRadius(radius);
+            if (i == currentSceneIndex) {
+                bg.setColor(color);
+                // Yellow needs dark ink; the rest read white.
+                pill.setTextColor(i == 1 ? android.graphics.Color.parseColor("#212121") : android.graphics.Color.WHITE);
+            } else {
+                bg.setColor(android.graphics.Color.TRANSPARENT);
+                bg.setStroke(dp(2), color);
+                pill.setTextColor(android.graphics.Color.argb(176,
+                        android.graphics.Color.red(color),
+                        android.graphics.Color.green(color),
+                        android.graphics.Color.blue(color)));
+            }
+            pill.setBackground(bg);
+        }
+    }
+
+    /** Tap pill = switch scene: same behavior tier as the old dropdown
+     *  (loads that slot's stored chain when present; chain canvas re-logs). */
+    private void activateScene(int slot) {
+        if (mainActivity == null || getContext() == null) return;
+        currentSceneIndex = slot;
+        try {
+            SharedPreferences p = getContext().getSharedPreferences("giggingear_scenes", android.content.Context.MODE_PRIVATE);
+            String json = p.getString("scene_" + slot, null);
+            if (json != null && !json.isEmpty()) {
+                mainActivity.loadPreset(json);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "activateScene load failed for slot " + slot, e);
+        }
+        refreshScenePills();
+        MainActivity.toast(sceneNameForSlot(slot));
+    }
+
+    /** Long-press pill: anchored 2-action sheet (Save / Rename). A normal tap
+     *  never reaches here — standard Android long-click semantics apply. */
+    private void showScenePillActions(final int slot, android.view.View anchor) {
+        android.widget.PopupMenu popup = new android.widget.PopupMenu(getContext(), anchor);
+        popup.getMenu().add("Save");
+        popup.getMenu().add("Rename...");
+        popup.setOnMenuItemClickListener(item -> {
+            if ("Rename...".contentEquals(item.getTitle())) {
+                showRenameSceneDialog(slot);
+            } else {
+                saveChainToScene(slot);
+            }
+            return true;
+        });
+        popup.show();
+    }
+
+    /** Rename dialog for a scene slot; persists via the existing scene_name_N
+     *  mechanism, so custom names survive an app restart. Pills keep the short
+     *  "SCENE N" label — the name surfaces in the toasts (switch / rename). */
+    private void showRenameSceneDialog(final int slot) {
+        if (getContext() == null) return;
+        final SharedPreferences p = getContext().getSharedPreferences("giggingear_scenes", android.content.Context.MODE_PRIVATE);
+        AlertDialog.Builder rb = new AlertDialog.Builder(getContext());
+        rb.setTitle("Rename SCENE " + (slot + 1));
+        final EditText input = new EditText(getContext());
+        input.setSingleLine(true);
+        input.setText(sceneNameForSlot(slot));
+        input.setSelectAllOnFocus(true);
+        rb.setView(input);
+        rb.setNegativeButton("Cancel", null);
+        rb.setPositiveButton("Save", (d, w) -> {
+            String nm = input.getText().toString().trim();
+            if (nm.isEmpty()) {
+                MainActivity.toast("Scene name cannot be empty.");
+                return;
+            }
+            p.edit().putString("scene_name_" + slot, nm).apply();
+            MainActivity.toast("Renamed SCENE " + (slot + 1) + " to " + nm);
+        });
+        AlertDialog d = rb.create();
+        d.show();
+        MainActivity.colorDialogButtons(d);
+    }
+
     private void saveCurrentChainToScene() {
+        saveChainToScene(currentSceneIndex);
+    }
+
+    /** Persist the live chain + plugin states into the given scene slot. */
+    private void saveChainToScene(int slot) {
         if (mainActivity == null || getContext() == null) return;
         try {
             SharedPreferences scenePrefs = getContext().getSharedPreferences("giggingear_scenes", android.content.Context.MODE_PRIVATE);
@@ -2288,7 +2364,7 @@ public class Rack extends Fragment {
                     json.put(key, v);
                 }
             }
-            int scene = currentSceneIndex;
+            int scene = slot;
             if (scene < 0 || scene >= names.size()) scene = 0;
             scenePrefs.edit().putString("scene_" + scene, json.toString()).apply();
             MainActivity.toast("Saved to " + names.get(scene));

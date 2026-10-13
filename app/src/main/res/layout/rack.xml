@@ -52,7 +52,11 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="2dp"
+                android:autoSizeMaxTextSize="@dimen/top_text_max"
+                android:autoSizeMinTextSize="12sp"
+                android:autoSizeTextType="uniform"
                 android:fontFamily="@font/plus_jakarta_sans"
+                android:maxLines="1"
                 android:text="80%"
                 android:textColor="@color/gg_glass_text_secondary"
                 android:textSize="12sp"
@@ -98,16 +102,19 @@
 
                 <TextView
                     android:id="@+id/top_preset_display"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
+                    android:layout_width="@dimen/top_preset_name_width"
+                    android:layout_height="match_parent"
                     android:layout_marginStart="6dp"
                     android:layout_marginEnd="6dp"
+                    android:autoSizeMaxTextSize="@dimen/top_text_max"
+                    android:autoSizeMinTextSize="12sp"
+                    android:autoSizeTextType="uniform"
                     android:ellipsize="end"
-                    android:ems="12"
                     android:fontFamily="@font/plus_jakarta_sans"
-                    android:maxEms="20"
+                    android:gravity="center_vertical"
                     android:maxLines="1"
                     android:text="1. CLEAN"
+                    android:textAllCaps="true"
                     android:textColor="@color/gg_glass_text_primary"
                     android:textSize="12sp"
                     android:textStyle="bold" />
@@ -122,37 +129,86 @@
                     android:tint="@color/gg_glass_text_primary" />
             </LinearLayout>
 
-            <View
+            <!-- [5] Scene pill bar: 4 equal-width pills (active = filled,
+                 inactive = ghost). Tap = switch, long-press = Save/Rename.
+                 Wiring in Rack.java. Replaces the old scene dropdown button. -->
+            <LinearLayout
+                android:id="@+id/top_scene_group"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:layout_weight="1" />
+                android:layout_marginStart="8dp"
+                android:layout_marginEnd="4dp"
+                android:layout_weight="1"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
 
-            <!-- [5] Scene selector pill dropdown ("Scene 1 v") -->
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/top_scene_dropdown"
-                style="@style/Widget.Material3.Button.OutlinedButton"
-                android:layout_width="wrap_content"
-                android:layout_height="22dp"
-                android:minWidth="0dp"
-                android:minHeight="22dp"
-                android:insetTop="0dp"
-                android:insetBottom="0dp"
-                android:paddingStart="10dp"
-                android:paddingTop="0dp"
-                android:paddingEnd="4dp"
-                android:paddingBottom="0dp"
-                android:layout_marginStart="4dp"
-                android:text="Scene 1"
-                android:textColor="@color/gg_glass_text_primary"
-                android:textSize="10.5sp"
-                android:textStyle="bold"
-                app:icon="@drawable/baseline_arrow_drop_down_24"
-                app:iconGravity="textEnd"
-                app:iconSize="14dp"
-                app:iconTint="@color/gg_glass_text_primary"
-                app:cornerRadius="11dp"
-                app:strokeColor="@color/gg_glass_text_secondary"
-                app:strokeWidth="1dp" />
+                <TextView
+                    android:id="@+id/top_scene_1"
+                    android:layout_width="0dp"
+                    android:layout_height="@dimen/scene_pill_height"
+                    android:layout_marginEnd="8dp"
+                    android:layout_weight="1"
+                    android:autoSizeMaxTextSize="@dimen/scene_pill_text_max"
+                    android:autoSizeMinTextSize="8sp"
+                    android:autoSizeTextType="uniform"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:fontFamily="@font/plus_jakarta_sans"
+                    android:gravity="center"
+                    android:maxLines="1"
+                    android:text="SCENE 1"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/top_scene_2"
+                    android:layout_width="0dp"
+                    android:layout_height="@dimen/scene_pill_height"
+                    android:layout_marginEnd="8dp"
+                    android:layout_weight="1"
+                    android:autoSizeMaxTextSize="@dimen/scene_pill_text_max"
+                    android:autoSizeMinTextSize="8sp"
+                    android:autoSizeTextType="uniform"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:fontFamily="@font/plus_jakarta_sans"
+                    android:gravity="center"
+                    android:maxLines="1"
+                    android:text="SCENE 2"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/top_scene_3"
+                    android:layout_width="0dp"
+                    android:layout_height="@dimen/scene_pill_height"
+                    android:layout_marginEnd="8dp"
+                    android:layout_weight="1"
+                    android:autoSizeMaxTextSize="@dimen/scene_pill_text_max"
+                    android:autoSizeMinTextSize="8sp"
+                    android:autoSizeTextType="uniform"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:fontFamily="@font/plus_jakarta_sans"
+                    android:gravity="center"
+                    android:maxLines="1"
+                    android:text="SCENE 3"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/top_scene_4"
+                    android:layout_width="0dp"
+                    android:layout_height="@dimen/scene_pill_height"
+                    android:layout_weight="1"
+                    android:autoSizeMaxTextSize="@dimen/scene_pill_text_max"
+                    android:autoSizeMinTextSize="8sp"
+                    android:autoSizeTextType="uniform"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:fontFamily="@font/plus_jakarta_sans"
+                    android:gravity="center"
+                    android:maxLines="1"
+                    android:text="SCENE 4"
+                    android:textStyle="bold" />
+            </LinearLayout>
 
             <!-- [6] Vertical Divider 2 -->
             <View
@@ -168,6 +224,10 @@
                 android:id="@+id/top_bpm_text"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:autoSizeMaxTextSize="@dimen/top_text_max"
+                android:autoSizeMinTextSize="12sp"
+                android:autoSizeTextType="uniform"
+                android:maxLines="1"
                 android:text="120 BPM"
                 android:textColor="@color/gg_glass_text_primary"
                 android:textSize="11sp"
@@ -179,6 +239,10 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="10dp"
+                android:autoSizeMaxTextSize="@dimen/top_text_max"
+                android:autoSizeMinTextSize="12sp"
+                android:autoSizeTextType="uniform"
+                android:maxLines="1"
                 android:text="CPU 5%"
                 android:textColor="@color/gg_glass_text_primary"
                 android:textSize="11sp"

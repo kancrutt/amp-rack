@@ -4,7 +4,7 @@
     <dimen name="signal_chain_height">66dp</dimen>
     <dimen name="signal_chain_card_height">66dp</dimen>
     <dimen name="param_gear_col_width">118dp</dimen>
-    <dimen name="rack_top_bar_height">40dp</dimen>
+    <dimen name="rack_top_bar_height">48dp</dimen>
     <dimen name="knob_size_large">52dp</dimen>
     <dimen name="knob_size_small">46dp</dimen>
     <dimen name="knob_label_size">8sp</dimen>

@@ -12,242 +12,292 @@
         android:layout_height="match_parent"
         android:orientation="vertical">
 
-        <!-- ================= TOP HEADER BAR (capsule/pill, floating) =================
-             Mockup order (left->right): Volume | Divider | Save | Preset nav |
-             Scene dropdown | Divider | Tempo | CPU. Every id below has live
-             backend wiring in Rack.java — zero dummy UI. -->
-        <LinearLayout
-            android:id="@+id/routing_header_bar"
+        <!-- ================= TOP HEADER BAR (Material3 Pixel Glass Morphism) =================
+             Order (left->right): Volume | Divider | Save | Preset nav (HeadlineSmall) |
+             Scene pills (LabelMedium) | Divider | Tempo | CPU. -->
+        <com.google.android.material.appbar.AppBarLayout
+            android:id="@+id/header_appbar"
             android:layout_width="match_parent"
-            android:layout_height="@dimen/rack_top_bar_height"
+            android:layout_height="wrap_content"
             android:layout_marginStart="10dp"
             android:layout_marginTop="8dp"
             android:layout_marginEnd="10dp"
-            android:background="@drawable/glass_topbar_bg"
-            android:elevation="6dp"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp">
-
-            <!-- [1] Master Volume: speaker icon + slider + % text -->
-            <ImageView
-                android:id="@+id/top_volume_icon"
-                android:layout_width="16dp"
-                android:layout_height="16dp"
-                android:contentDescription="Master volume"
-                android:src="@drawable/ic_baseline_volume_up_24"
-                android:tint="@color/gg_glass_text_secondary" />
+            android:background="@drawable/bg_header_glass"
+            android:elevation="8dp"
+            android:outlineAmbientShadowColor="@android:color/transparent"
+            android:outlineSpotShadowColor="@android:color/transparent"
+            android:stateListAnimator="@null"
+            android:translationZ="8dp"
+            app:elevation="0dp">
 
             <LinearLayout
-                android:id="@+id/top_volume_knob_container"
-                android:layout_width="wrap_content"
-                android:layout_height="match_parent"
-                android:paddingStart="6dp"
-                android:paddingEnd="2dp"
-                android:gravity="center" />
-
-            <TextView
-                android:id="@+id/top_volume_val"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="2dp"
-                android:autoSizeMaxTextSize="@dimen/top_text_max"
-                android:autoSizeMinTextSize="12sp"
-                android:autoSizeTextType="uniform"
-                android:fontFamily="@font/plus_jakarta_sans"
-                android:maxLines="1"
-                android:text="80%"
-                android:textColor="@color/gg_glass_text_secondary"
-                android:textSize="12sp"
-                android:textStyle="bold" />
-
-            <!-- [2] Vertical Divider 1 -->
-            <View
-                android:id="@+id/top_divider_1"
-                android:layout_width="1dp"
-                android:layout_height="18dp"
-                android:layout_marginStart="12dp"
-                android:layout_marginEnd="12dp"
-                android:background="#333333" />
-
-            <!-- [3] Save button: bordered square floppy -->
-            <ImageView
-                android:id="@+id/top_quick_save"
-                android:layout_width="26dp"
-                android:layout_height="26dp"
-                android:padding="4dp"
-                android:background="@drawable/glass_save_bg"
-                android:contentDescription="Save preset"
-                android:src="@drawable/ic_baseline_save_24"
-                android:tint="@color/gg_glass_text_secondary" />
-
-            <!-- [4] Preset Controller: < name > — name capped at 20 chars so the
-                 arrows hug the name proportionally, never pushed far right. -->
-            <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="10dp"
+                android:id="@+id/routing_header_bar"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/rack_top_bar_height"
+                android:background="@android:color/transparent"
                 android:gravity="center_vertical"
-                android:orientation="horizontal">
+                android:orientation="horizontal"
+                android:paddingStart="12dp"
+                android:paddingTop="8dp"
+                android:paddingEnd="12dp"
+                android:paddingBottom="8dp">
 
-                <ImageButton
-                    android:id="@+id/preset_prev"
-                    android:layout_width="18dp"
-                    android:layout_height="18dp"
-                    android:background="@android:color/transparent"
-                    android:contentDescription="Previous preset"
-                    android:src="@drawable/ic_baseline_arrow_back_ios_new_24"
-                    android:tint="@color/gg_glass_text_primary" />
+                <!-- [1] Master Volume: 24dp Material3 icon + slider + LabelMedium % text -->
+                <ImageView
+                    android:id="@+id/top_volume_icon"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:background="@drawable/ripple_header_icon"
+                    android:contentDescription="Master volume"
+                    android:padding="2dp"
+                    android:src="@drawable/ic_baseline_volume_up_24"
+                    android:tint="@color/m3_glass_icon_inactive" />
 
-                <TextView
-                    android:id="@+id/top_preset_display"
-                    android:layout_width="@dimen/top_preset_name_width"
+                <LinearLayout
+                    android:id="@+id/top_volume_knob_container"
+                    android:layout_width="wrap_content"
                     android:layout_height="match_parent"
-                    android:layout_marginStart="6dp"
-                    android:layout_marginEnd="6dp"
-                    android:autoSizeMaxTextSize="@dimen/top_text_max"
-                    android:autoSizeMinTextSize="12sp"
-                    android:autoSizeTextType="uniform"
-                    android:ellipsize="end"
+                    android:gravity="center"
+                    android:paddingStart="6dp"
+                    android:paddingEnd="2dp" />
+
+                <TextView
+                    android:id="@+id/top_volume_val"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
                     android:fontFamily="@font/plus_jakarta_sans"
+                    android:includeFontPadding="false"
+                    android:letterSpacing="0.005"
+                    android:maxLines="1"
+                    android:text="80%"
+                    android:textColor="@color/m3_glass_icon_inactive"
+                    android:textFontWeight="500"
+                    android:textSize="12sp" />
+
+                <!-- [2] Vertical Divider 1 -->
+                <View
+                    android:id="@+id/top_divider_1"
+                    android:layout_width="1dp"
+                    android:layout_height="20dp"
+                    android:layout_marginStart="10dp"
+                    android:layout_marginEnd="10dp"
+                    android:background="@color/m3_glass_stroke_border" />
+
+                <!-- [3] Save button: 24dp icon inside subtle glass pill -->
+                <ImageView
+                    android:id="@+id/top_quick_save"
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:background="@drawable/glass_save_bg"
+                    android:contentDescription="Save preset"
+                    android:padding="4dp"
+                    android:src="@drawable/ic_baseline_save_24"
+                    android:tint="@color/m3_glass_icon_active" />
+
+                <!-- [4] Preset Controller: < HeadlineSmall name > -->
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:layout_marginStart="8dp"
                     android:gravity="center_vertical"
-                    android:maxLines="1"
-                    android:text="1. CLEAN"
-                    android:textAllCaps="true"
-                    android:textColor="@color/gg_glass_text_primary"
-                    android:textSize="12sp"
-                    android:textStyle="bold" />
+                    android:orientation="horizontal">
 
-                <ImageButton
-                    android:id="@+id/preset_next"
-                    android:layout_width="18dp"
-                    android:layout_height="18dp"
-                    android:background="@android:color/transparent"
-                    android:contentDescription="Next preset"
-                    android:src="@drawable/ic_baseline_arrow_forward_ios_24"
-                    android:tint="@color/gg_glass_text_primary" />
+                    <ImageButton
+                        android:id="@+id/preset_prev"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:background="@drawable/ripple_header_icon"
+                        android:contentDescription="Previous preset"
+                        android:padding="3dp"
+                        android:scaleType="centerInside"
+                        android:src="@drawable/ic_baseline_arrow_back_ios_new_24"
+                        android:tint="@color/m3_glass_icon_active" />
+
+                    <TextView
+                        android:id="@+id/top_preset_display"
+                        android:layout_width="@dimen/top_preset_name_width"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="6dp"
+                        android:layout_marginEnd="6dp"
+                        android:autoSizeMaxTextSize="24sp"
+                        android:autoSizeMinTextSize="12sp"
+                        android:autoSizeTextType="uniform"
+                        android:ellipsize="end"
+                        android:fontFamily="@font/plus_jakarta_sans"
+                        android:gravity="center_vertical"
+                        android:includeFontPadding="false"
+                        android:letterSpacing="0.005"
+                        android:maxLines="1"
+                        android:text="1. CLEAN"
+                        android:textAllCaps="true"
+                        android:textColor="@color/m3_glass_icon_active"
+                        android:textFontWeight="500"
+                        android:textSize="24sp" />
+
+                    <ImageButton
+                        android:id="@+id/preset_next"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:background="@drawable/ripple_header_icon"
+                        android:contentDescription="Next preset"
+                        android:padding="3dp"
+                        android:scaleType="centerInside"
+                        android:src="@drawable/ic_baseline_arrow_forward_ios_24"
+                        android:tint="@color/m3_glass_icon_active" />
+                </LinearLayout>
+
+                <!-- [5] Scene pill bar: 4 equal-width Material3 glass pills.
+                     Tap = switch, long-press = Save/Rename. -->
+                <LinearLayout
+                    android:id="@+id/top_scene_group"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginStart="8dp"
+                    android:layout_marginEnd="4dp"
+                    android:layout_weight="1"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/top_scene_1"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginEnd="6dp"
+                        android:layout_weight="1"
+                        android:autoSizeMaxTextSize="@dimen/scene_pill_text_max"
+                        android:autoSizeMinTextSize="@dimen/scene_pill_text_min"
+                        android:autoSizeTextType="uniform"
+                        android:background="@drawable/shape_header_pill"
+                        android:clickable="true"
+                        android:ellipsize="end"
+                        android:focusable="true"
+                        android:fontFamily="@font/plus_jakarta_sans"
+                        android:gravity="center"
+                        android:includeFontPadding="false"
+                        android:letterSpacing="0.005"
+                        android:maxLines="1"
+                        android:paddingStart="6dp"
+                        android:paddingEnd="6dp"
+                        android:text="S1"
+                        android:textColor="@drawable/color_scene_pill_text"
+                        android:textFontWeight="500"
+                        android:textSize="12sp" />
+
+                    <TextView
+                        android:id="@+id/top_scene_2"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginEnd="6dp"
+                        android:layout_weight="1"
+                        android:autoSizeMaxTextSize="@dimen/scene_pill_text_max"
+                        android:autoSizeMinTextSize="@dimen/scene_pill_text_min"
+                        android:autoSizeTextType="uniform"
+                        android:background="@drawable/shape_header_pill"
+                        android:clickable="true"
+                        android:ellipsize="end"
+                        android:focusable="true"
+                        android:fontFamily="@font/plus_jakarta_sans"
+                        android:gravity="center"
+                        android:includeFontPadding="false"
+                        android:letterSpacing="0.005"
+                        android:maxLines="1"
+                        android:paddingStart="6dp"
+                        android:paddingEnd="6dp"
+                        android:text="S2"
+                        android:textColor="@drawable/color_scene_pill_text"
+                        android:textFontWeight="500"
+                        android:textSize="12sp" />
+
+                    <TextView
+                        android:id="@+id/top_scene_3"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginEnd="6dp"
+                        android:layout_weight="1"
+                        android:autoSizeMaxTextSize="@dimen/scene_pill_text_max"
+                        android:autoSizeMinTextSize="@dimen/scene_pill_text_min"
+                        android:autoSizeTextType="uniform"
+                        android:background="@drawable/shape_header_pill"
+                        android:clickable="true"
+                        android:ellipsize="end"
+                        android:focusable="true"
+                        android:fontFamily="@font/plus_jakarta_sans"
+                        android:gravity="center"
+                        android:includeFontPadding="false"
+                        android:letterSpacing="0.005"
+                        android:maxLines="1"
+                        android:paddingStart="6dp"
+                        android:paddingEnd="6dp"
+                        android:text="S3"
+                        android:textColor="@drawable/color_scene_pill_text"
+                        android:textFontWeight="500"
+                        android:textSize="12sp" />
+
+                    <TextView
+                        android:id="@+id/top_scene_4"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:autoSizeMaxTextSize="@dimen/scene_pill_text_max"
+                        android:autoSizeMinTextSize="@dimen/scene_pill_text_min"
+                        android:autoSizeTextType="uniform"
+                        android:background="@drawable/shape_header_pill"
+                        android:clickable="true"
+                        android:ellipsize="end"
+                        android:focusable="true"
+                        android:fontFamily="@font/plus_jakarta_sans"
+                        android:gravity="center"
+                        android:includeFontPadding="false"
+                        android:letterSpacing="0.005"
+                        android:maxLines="1"
+                        android:paddingStart="6dp"
+                        android:paddingEnd="6dp"
+                        android:text="S4"
+                        android:textColor="@drawable/color_scene_pill_text"
+                        android:textFontWeight="500"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <!-- [6] Vertical Divider 2 -->
+                <View
+                    android:id="@+id/top_divider_2"
+                    android:layout_width="1dp"
+                    android:layout_height="20dp"
+                    android:layout_marginStart="10dp"
+                    android:layout_marginEnd="10dp"
+                    android:background="@color/m3_glass_stroke_border" />
+
+                <!-- [7] Tempo Display (LabelMedium 12sp #99FFFFFF) -->
+                <TextView
+                    android:id="@+id/top_bpm_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="@font/plus_jakarta_sans"
+                    android:includeFontPadding="false"
+                    android:letterSpacing="0.005"
+                    android:maxLines="1"
+                    android:text="120 BPM"
+                    android:textColor="@color/m3_glass_icon_inactive"
+                    android:textFontWeight="500"
+                    android:textSize="12sp" />
+
+                <!-- [8] CPU Display (LabelMedium 12sp #99FFFFFF) -->
+                <TextView
+                    android:id="@+id/cpu_meter_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:fontFamily="@font/plus_jakarta_sans"
+                    android:includeFontPadding="false"
+                    android:letterSpacing="0.005"
+                    android:maxLines="1"
+                    android:text="CPU 5%"
+                    android:textColor="@color/m3_glass_icon_inactive"
+                    android:textFontWeight="500"
+                    android:textSize="12sp" />
             </LinearLayout>
-
-            <!-- [5] Scene pill bar: 4 equal-width pills (active = filled,
-                 inactive = ghost). Tap = switch, long-press = Save/Rename.
-                 Wiring in Rack.java. Replaces the old scene dropdown button. -->
-            <LinearLayout
-                android:id="@+id/top_scene_group"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_marginStart="8dp"
-                android:layout_marginEnd="4dp"
-                android:layout_weight="1"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
-
-                <TextView
-                    android:id="@+id/top_scene_1"
-                    android:layout_width="0dp"
-                    android:layout_height="@dimen/scene_pill_height"
-                    android:layout_marginEnd="8dp"
-                    android:layout_weight="1"
-                    android:autoSizeMaxTextSize="@dimen/scene_pill_text_max"
-                    android:autoSizeMinTextSize="8sp"
-                    android:autoSizeTextType="uniform"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:fontFamily="@font/plus_jakarta_sans"
-                    android:gravity="center"
-                    android:maxLines="1"
-                    android:text="SCENE 1"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/top_scene_2"
-                    android:layout_width="0dp"
-                    android:layout_height="@dimen/scene_pill_height"
-                    android:layout_marginEnd="8dp"
-                    android:layout_weight="1"
-                    android:autoSizeMaxTextSize="@dimen/scene_pill_text_max"
-                    android:autoSizeMinTextSize="8sp"
-                    android:autoSizeTextType="uniform"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:fontFamily="@font/plus_jakarta_sans"
-                    android:gravity="center"
-                    android:maxLines="1"
-                    android:text="SCENE 2"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/top_scene_3"
-                    android:layout_width="0dp"
-                    android:layout_height="@dimen/scene_pill_height"
-                    android:layout_marginEnd="8dp"
-                    android:layout_weight="1"
-                    android:autoSizeMaxTextSize="@dimen/scene_pill_text_max"
-                    android:autoSizeMinTextSize="8sp"
-                    android:autoSizeTextType="uniform"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:fontFamily="@font/plus_jakarta_sans"
-                    android:gravity="center"
-                    android:maxLines="1"
-                    android:text="SCENE 3"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/top_scene_4"
-                    android:layout_width="0dp"
-                    android:layout_height="@dimen/scene_pill_height"
-                    android:layout_weight="1"
-                    android:autoSizeMaxTextSize="@dimen/scene_pill_text_max"
-                    android:autoSizeMinTextSize="8sp"
-                    android:autoSizeTextType="uniform"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:fontFamily="@font/plus_jakarta_sans"
-                    android:gravity="center"
-                    android:maxLines="1"
-                    android:text="SCENE 4"
-                    android:textStyle="bold" />
-            </LinearLayout>
-
-            <!-- [6] Vertical Divider 2 -->
-            <View
-                android:id="@+id/top_divider_2"
-                android:layout_width="1dp"
-                android:layout_height="18dp"
-                android:layout_marginStart="12dp"
-                android:layout_marginEnd="12dp"
-                android:background="#333333" />
-
-            <!-- [7] Tempo Display -->
-            <TextView
-                android:id="@+id/top_bpm_text"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:autoSizeMaxTextSize="@dimen/top_text_max"
-                android:autoSizeMinTextSize="12sp"
-                android:autoSizeTextType="uniform"
-                android:maxLines="1"
-                android:text="120 BPM"
-                android:textColor="@color/gg_glass_text_primary"
-                android:textSize="11sp"
-                android:textStyle="bold" />
-
-            <!-- [8] CPU Display -->
-            <TextView
-                android:id="@+id/cpu_meter_text"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="10dp"
-                android:autoSizeMaxTextSize="@dimen/top_text_max"
-                android:autoSizeMinTextSize="12sp"
-                android:autoSizeTextType="uniform"
-                android:maxLines="1"
-                android:text="CPU 5%"
-                android:textColor="@color/gg_glass_text_primary"
-                android:textSize="11sp"
-                android:textStyle="bold" />
-        </LinearLayout>
+        </com.google.android.material.appbar.AppBarLayout>
 
         <!-- Upper Half: Signal Chain Canvas — floating rounded glassy card,
              same model as the header (glass_topbar_bg: 14dp + 1dp stroke) -->

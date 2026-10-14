@@ -5,7 +5,7 @@
     <!-- Also serves landscape phones (width 825dp -> closest w-bucket w480). -->
     <dimen name="signal_chain_card_height">72dp</dimen>
     <dimen name="param_gear_col_width">130dp</dimen>
-    <dimen name="rack_top_bar_height">42dp</dimen>
+    <dimen name="rack_top_bar_height">48dp</dimen>
     <dimen name="knob_size_large">58dp</dimen>
     <dimen name="knob_size_small">50dp</dimen>
     <dimen name="knob_label_size">8.5sp</dimen>

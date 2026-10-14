@@ -185,9 +185,9 @@
     <color name="cat_amp_active">#D96B58</color>
     <color name="cat_amp_inactive">#5A2C26</color>
 
-    <!-- ── Cabinet / IR ── neutral gray-white (no hue, matches Helix convention) ── -->
-    <color name="cat_cab_active">#D0D0D0</color>
-    <color name="cat_cab_inactive">#555555</color>
+    <!-- ── Cabinet / IR ── Amp-family red, slightly darker/older ── -->
+    <color name="cat_cab_active">#C45A48</color>
+    <color name="cat_cab_inactive">#4E2722</color>
 
     <!-- ── Distortion / Overdrive ── orange-red ── -->
     <color name="cat_dist_active">#E07A5F</color>
@@ -251,8 +251,8 @@
     <!-- Category Colors (Synced 100% to Zero-Trust Mockup Grid) -->
     <color name="cat_amp_sel">#FF3D00</color>
     <color name="cat_amp_dim">#5A1800</color>
-    <color name="cat_cab_sel">#ECEFF1</color>
-    <color name="cat_cab_dim">#455A64</color>
+    <color name="cat_cab_sel">#C45A48</color>
+    <color name="cat_cab_dim">#4E2722</color>
     <color name="cat_dist_sel">#FF5252</color>
     <color name="cat_dist_dim">#5C1D1D</color>
     <color name="cat_mod_sel">#7C4DFF</color>
@@ -275,7 +275,7 @@
     <color name="cat_gate_dim">#593E00</color>
 
     <color name="color_cat_amp_active">#D96B58</color>
-    <color name="color_cat_cab_active">#D0D0D0</color>
+    <color name="color_cat_cab_active">#C45A48</color>
     <color name="color_cat_distortion_active">#E07A5F</color>
     <color name="color_cat_modulation_active">#5C82E6</color>
     <color name="color_cat_delay_active">#52B788</color>
@@ -288,7 +288,7 @@
     <color name="color_cat_noisegate_active">#F4A261</color>
 
     <color name="color_cat_amp_inactive">#5A1800</color>
-    <color name="color_cat_cab_inactive">#455A64</color>
+    <color name="color_cat_cab_inactive">#4E2722</color>
     <color name="color_cat_distortion_inactive">#5C1D1D</color>
     <color name="color_cat_modulation_inactive">#281B54</color>
     <color name="color_cat_delay_inactive">#004D40</color>
@@ -347,4 +347,19 @@
     <!-- Semantic colors -->
     <color name="gg_danger">#EF4444</color>
     <color name="gg_node_status_active">#22C55E</color>
+
+    <!-- Material3 Pixel Glass Morphism Header Tokens -->
+    <color name="m3_glass_surface_dark">#F21C1C1C</color>
+    <color name="m3_glass_surface_base">#F2121212</color>
+    <color name="m3_glass_gradient_start">#14FFFFFF</color>
+    <color name="m3_glass_gradient_end">#05FFFFFF</color>
+    <color name="m3_glass_stroke_subtle">#1F1F1F</color>
+    <color name="m3_glass_stroke_border">#1FFFFFFF</color>
+    <color name="m3_glass_ripple">#14FFFFFF</color>
+    <color name="m3_glass_icon_active">#FFFFFFFF</color>
+    <color name="m3_glass_icon_inactive">#99FFFFFF</color>
+    <color name="m3_glass_pill_active_bg">#26FFFFFF</color>
+    <color name="m3_glass_pill_active_stroke">#66FFFFFF</color>
+    <color name="m3_glass_pill_inactive_bg">#0DFFFFFF</color>
+    <color name="m3_glass_pill_inactive_stroke">#1FFFFFFF</color>
 </resources>

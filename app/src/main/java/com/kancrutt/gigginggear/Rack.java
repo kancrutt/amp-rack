@@ -93,12 +93,6 @@ public class Rack extends Fragment {
     int currentPresetNumber = 1 ;
     int currentSceneIndex = 0 ;
     TextView[] scenePillViews;
-    // Pill palette per scene slot (SCENE 1..4): red / yellow / green / orange.
-    static final int[] SCENE_COLORS = {
-            android.graphics.Color.parseColor("#E53935"),
-            android.graphics.Color.parseColor("#FDD835"),
-            android.graphics.Color.parseColor("#43A047"),
-            android.graphics.Color.parseColor("#FB8C00") };
     LinearProgressIndicator quickPatchProgress ;
     Dialog youtubePlayer ;
     String TAG = getClass().getSimpleName();
@@ -596,7 +590,9 @@ public class Rack extends Fragment {
         // order (logo -> CPU -> sample-rate) so Scene + preset name always fit.
         // Replaces the old fixed-dp budgets tuned for one screen width.
         // One-way policy: elements only collapse (restore happens on view recreate).
+        final View headerAppBar = view.findViewById(R.id.header_appbar);
         final View headerBarV = view.findViewById(R.id.routing_header_bar);
+        applyHeaderGlassMorphism(headerAppBar != null ? headerAppBar : headerBarV);
         topBarForCollapse = headerBarV;
         if (headerBarV != null) {
             headerBarV.post(() -> applyTopBarCollapse());
@@ -606,24 +602,24 @@ public class Rack extends Fragment {
             quickSaveBtn.setOnClickListener(v -> showQuickSaveDialog());
         }
 
-        // ---- Scene pill bar: tap = switch scene (same path as the old dropdown),
-        // long-press = anchored Save / Rename sheet (standard long-click semantics).
-        scenePillViews = new TextView[] {
-                view.findViewById(R.id.top_scene_1),
-                view.findViewById(R.id.top_scene_2),
-                view.findViewById(R.id.top_scene_3),
-                view.findViewById(R.id.top_scene_4) };
-        for (int i = 0; i < scenePillViews.length; i++) {
-            final TextView pill = scenePillViews[i];
-            final int slot = i;
-            if (pill == null) continue;
-            pill.setOnClickListener(v -> activateScene(slot));
-            pill.setOnLongClickListener(v -> {
-                showScenePillActions(slot, pill);
-                return true;
-            });
-        }
-        refreshScenePills();
+         // ---- Scene pill bar: tap = switch scene (same path as the old dropdown),
+         // long-press = anchored Save / Rename sheet (standard long-click semantics).
+         scenePillViews = new TextView[] {
+                 view.findViewById(R.id.top_scene_1),
+                 view.findViewById(R.id.top_scene_2),
+                 view.findViewById(R.id.top_scene_3),
+                 view.findViewById(R.id.top_scene_4) };
+         for (int i = 0; i < scenePillViews.length; i++) {
+             final TextView pill = scenePillViews[i];
+             final int slot = i;
+             if (pill == null) continue;
+             pill.setOnClickListener(v -> activateScene(slot));
+             pill.setOnLongClickListener(v -> {
+                 showScenePillActions(slot, pill);
+                 return true;
+             });
+         }
+         refreshScenePills();
 
         // ---- Safe-area / rounded-corner insets (B4) ----
         ViewCompat.setOnApplyWindowInsetsListener(view, (v, insets) -> {
@@ -2220,41 +2216,75 @@ public class Rack extends Fragment {
 
     /** Header-pill display name for a slot: stored rename or default "SCENE N". */
     private String sceneNameForSlot(int slot) {
-        if (getContext() == null) return "SCENE " + (slot + 1);
+        if (getContext() == null) return "S" + (slot + 1);
         try {
             SharedPreferences p = getContext().getSharedPreferences("giggingear_scenes", android.content.Context.MODE_PRIVATE);
             String[] defs = getContext().getResources().getStringArray(R.array.scene_slots);
-            String def = defs.length > slot ? defs[slot] : "SCENE " + (slot + 1);
+            String def = defs.length > slot ? defs[slot] : "S" + (slot + 1);
             return p.getString("scene_name_" + slot, def);
         } catch (Exception e) {
-            return "SCENE " + (slot + 1);
+            return "S" + (slot + 1);
         }
     }
 
-    /** Paint the 4 header pills: active = solid slot color, inactive = ghost. */
-    private void refreshScenePills() {
-        if (scenePillViews == null || getContext() == null) return;
-        float radius = getResources().getDimension(R.dimen.scene_pill_height) / 2f;
-        for (int i = 0; i < scenePillViews.length; i++) {
-            TextView pill = scenePillViews[i];
-            if (pill == null) continue;
-            int color = SCENE_COLORS[i % SCENE_COLORS.length];
-            android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
-            bg.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
-            bg.setCornerRadius(radius);
-            if (i == currentSceneIndex) {
-                bg.setColor(color);
-                // Yellow needs dark ink; the rest read white.
-                pill.setTextColor(i == 1 ? android.graphics.Color.parseColor("#212121") : android.graphics.Color.WHITE);
-            } else {
-                bg.setColor(android.graphics.Color.TRANSPARENT);
-                bg.setStroke(dp(2), color);
-                pill.setTextColor(android.graphics.Color.argb(176,
-                        android.graphics.Color.red(color),
-                        android.graphics.Color.green(color),
-                        android.graphics.Color.blue(color)));
+    /** Material3 Pixel glass morphism setup for the header AppBarLayout:
+     *  API 31+ uses native 8dp elevation/translationZ outline clipping with
+     *  zero shadow; API < 31 applies a ColorMatrix frosted-luminance filter
+     *  on the background drawable so child text/icons remain crisp. */
+    private void applyHeaderGlassMorphism(View headerContainer) {
+        if (headerContainer == null) return;
+        headerContainer.setClipToOutline(true);
+        headerContainer.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
+        float zPx = dp(8);
+        headerContainer.setElevation(zPx);
+        headerContainer.setTranslationZ(zPx);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            headerContainer.setOutlineAmbientShadowColor(android.graphics.Color.TRANSPARENT);
+            headerContainer.setOutlineSpotShadowColor(android.graphics.Color.TRANSPARENT);
+        }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            android.graphics.drawable.Drawable bg = headerContainer.getBackground();
+            if (bg != null) {
+                android.graphics.ColorMatrix cm = new android.graphics.ColorMatrix();
+                cm.setSaturation(0.85f);
+                android.graphics.ColorMatrix tint = new android.graphics.ColorMatrix(new float[] {
+                        1.04f, 0f,    0f,    0f, 4f,
+                        0f,    1.04f, 0f,    0f, 4f,
+                        0f,    0f,    1.06f, 0f, 6f,
+                        0f,    0f,    0f,    1f, 0f
+                });
+                cm.postConcat(tint);
+                bg.mutate().setColorFilter(new android.graphics.ColorMatrixColorFilter(cm));
             }
-            pill.setBackground(bg);
+        }
+    }
+
+    /** Paint the 4 header pills: active = #FFFFFFFF text + glass highlight,
+     *  inactive = #99FFFFFF text + subtle glass border, with 200ms smooth transition. */
+    private void refreshScenePills() {
+        if (scenePillViews == null) return;
+        final int activeColor = 0xFFFFFFFF;
+        final int inactiveColor = 0x99FFFFFF;
+        for (int i = 0; i < scenePillViews.length; i++) {
+            final TextView pill = scenePillViews[i];
+            if (pill == null) continue;
+            final boolean active = (i == currentSceneIndex);
+            boolean wasSelected = pill.isSelected();
+            pill.setSelected(active);
+            int targetColor = active ? activeColor : inactiveColor;
+            float targetAlpha = active ? 1.0f : 0.90f;
+            if (wasSelected != active && pill.isAttachedToWindow()) {
+                int startColor = pill.getCurrentTextColor();
+                android.animation.ValueAnimator colorAnim =
+                        android.animation.ValueAnimator.ofArgb(startColor, targetColor);
+                colorAnim.setDuration(200);
+                colorAnim.addUpdateListener(a -> pill.setTextColor((int) a.getAnimatedValue()));
+                colorAnim.start();
+                pill.animate().alpha(targetAlpha).setDuration(200).start();
+            } else {
+                pill.setTextColor(targetColor);
+                pill.setAlpha(targetAlpha);
+            }
         }
     }
 

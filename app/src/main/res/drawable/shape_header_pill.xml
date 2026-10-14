@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Material3 semi-transparent glass pill with 8% white ripple (#14FFFFFF)
+     and 12% white border (#1FFFFFFF) when inactive / luminous glass when active. -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="@color/m3_glass_ripple">
+    <item android:id="@android:id/mask">
+        <shape android:shape="rectangle">
+            <solid android:color="#FFFFFFFF" />
+            <corners android:radius="@dimen/scene_pill_radius" />
+        </shape>
+    </item>
+    <item>
+        <selector>
+            <item android:state_selected="true">
+                <layer-list>
+                    <item>
+                        <shape android:shape="rectangle">
+                            <solid android:color="@color/m3_glass_pill_active_bg" />
+                            <corners android:radius="@dimen/scene_pill_radius" />
+                            <stroke
+                                android:width="1dp"
+                                android:color="@color/m3_glass_pill_active_stroke" />
+                        </shape>
+                    </item>
+                    <item>
+                        <shape android:shape="rectangle">
+                            <gradient
+                                android:angle="270"
+                                android:startColor="@color/m3_glass_gradient_start"
+                                android:endColor="@color/m3_glass_gradient_end"
+                                android:type="linear" />
+                            <corners android:radius="@dimen/scene_pill_radius" />
+                        </shape>
+                    </item>
+                </layer-list>
+            </item>
+            <item>
+                <shape android:shape="rectangle">
+                    <solid android:color="@color/m3_glass_pill_inactive_bg" />
+                    <corners android:radius="@dimen/scene_pill_radius" />
+                    <stroke
+                        android:width="1dp"
+                        android:color="@color/m3_glass_pill_inactive_stroke" />
+                </shape>
+            </item>
+        </selector>
+    </item>
+</ripple>

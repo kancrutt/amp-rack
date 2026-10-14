@@ -11,12 +11,14 @@
          (S23 landscape width 825dp >= 600). Telemetry proof: 454px/160dp. -->
     <dimen name="signal_chain_card_height">64dp</dimen>
     <dimen name="param_gear_col_width">115dp</dimen>
-    <dimen name="rack_top_bar_height">40dp</dimen>
-    <!-- Header auto-fit caps: text height ~55-70% of the header row height. -->
-    <dimen name="top_text_max">20sp</dimen>
+    <dimen name="rack_top_bar_height">48dp</dimen>
+    <!-- Header auto-fit caps: Material3 HeadlineSmall (24sp) & LabelMedium (12sp) -->
+    <dimen name="top_text_max">24sp</dimen>
     <dimen name="top_preset_name_width">150dp</dimen>
-    <dimen name="scene_pill_height">36dp</dimen>
-    <dimen name="scene_pill_text_max">16sp</dimen>
+    <dimen name="scene_pill_height">32dp</dimen>
+    <dimen name="scene_pill_text_max">12sp</dimen>
+    <dimen name="scene_pill_text_min">9sp</dimen>
+    <dimen name="scene_pill_radius">12dp</dimen>
 
     <!-- Dynamic Rotary Knob & Label Scaling for Phones -->
     <dimen name="knob_size_large">52dp</dimen>

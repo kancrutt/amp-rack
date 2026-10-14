@@ -135,4 +135,13 @@
     <attr name="color_cat_wah_inactive" format="color" />
     <attr name="color_cat_volume_inactive" format="color" />
     <attr name="color_cat_noisegate_inactive" format="color" />
+
+    <!-- Material3 Glass Morphism Header Attributes -->
+    <declare-styleable name="GlassMorphismHeader">
+        <attr name="glassBlurRadius" format="dimension" />
+        <attr name="glassBackgroundAlpha" format="float" />
+        <attr name="glassCornerRadius" format="dimension" />
+        <attr name="glassStrokeWidth" format="dimension" />
+        <attr name="glassStrokeColor" format="color" />
+    </declare-styleable>
 </resources>
